@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "881801623559",
+    "project_id": "parisapp-7c377",
+    "storage_bucket": "parisapp-7c377.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:881801623559:android:35e7bc3c9d946104b612a2",
+        "android_client_info": {
+          "package_name": "com.example.paris_curtian_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDQ2FJb6rztI9H1fgow7008XSci34kkNTo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
