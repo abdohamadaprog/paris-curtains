@@ -1,88 +1,128 @@
 import 'package:flutter/material.dart';
-
 import '../../../core/constants/app_colors.dart';
 
-// 1. شريط الخطوات (Stepper)
+class UploadStyle {
+  UploadStyle._();
+
+  static const Color gold = AppColors.primaryGold;
+  static const Color goldLight = AppColors.lightGold;
+  static const Color background = Color(0xFF101116);
+  static const Color surface = Color(0xFF1A1B23);
+  static const Color surfaceLight = Color(0xFF24252E);
+  static const Color textPrimary = Color(0xFFF8F5EF);
+  static const Color textSecondary = Color(0xFFB8B5AF);
+  static const Color border = Color(0xFF393943);
+  static const Color success = Color(0xFF72C69A);
+  static const Color danger = Color(0xFFE57373);
+
+  static const double radius = 18;
+
+  static const TextStyle heading = TextStyle(
+    fontFamily: 'Cairo',
+    fontSize: 17,
+    fontWeight: FontWeight.bold,
+    color: textPrimary,
+  );
+
+  static const TextStyle body = TextStyle(
+    fontFamily: 'Cairo',
+    fontSize: 13,
+    color: textSecondary,
+  );
+}
+
 class NeonStepper extends StatelessWidget {
   final int currentStep;
+
   const NeonStepper({super.key, required this.currentStep});
 
   @override
   Widget build(BuildContext context) {
+    const labels = ['الصور', 'التفاصيل', 'النشر'];
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      decoration: BoxDecoration(
+        color: UploadStyle.surface,
+        borderRadius: BorderRadius.circular(UploadStyle.radius),
+        border: Border.all(color: UploadStyle.border),
+      ),
       child: Row(
         children: [
-          _buildStep(0, "الصورة"),
-          _buildLine(0),
-          _buildStep(1, "التفاصيل"),
-          _buildLine(1),
-          _buildStep(2, "حفظ"),
+          for (int i = 0; i < labels.length; i++) ...[
+            _step(i, labels[i]),
+            if (i < labels.length - 1) Expanded(child: _line(i)),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildStep(int index, String title) {
-    bool isActive = currentStep >= index;
+  Widget _step(int index, String label) {
+    final completed = currentStep > index;
+    final active = currentStep >= index;
+
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          width: 35,
-          height: 35,
+          duration: const Duration(milliseconds: 220),
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: isActive ? AppColors.neonGold : Colors.transparent,
+            color: active ? UploadStyle.gold : UploadStyle.surfaceLight,
             border: Border.all(
-              color: isActive ? AppColors.neonGold : Colors.white24,
+              color: active ? UploadStyle.gold : UploadStyle.border,
             ),
-            boxShadow: isActive
-                ? [
-                    BoxShadow(
-                      color: AppColors.neonGold.withOpacity(0.6),
-                      blurRadius: 10,
-                    ),
-                  ]
-                : [],
           ),
           child: Center(
-            child: isActive
-                ? const Icon(Icons.check, color: Colors.black, size: 20)
+            child: completed
+                ? const Icon(
+                    Icons.check_rounded,
+                    size: 20,
+                    color: UploadStyle.background,
+                  )
                 : Text(
-                    "${index + 1}",
+                    '${index + 1}',
                     style: TextStyle(
                       fontFamily: 'Cairo',
                       fontWeight: FontWeight.bold,
-                      color: Colors.white54,
+                      color: active
+                          ? UploadStyle.background
+                          : UploadStyle.textSecondary,
                     ),
                   ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 7),
         Text(
-          title,
+          label,
           style: TextStyle(
             fontFamily: 'Cairo',
-            fontSize: 10,
-            color: isActive ? Colors.white : Colors.white24,
+            fontSize: 11,
+            fontWeight: active ? FontWeight.bold : FontWeight.normal,
+            color: active ? UploadStyle.goldLight : UploadStyle.textSecondary,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildLine(int index) {
-    return Expanded(
-      child: Container(
-        height: 2,
-        color: currentStep >= index + 1 ? AppColors.neonGold : Colors.white12,
+  Widget _line(int index) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      height: 2,
+      margin: const EdgeInsets.only(left: 8, right: 8, bottom: 20),
+      decoration: BoxDecoration(
+        color: currentStep > index ? UploadStyle.gold : UploadStyle.border,
+        borderRadius: BorderRadius.circular(4),
       ),
     );
   }
 }
 
-// 2. زرار نيون (Neon Button)
 class NeonButton extends StatelessWidget {
   final String text;
   final VoidCallback onTap;
@@ -99,22 +139,29 @@ class NeonButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 55,
+      height: 54,
       child: ElevatedButton(
+        onPressed: onTap,
         style: ElevatedButton.styleFrom(
-          backgroundColor: isPrimary ? AppColors.neonGold : Colors.transparent,
-          foregroundColor: isPrimary ? Colors.black : Colors.white,
-          side: isPrimary ? null : const BorderSide(color: Colors.white24),
+          elevation: isPrimary ? 2 : 0,
+          shadowColor: UploadStyle.gold.withOpacity(0.16),
+          backgroundColor: isPrimary ? UploadStyle.gold : UploadStyle.surface,
+          foregroundColor: isPrimary
+              ? UploadStyle.background
+              : UploadStyle.textPrimary,
+          side: BorderSide(
+            color: isPrimary ? UploadStyle.gold : UploadStyle.border,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(15),
           ),
         ),
-        onPressed: onTap,
         child: Text(
           text,
-          style: TextStyle(
+          textAlign: TextAlign.center,
+          style: const TextStyle(
             fontFamily: 'Cairo',
-            fontSize: 16,
+            fontSize: 15,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -123,7 +170,6 @@ class NeonButton extends StatelessWidget {
   }
 }
 
-// 3. كارت الاختيار الزجاجي (Glass Selection Card)
 class GlassSelectionCard extends StatelessWidget {
   final String title;
   final String? value;
@@ -140,63 +186,70 @@ class GlassSelectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    bool isSelected = value != null;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 90,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: AppColors.glassWhite,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(
-            color: isSelected ? AppColors.neonGold : Colors.white10,
+    final selected = value != null;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          constraints: const BoxConstraints(minHeight: 108),
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 12),
+          decoration: BoxDecoration(
+            color: selected
+                ? UploadStyle.gold.withOpacity(0.08)
+                : UploadStyle.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected ? UploadStyle.gold : UploadStyle.border,
+              width: selected ? 1.3 : 1,
+            ),
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppColors.neonGold.withOpacity(0.1),
-                    blurRadius: 10,
-                  ),
-                ]
-              : [],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? AppColors.neonGold : Colors.white54,
-              size: 24,
-            ),
-            const SizedBox(height: 5),
-            Text(
-              title,
-              style: TextStyle(
-                fontFamily: 'Cairo',
-                fontSize: 10,
-                color: Colors.white38,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 25,
+                color: selected
+                    ? UploadStyle.goldLight
+                    : UploadStyle.textSecondary,
               ),
-            ),
-            Text(
-              value ?? "اختر",
-              style: TextStyle(
-                fontFamily: 'Cairo',
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? Colors.white : Colors.white24,
+              const SizedBox(height: 7),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 11,
+                  color: UploadStyle.textSecondary,
+                ),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+              const SizedBox(height: 3),
+              Text(
+                value ?? 'اضغط للاختيار',
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: selected
+                      ? UploadStyle.goldLight
+                      : UploadStyle.textPrimary,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// 4. خيار الفئة (Category Option)
 class CategoryOptionCard extends StatelessWidget {
   final String title;
   final IconData icon;
@@ -213,43 +266,58 @@ class CategoryOptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color activeColor = title == "إكسسوارات"
-        ? AppColors.neonOrange
-        : AppColors.neonCyan;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? activeColor.withOpacity(0.2)
-              : AppColors.glassWhite,
-          border: Border.all(color: isSelected ? activeColor : Colors.white10),
-          borderRadius: BorderRadius.circular(15),
-          boxShadow: isSelected
-              ? [BoxShadow(color: activeColor.withOpacity(0.3), blurRadius: 10)]
-              : [],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? activeColor : Colors.white54,
-              size: 24,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          constraints: const BoxConstraints(minHeight: 88),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? UploadStyle.gold.withOpacity(0.09)
+                : UploadStyle.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected ? UploadStyle.gold : UploadStyle.border,
+              width: isSelected ? 1.3 : 1,
             ),
-            const SizedBox(height: 5),
-            Text(
-              title,
-              style: TextStyle(
-                fontFamily: 'Cairo',
-                color: isSelected ? Colors.white : Colors.white54,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 25,
+                color: isSelected
+                    ? UploadStyle.goldLight
+                    : UploadStyle.textSecondary,
               ),
-            ),
-          ],
+              const SizedBox(height: 6),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected
+                      ? UploadStyle.goldLight
+                      : UploadStyle.textPrimary,
+                ),
+              ),
+              if (isSelected) ...[
+                const SizedBox(height: 4),
+                const Icon(
+                  Icons.check_circle_rounded,
+                  size: 15,
+                  color: UploadStyle.gold,
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
