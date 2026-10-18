@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -54,13 +54,13 @@ class _UploadImagePageState extends State<UploadImagePage> {
 
   final List<String> _curtainCategories = [
     'ويفي',
+    'دابل ويفي',
     'حلقات كبس',
     'مواسير',
     'بلتكانة',
   ];
 
-  final List<File> _selectedImages = [];
-
+  final List<XFile> _selectedImages = [];
   int _currentStep = 0;
   int _totalImages = 0;
   int _uploadedCount = 0;
@@ -89,24 +89,6 @@ class _UploadImagePageState extends State<UploadImagePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: UploadStyle.background,
-      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
-      floatingActionButton:
-          (!_isUploading && _currentStep == 0 && !_isAccessoryMode)
-          ? FloatingActionButton.extended(
-              onPressed: _pickAccessoryImagesOnly,
-              backgroundColor: UploadStyle.surfaceLight,
-              foregroundColor: UploadStyle.goldLight,
-              elevation: 3,
-              icon: const Icon(Icons.category_rounded),
-              label: const Text(
-                'رفع إكسسوارات',
-                style: TextStyle(
-                  fontFamily: 'Cairo',
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            )
-          : null,
       body: Stack(
         children: [
           const _BackgroundGlow(),
@@ -251,6 +233,23 @@ class _UploadImagePageState extends State<UploadImagePage> {
           icon: Icons.add_photo_alternate_outlined,
           onTap: _pickImages,
         ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: _isUploading ? null : _pickAccessoryImagesOnly,
+          icon: const Icon(Icons.category_rounded),
+          label: const Text(
+            'رفع إكسسوارات بدل صور الستاير',
+            style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold),
+          ),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: UploadStyle.goldLight,
+            side: const BorderSide(color: UploadStyle.gold),
+            minimumSize: const Size.fromHeight(48),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        ),
         const SizedBox(height: 16),
         _buildSelectedImages(),
         const SizedBox(height: 20),
@@ -329,6 +328,7 @@ class _UploadImagePageState extends State<UploadImagePage> {
             final category = _curtainCategories[index];
             final icons = <IconData>[
               Icons.waves_rounded,
+              Icons.waves_outlined,
               Icons.circle_outlined,
               Icons.horizontal_distribute_rounded,
               Icons.curtains_closed_outlined,
@@ -889,16 +889,17 @@ class _UploadImagePageState extends State<UploadImagePage> {
       if (!mounted || images.isEmpty) return;
 
       setState(() {
-        final existing = _selectedImages.map((f) => f.path).toSet();
+        final existing = _selectedImages.map((image) => image.path).toSet();
 
         for (final image in images) {
           if (existing.add(image.path)) {
-            _selectedImages.add(File(image.path));
+            _selectedImages.add(image);
           }
         }
       });
     } catch (e) {
       debugPrint('Image picker error: $e');
+
       if (mounted) {
         _showMessage('تعذر اختيار الصور. حاول مرة أخرى.', isError: true);
       }
@@ -921,17 +922,19 @@ class _UploadImagePageState extends State<UploadImagePage> {
         _selectedCategory = 'إكسسوارات';
         _selectedAccessoryType = null;
         _currentStep = 0;
+        _selectedImages.clear();
 
-        final existing = _selectedImages.map((f) => f.path).toSet();
+        final existing = <String>{};
 
         for (final image in images) {
           if (existing.add(image.path)) {
-            _selectedImages.add(File(image.path));
+            _selectedImages.add(image);
           }
         }
       });
     } catch (e) {
       debugPrint('Accessory picker error: $e');
+
       if (mounted) {
         _showMessage('تعذر اختيار الصور. حاول مرة أخرى.', isError: true);
       }
