@@ -12,6 +12,7 @@ import 'upload_image_page.dart';
 import 'gallery_management_page.dart';
 import 'installation_agenda_page.dart';
 import 'promo_management_page.dart';
+import 'upload_queue_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -111,6 +112,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   ),
 
                   const SizedBox(height: 26),
+
                   _sectionTitle(
                     'إدارة المعرض والمحتوى',
                     'تحكم في الصور وطريقة عرضها',
@@ -126,6 +128,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     color: _cyan,
                     onTap: () => _navTo(const GalleryManagementPage()),
                   ),
+
                   _buildFeatureCard(
                     title: 'ترتيب الصور',
                     subtitle: 'تغيير ترتيب ظهور الصور',
@@ -133,6 +136,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     color: _green,
                     onTap: () => _navTo(const GalleryReorderPage()),
                   ),
+
                   _buildFeatureCard(
                     title: 'صور السلايدر والعروض',
                     subtitle: 'إدارة الصور الظاهرة في الواجهة',
@@ -141,7 +145,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     onTap: () => _navTo(const PromoManagementPage()),
                   ),
 
+                  // متابعة عمليات رفع الصور
+                  _buildFeatureCard(
+                    title: 'متابعة رفع الصور',
+                    subtitle: 'عرض حالة الرفع وإعادة محاولة الصور الفاشلة',
+                    icon: Icons.cloud_sync_rounded,
+                    color: _purple,
+                    onTap: () => _navTo(const UploadQueuePage()),
+                  ),
+
                   const SizedBox(height: 18),
+
                   _sectionTitle(
                     'إعدادات وتقارير',
                     'الأمان ومتابعة بيانات التطبيق',
@@ -177,6 +191,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   const SizedBox(height: 24),
                   _buildHomeButton(),
                   const SizedBox(height: 18),
+
                   const Center(
                     child: Text(
                       'PARIS CURTAINS • ADMIN',
@@ -228,6 +243,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ),
               ),
               const SizedBox(width: 12),
+
               const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -254,6 +270,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   ],
                 ),
               ),
+
               Container(
                 padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
@@ -268,7 +285,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ),
             ],
           ),
+
           const SizedBox(height: 22),
+
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             decoration: BoxDecoration(
@@ -371,6 +390,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           child: Icon(icon, color: color, size: 21),
         ),
         const SizedBox(width: 11),
+
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -433,6 +453,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   child: Icon(icon, color: color, size: 24),
                 ),
                 const SizedBox(width: 13),
+
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -458,6 +479,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     ],
                   ),
                 ),
+
                 Icon(
                   Icons.arrow_forward_ios_rounded,
                   color: color.withOpacity(0.8),
@@ -493,6 +515,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             children: [
               Icon(Icons.home_rounded, color: _gold, size: 25),
               SizedBox(width: 12),
+
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -518,6 +541,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   ],
                 ),
               ),
+
               Icon(Icons.arrow_back_ios_new_rounded, color: _muted, size: 15),
             ],
           ),
@@ -582,8 +606,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       ? null
                       : (value) async {
                           final success = await _toggleBiometrics(value);
+
                           if (success) {
-                            setStateDialog(() => isEnabled = value);
+                            setStateDialog(() {
+                              isEnabled = value;
+                            });
                           }
                         },
                 );
@@ -620,11 +647,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         if (mounted) {
           _showSnack('تم تفعيل البصمة بنجاح', _green);
         }
+
         return true;
       } catch (_) {
         if (mounted) {
           _showSnack('تعذر تفعيل البصمة على هذا الجهاز', AppColors.neonRed);
         }
+
         return false;
       }
     } else {
@@ -633,6 +662,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       if (mounted) {
         _showSnack('تم إلغاء تفعيل البصمة', _gold);
       }
+
       return true;
     }
   }

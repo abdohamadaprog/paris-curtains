@@ -1,13 +1,11 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../services/upload_queue_service.dart';
 import '../widgets/upload_widgets.dart';
 
 class UploadImagePage extends StatefulWidget {
@@ -54,17 +52,15 @@ class _UploadImagePageState extends State<UploadImagePage> {
 
   final List<String> _curtainCategories = [
     'ويفي',
-    'دابل ويفي',
     'حلقات كبس',
     'مواسير',
     'بلتكانة',
   ];
 
   final List<XFile> _selectedImages = [];
+  final Map<String, Future<Uint8List>> _imageBytesCache = {};
+
   int _currentStep = 0;
-  int _totalImages = 0;
-  int _uploadedCount = 0;
-  int _failedCount = 0;
 
   bool _isUploading = false;
   bool _isAccessoryMode = false;
@@ -76,19 +72,28 @@ class _UploadImagePageState extends State<UploadImagePage> {
 
   double _rating = 5;
 
-  static const String _cloudinaryUrl =
-      'https://api.cloudinary.com/v1_1/dlmx10dic/image/upload';
-  static const String _uploadPreset = 'curtains_upload';
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: UploadStyle.background,
+      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
+      floatingActionButton:
+          (!_isUploading && _currentStep == 0 && !_isAccessoryMode)
+          ? FloatingActionButton.extended(
+              onPressed: _pickAccessoryImagesOnly,
+              backgroundColor: UploadStyle.surfaceLight,
+              foregroundColor: UploadStyle.goldLight,
+              elevation: 3,
+              icon: const Icon(Icons.category_rounded),
+              label: const Text(
+                'رفع إكسسوارات',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            )
+          : null,
       body: Stack(
         children: [
           const _BackgroundGlow(),
@@ -233,23 +238,6 @@ class _UploadImagePageState extends State<UploadImagePage> {
           icon: Icons.add_photo_alternate_outlined,
           onTap: _pickImages,
         ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: _isUploading ? null : _pickAccessoryImagesOnly,
-          icon: const Icon(Icons.category_rounded),
-          label: const Text(
-            'رفع إكسسوارات بدل صور الستاير',
-            style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold),
-          ),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: UploadStyle.goldLight,
-            side: const BorderSide(color: UploadStyle.gold),
-            minimumSize: const Size.fromHeight(48),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-        ),
         const SizedBox(height: 16),
         _buildSelectedImages(),
         const SizedBox(height: 20),
@@ -328,7 +316,6 @@ class _UploadImagePageState extends State<UploadImagePage> {
             final category = _curtainCategories[index];
             final icons = <IconData>[
               Icons.waves_rounded,
-              Icons.waves_outlined,
               Icons.circle_outlined,
               Icons.horizontal_distribute_rounded,
               Icons.curtains_closed_outlined,
@@ -365,6 +352,7 @@ class _UploadImagePageState extends State<UploadImagePage> {
                     );
                     return;
                   }
+
                   setState(() => _currentStep = 2);
                 },
               ),
@@ -390,21 +378,17 @@ class _UploadImagePageState extends State<UploadImagePage> {
         const SizedBox(height: 24),
         _buildRatingCard(),
         const SizedBox(height: 24),
-        if (_isUploading)
-          _buildUploadProgress()
-        else ...[
-          NeonButton(
-            text: 'نشر الستاير الآن',
-            isPrimary: true,
-            onTap: _uploadAllImages,
-          ),
-          const SizedBox(height: 12),
-          NeonButton(
-            text: 'رجوع للتفاصيل',
-            isPrimary: false,
-            onTap: () => setState(() => _currentStep = 1),
-          ),
-        ],
+        NeonButton(
+          text: 'نشر الستاير الآن',
+          isPrimary: true,
+          onTap: _uploadAllImages,
+        ),
+        const SizedBox(height: 12),
+        NeonButton(
+          text: 'رجوع للتفاصيل',
+          isPrimary: false,
+          onTap: () => setState(() => _currentStep = 1),
+        ),
       ],
     );
   }
@@ -477,28 +461,25 @@ class _UploadImagePageState extends State<UploadImagePage> {
         const SizedBox(height: 24),
         _buildRatingCard(),
         const SizedBox(height: 24),
-        if (_isUploading)
-          _buildUploadProgress()
-        else
-          Row(
-            children: [
-              Expanded(
-                child: NeonButton(
-                  text: 'إلغاء',
-                  isPrimary: false,
-                  onTap: _confirmCancelAccessoryMode,
-                ),
+        Row(
+          children: [
+            Expanded(
+              child: NeonButton(
+                text: 'إلغاء',
+                isPrimary: false,
+                onTap: _confirmCancelAccessoryMode,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: NeonButton(
-                  text: 'نشر الإكسسوارات',
-                  isPrimary: true,
-                  onTap: _uploadAllImages,
-                ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: NeonButton(
+                text: 'نشر الإكسسوارات',
+                isPrimary: true,
+                onTap: _uploadAllImages,
               ),
-            ],
-          ),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -644,17 +625,7 @@ class _UploadImagePageState extends State<UploadImagePage> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(13),
-                  child: Image.file(
-                    file,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: UploadStyle.surfaceLight,
-                      child: const Icon(
-                        Icons.broken_image_outlined,
-                        color: UploadStyle.textSecondary,
-                      ),
-                    ),
-                  ),
+                  child: _buildImagePreview(file),
                 ),
                 Positioned(
                   top: 5,
@@ -666,8 +637,12 @@ class _UploadImagePageState extends State<UploadImagePage> {
                       customBorder: const CircleBorder(),
                       onTap: _isUploading
                           ? null
-                          : () =>
-                                setState(() => _selectedImages.removeAt(index)),
+                          : () {
+                              setState(() {
+                                final removed = _selectedImages.removeAt(index);
+                                _imageBytesCache.remove(removed.path);
+                              });
+                            },
                       child: const Padding(
                         padding: EdgeInsets.all(5),
                         child: Icon(
@@ -798,66 +773,6 @@ class _UploadImagePageState extends State<UploadImagePage> {
     );
   }
 
-  Widget _buildUploadProgress() {
-    final progress = _totalImages == 0
-        ? 0.0
-        : (_uploadedCount + _failedCount) / _totalImages;
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: UploadStyle.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: UploadStyle.gold.withOpacity(0.45)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Row(
-            children: [
-              SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.3,
-                  color: UploadStyle.gold,
-                ),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text('جاري نشر الصور...', style: UploadStyle.heading),
-              ),
-            ],
-          ),
-          const SizedBox(height: 15),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 7,
-              backgroundColor: UploadStyle.border,
-              valueColor: const AlwaysStoppedAnimation<Color>(UploadStyle.gold),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'تمت معالجة ${_uploadedCount + _failedCount} من $_totalImages صورة',
-            style: UploadStyle.body,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'ناجح: $_uploadedCount  •  فشل: $_failedCount',
-            style: const TextStyle(
-              fontFamily: 'Cairo',
-              fontSize: 12,
-              color: UploadStyle.textPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildInfoCard({required IconData icon, required String text}) {
     return Container(
       padding: const EdgeInsets.all(13),
@@ -877,28 +792,121 @@ class _UploadImagePageState extends State<UploadImagePage> {
     );
   }
 
+  String _imageExtension(XFile file) {
+    final candidate = file.name.isNotEmpty ? file.name : file.path;
+    final dot = candidate.lastIndexOf('.');
+    return dot < 0 ? '' : candidate.substring(dot + 1).toLowerCase();
+  }
+
+  bool _isSupportedImage(XFile file) {
+    return const {
+      'jpg',
+      'jpeg',
+      'png',
+      'webp',
+      'heic',
+      'heif',
+    }.contains(_imageExtension(file));
+  }
+
+  Widget _buildImagePreview(XFile file) {
+    final extension = _imageExtension(file);
+
+    if (extension == 'heic' || extension == 'heif') {
+      return Container(
+        color: UploadStyle.surfaceLight,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.all(8),
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.image_outlined, color: UploadStyle.goldLight, size: 30),
+            SizedBox(height: 6),
+            Text(
+              'HEIC / HEIF',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: UploadStyle.textSecondary,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              'ستظهر الصورة بعد الرفع',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: UploadStyle.textSecondary, fontSize: 9),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final bytesFuture = _imageBytesCache.putIfAbsent(
+      file.path,
+      () => file.readAsBytes(),
+    );
+
+    return FutureBuilder<Uint8List>(
+      future: bytesFuture,
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          return Image.memory(
+            snapshot.data!,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _imagePreviewError(),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return _imagePreviewError();
+        }
+
+        return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+      },
+    );
+  }
+
+  Widget _imagePreviewError() {
+    return Container(
+      color: UploadStyle.surfaceLight,
+      alignment: Alignment.center,
+      child: const Icon(
+        Icons.broken_image_outlined,
+        color: UploadStyle.textSecondary,
+      ),
+    );
+  }
+
   Future<void> _pickImages() async {
     if (_isUploading) return;
 
     try {
-      final images = await _picker.pickMultiImage(
-        imageQuality: 80,
-        maxWidth: 1400,
-      );
+      final images = await _picker.pickMultiImage();
 
       if (!mounted || images.isEmpty) return;
 
-      setState(() {
-        final existing = _selectedImages.map((image) => image.path).toSet();
+      final supportedImages = images.where(_isSupportedImage).toList();
 
-        for (final image in images) {
+      if (supportedImages.isEmpty) {
+        _showMessage(
+          'التنسيقات المدعومة: JPG وJPEG وPNG وWebP وHEIC وHEIF.',
+          isError: true,
+        );
+        return;
+      }
+
+      setState(() {
+        final existing = _selectedImages.map((f) => f.path).toSet();
+
+        for (final image in supportedImages) {
           if (existing.add(image.path)) {
             _selectedImages.add(image);
           }
         }
       });
-    } catch (e) {
-      debugPrint('Image picker error: $e');
+    } catch (error, stackTrace) {
+      debugPrint('Image picker error: $error');
+      debugPrintStack(stackTrace: stackTrace);
 
       if (mounted) {
         _showMessage('تعذر اختيار الصور. حاول مرة أخرى.', isError: true);
@@ -910,30 +918,37 @@ class _UploadImagePageState extends State<UploadImagePage> {
     if (_isUploading) return;
 
     try {
-      final images = await _picker.pickMultiImage(
-        imageQuality: 80,
-        maxWidth: 1400,
-      );
+      final images = await _picker.pickMultiImage();
 
       if (!mounted || images.isEmpty) return;
+
+      final supportedImages = images.where(_isSupportedImage).toList();
+
+      if (supportedImages.isEmpty) {
+        _showMessage(
+          'التنسيقات المدعومة: JPG وJPEG وPNG وWebP وHEIC وHEIF.',
+          isError: true,
+        );
+        return;
+      }
 
       setState(() {
         _isAccessoryMode = true;
         _selectedCategory = 'إكسسوارات';
         _selectedAccessoryType = null;
         _currentStep = 0;
-        _selectedImages.clear();
 
-        final existing = <String>{};
+        final existing = _selectedImages.map((f) => f.path).toSet();
 
-        for (final image in images) {
+        for (final image in supportedImages) {
           if (existing.add(image.path)) {
             _selectedImages.add(image);
           }
         }
       });
-    } catch (e) {
-      debugPrint('Accessory picker error: $e');
+    } catch (error, stackTrace) {
+      debugPrint('Accessory picker error: $error');
+      debugPrintStack(stackTrace: stackTrace);
 
       if (mounted) {
         _showMessage('تعذر اختيار الصور. حاول مرة أخرى.', isError: true);
@@ -987,7 +1002,9 @@ class _UploadImagePageState extends State<UploadImagePage> {
                           ),
                           backgroundColor: UploadStyle.surfaceLight,
                           side: const BorderSide(color: UploadStyle.border),
-                          onPressed: () => Navigator.pop(sheetContext, option),
+                          onPressed: () {
+                            Navigator.pop(sheetContext, option);
+                          },
                         );
                       }).toList(),
                     ),
@@ -1032,115 +1049,77 @@ class _UploadImagePageState extends State<UploadImagePage> {
       return;
     }
 
-    final images = List<File>.from(_selectedImages);
-    final category = _selectedCategory;
-    final accessoryType = _selectedAccessoryType;
-    final isAccessory = _isAccessoryMode;
-    final heavy = _selectedHeavy;
-    final light = _selectedLight;
-    final rating = _rating;
+    final files = List<XFile>.from(_selectedImages);
 
     setState(() {
       _isUploading = true;
-      _totalImages = images.length;
-      _uploadedCount = 0;
-      _failedCount = 0;
     });
 
-    for (final imageFile in images) {
-      try {
-        final request = http.MultipartRequest(
-          'POST',
-          Uri.parse(_cloudinaryUrl),
-        );
+    try {
+      await UploadQueueService.instance.enqueue(
+        files: files,
+        category: _selectedCategory,
+        rating: _rating,
+        isAccessory: _isAccessoryMode,
+        accessoryType: _selectedAccessoryType,
+        heavyFabric: _selectedHeavy,
+        lightFabric: _selectedLight,
+      );
 
-        request.fields['upload_preset'] = _uploadPreset;
-        request.files.add(
-          await http.MultipartFile.fromPath('file', imageFile.path),
-        );
+      if (!mounted) return;
 
-        final response = await request.send().timeout(
-          const Duration(minutes: 2),
-        );
-
-        final responseText = await response.stream.bytesToString();
-
-        if (response.statusCode != 200) {
-          throw Exception(
-            'Cloudinary HTTP ${response.statusCode}: $responseText',
-          );
-        }
-
-        final decoded = jsonDecode(responseText);
-
-        if (decoded is! Map<String, dynamic>) {
-          throw const FormatException('Invalid Cloudinary response');
-        }
-
-        final imageUrl = decoded['secure_url'];
-
-        if (imageUrl is! String || imageUrl.isEmpty) {
-          throw const FormatException('Missing secure_url');
-        }
-
-        final data = <String, dynamic>{
-          'url': imageUrl,
-          'category': category,
-          'rating': rating,
-          'created_at': FieldValue.serverTimestamp(),
-          'sort_order': 0,
-        };
-
-        if (isAccessory) {
-          data['accessory_type'] = accessoryType;
-        } else {
-          data['heavy_fabric'] = heavy;
-          data['light_fabric'] = light;
-        }
-
-        await FirebaseFirestore.instance
-            .collection('gallery_images')
-            .add(data)
-            .timeout(const Duration(seconds: 30));
-
-        if (!mounted) return;
-
-        setState(() {
-          _uploadedCount++;
-        });
-      } catch (e) {
-        debugPrint('Upload failed for ${imageFile.path}: $e');
-
-        if (!mounted) return;
-
-        setState(() {
-          _failedCount++;
-        });
-      }
-    }
-
-    if (!mounted) return;
-
-    setState(() {
-      _isUploading = false;
-    });
-
-    if (_failedCount == 0) {
-      _showMessage('تم نشر $_uploadedCount صورة بنجاح 🎉', isError: false);
+      _showMessage(
+        'تمت إضافة ${files.length} صورة لطابور الرفع.',
+        isError: false,
+      );
 
       Navigator.pop(context, true);
-      return;
+    } catch (error, stackTrace) {
+      debugPrint('Failed to enqueue images: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
+
+      setState(() {
+        _isUploading = false;
+      });
+
+      _showMessage(
+        'تعذر بدء رفع الصور. راجع الخطأ وحاول مرة أخرى.',
+        isError: true,
+      );
+    }
+  }
+
+  String _friendlyUploadError(Object error) {
+    final raw = error.toString();
+    final cloudinaryStart = raw.indexOf('{');
+
+    if (cloudinaryStart >= 0) {
+      try {
+        final decoded = jsonDecode(raw.substring(cloudinaryStart));
+
+        if (decoded is Map &&
+            decoded['error'] is Map &&
+            decoded['error']['message'] != null) {
+          return decoded['error']['message'].toString();
+        }
+      } catch (_) {}
     }
 
-    _showMessage(
-      'نجح $_uploadedCount صورة، وفشل $_failedCount. '
-      'تقدر تعيد محاولة نشر الصور المتبقية.',
-      isError: true,
-    );
+    if (raw.contains('SocketException') || raw.contains('Failed host lookup')) {
+      return 'مشكلة اتصال بالإنترنت أو تعذّر الوصول إلى خادم الصور.';
+    }
 
-    // الاحتفاظ بالصور المختارة حتى لا تضيع اختيارات المستخدم.
-    // زر إعادة المحاولة سيعيد العملية لكل الصور؛ لذلك لا نعرضه هنا
-    // لتجنب إنشاء مستندات مكررة للصور الناجحة.
+    if (raw.contains('TimeoutException')) {
+      return 'انتهت مهلة الرفع؛ جرّب مرة أخرى.';
+    }
+
+    if (raw.contains('FirebaseException')) {
+      return 'تعذّر حفظ بيانات الصورة في Firebase: $raw';
+    }
+
+    return raw.replaceFirst('Exception: ', '').replaceFirst('Bad state: ', '');
   }
 
   void _showMessage(String message, {required bool isError}) {
@@ -1161,7 +1140,7 @@ class _UploadImagePageState extends State<UploadImagePage> {
 
   Future<void> _confirmExit() async {
     if (_isUploading) {
-      _showMessage('استنى لحد ما عملية النشر تخلص.', isError: true);
+      _showMessage('جاري إضافة الصور لطابور الرفع، استنى لحظة.', isError: true);
       return;
     }
 
