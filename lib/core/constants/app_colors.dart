@@ -31,6 +31,14 @@ class AppColors {
   static const Color neonRed = danger;
   static const Color neonPurple = primaryGold;
 
+  // --- تدرج الذهب الفاخر (للعناوين والأزرار والإطارات) ---
+  static const Color goldDeep = Color(0xFF9A7338);
+  static const LinearGradient goldGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [lightGold, primaryGold, goldDeep],
+  );
+
   static const Color glassWhite = Color(0x14FFFFFF);
   static const Color glassDark = Color(0x99000000);
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/theme_manger.dart';
 import '../widgets/gallery_grid.dart';
+import '../widgets/gallery_widgets.dart';
 
 class AccessoriesGalleryPage extends StatefulWidget {
   const AccessoriesGalleryPage({super.key});
@@ -12,8 +13,6 @@ class AccessoriesGalleryPage extends StatefulWidget {
 }
 
 class _AccessoriesGalleryPageState extends State<AccessoriesGalleryPage> {
-  static const Color _gold = AppColors.primaryGold;
-
   String _selectedType = 'الكل';
   int _gridCount = 2;
 
@@ -36,114 +35,247 @@ class _AccessoriesGalleryPageState extends State<AccessoriesGalleryPage> {
       listenable: themeManger,
       builder: (context, child) {
         final isDarkMode = themeManger.isDarkMode;
-        final theme = Theme.of(context);
-        final background = theme.scaffoldBackgroundColor;
-        final textColor = theme.colorScheme.onSurface;
-        final accent = _gold;
 
-        return Scaffold(
-          backgroundColor: background,
-          appBar: AppBar(
-            backgroundColor: background,
-            elevation: 0,
-            centerTitle: true,
-            title: Text(
-              'كتالوج الإكسسوارات',
-              style: TextStyle(
-                fontFamily: 'Aref Ruqaa',
-                color: textColor,
-                fontWeight: FontWeight.bold,
-                fontSize: 24,
-              ),
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: isDarkMode
+                  ? const [Color(0xFF1C1B25), AppColors.bgDark]
+                  : const [AppColors.bgCreamy, AppColors.background],
             ),
-            leading: IconButton(
-              icon: Icon(Icons.arrow_back_ios, color: textColor),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            actions: [
-              IconButton(
-                tooltip: 'تغيير المظهر',
-                onPressed: () => themeManger.toggleTheme(),
-                icon: Icon(
-                  isDarkMode ? Icons.wb_sunny : Icons.nightlight_round,
-                  color: accent,
-                ),
-              ),
-            ],
           ),
-          body: Column(
-            children: [
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 45,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _accessoryTypes.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    final type = _accessoryTypes[index];
-                    final selected = _selectedType == type;
-
-                    return ChoiceChip(
-                      label: Text(type),
-                      selected: selected,
-                      showCheckmark: false,
-                      onSelected: (_) {
-                        setState(() => _selectedType = type);
-                      },
-                      selectedColor: accent,
-                      backgroundColor: isDarkMode
-                          ? const Color(0xFF25221D)
-                          : const Color(0xFFF3EFE6),
-                      side: BorderSide(
-                        color: selected
-                            ? accent
-                            : theme.dividerColor.withValues(alpha: 0.4),
-                      ),
-                      labelStyle: TextStyle(
-                        fontFamily: 'Cairo',
-                        color: selected ? const Color(0xFF211D15) : textColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    );
-                  },
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              centerTitle: true,
+              leadingWidth: 64,
+              leading: Padding(
+                padding: const EdgeInsetsDirectional.only(start: 14),
+                child: Center(
+                  child: _CircleIconButton(
+                    tooltip: 'رجوع',
+                    icon: Icons.arrow_back_ios_new_rounded,
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
+              title: Text(
+                'كتالوج الإكسسوارات',
+                style: TextStyle(
+                  fontFamily: 'Aref Ruqaa',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 26,
+                  color: isDarkMode ? AppColors.lightGold : AppColors.goldDeep,
+                ),
+              ),
+              actions: [
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 14),
+                  child: _CircleIconButton(
+                    tooltip: isDarkMode ? 'الوضع الفاتح' : 'الوضع الداكن',
+                    icon: isDarkMode
+                        ? Icons.light_mode_rounded
+                        : Icons.dark_mode_rounded,
+                    onPressed: () => themeManger.toggleTheme(),
+                  ),
+                ),
+              ],
+            ),
+            body: Column(
+              children: [
+                SectionTitle(
+                  title: 'اختر نوع الإكسسوار',
+                  padding: const EdgeInsetsDirectional.fromSTEB(16, 6, 16, 12),
+                  trailing: _GridCountButton(
+                    count: _gridCount,
+                    onTap: () {
                       setState(() {
                         _gridCount = _gridCount == 4 ? 2 : _gridCount + 1;
                       });
                     },
-                    icon: const Icon(Icons.grid_view_rounded, size: 18),
-                    label: Text('×$_gridCount'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: textColor,
-                      side: BorderSide(color: accent.withValues(alpha: 0.6)),
-                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Expanded(
-                child: GalleryGrid(
-                  category: 'إكسسوارات',
-                  accessoryType: _selectedType,
-                  isNeonMode: isDarkMode,
-                  accentColor: accent,
-                  crossAxisCount: _gridCount,
+                SizedBox(
+                  height: 46,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: _accessoryTypes.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final type = _accessoryTypes[index];
+
+                      return _TypeChip(
+                        label: type,
+                        selected: _selectedType == type,
+                        isDark: isDarkMode,
+                        onTap: () => setState(() => _selectedType = type),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Expanded(
+                  child: GalleryGrid(
+                    category: 'إكسسوارات',
+                    accessoryType: _selectedType,
+                    crossAxisCount: _gridCount,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CircleIconButton extends StatelessWidget {
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  const _CircleIconButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const gold = AppColors.primaryGold;
+
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: gold.withValues(alpha: 0.1),
+        shape: CircleBorder(
+          side: BorderSide(color: gold.withValues(alpha: 0.35)),
+        ),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onPressed,
+          child: SizedBox(
+            width: 42,
+            height: 42,
+            child: Icon(icon, color: gold, size: 20),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GridCountButton extends StatelessWidget {
+  final int count;
+  final VoidCallback onTap;
+
+  const _GridCountButton({required this.count, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    const gold = AppColors.primaryGold;
+
+    return Material(
+      color: gold.withValues(alpha: 0.1),
+      shape: StadiumBorder(
+        side: BorderSide(color: gold.withValues(alpha: 0.45)),
+      ),
+      child: InkWell(
+        customBorder: const StadiumBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.grid_view_rounded, size: 16, color: gold),
+              const SizedBox(width: 6),
+              Text(
+                '×$count',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: gold,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
           ),
-        );
-      },
+        ),
+      ),
+    );
+  }
+}
+
+class _TypeChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _TypeChip({
+    required this.label,
+    required this.selected,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      decoration: BoxDecoration(
+        gradient: selected ? AppColors.goldGradient : null,
+        color: selected
+            ? null
+            : (isDark ? AppColors.surfaceDark : Colors.white),
+        borderRadius: BorderRadius.circular(23),
+        border: Border.all(
+          color: selected
+              ? AppColors.lightGold
+              : AppColors.primaryGold.withValues(alpha: 0.35),
+        ),
+        boxShadow: selected
+            ? [
+                BoxShadow(
+                  color: AppColors.primaryGold.withValues(alpha: 0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ]
+            : const [],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(23),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: Center(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.bold,
+                  color: selected
+                      ? AppColors.bgDark
+                      : theme.colorScheme.onSurface,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

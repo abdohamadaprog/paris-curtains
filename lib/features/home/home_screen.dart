@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/constants/app_colors.dart';
 import '../../core/utils/theme_manger.dart';
 import 'screens/gallery_screen.dart';
 import 'screens/search_screen.dart';
@@ -17,24 +18,35 @@ class HomeScreen extends StatelessWidget {
 
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          body: SafeArea(
-            child: Column(
-              children: [
-                HomeAppBar(
-                  isDarkMode: isDarkMode,
-                  onSearch: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const SearchScreen(),
-                      ),
-                    );
-                  },
-                  onThemeToggle: () {
-                    themeManger.toggleTheme();
-                  },
-                ),
-                const Expanded(child: GalleryScreen()),
-              ],
+          body: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: isDarkMode
+                    ? const [Color(0xFF1C1B25), AppColors.bgDark]
+                    : const [AppColors.bgCreamy, AppColors.background],
+              ),
+            ),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  HomeAppBar(
+                    isDarkMode: isDarkMode,
+                    onSearch: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const SearchScreen(),
+                        ),
+                      );
+                    },
+                    onThemeToggle: () {
+                      themeManger.toggleTheme();
+                    },
+                  ),
+                  const Expanded(child: GalleryScreen()),
+                ],
+              ),
             ),
           ),
         );
