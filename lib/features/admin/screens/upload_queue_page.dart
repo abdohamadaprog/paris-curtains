@@ -105,7 +105,7 @@ class _UploadQueuePageState extends State<UploadQueuePage> {
                 ],
                 const SizedBox(height: 8),
                 const Text(
-                  'تستمر العملية أثناء التنقل داخل التطبيق. لا تغلق أو تعِد تحميل التبويب قبل انتهاء الرفع.',
+                  'تستمر العملية أثناء التنقل داخل التطبيق. لو اتقفل التطبيق أثناء الرفع، قد تحتاج لإعادة اختيار الصورة إذا لم يعد الملف الأصلي متاحًا.',
                   style: TextStyle(
                     color: Colors.white60,
                     fontFamily: 'Cairo',

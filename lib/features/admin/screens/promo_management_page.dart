@@ -28,13 +28,19 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
       'POST',
       Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/upload'),
     );
-    request.files.add(await http.MultipartFile.fromPath('file', image.path));
+    final bytes = await image.readAsBytes().timeout(const Duration(minutes: 2));
+    request.files.add(
+      http.MultipartFile.fromBytes('file', bytes, filename: image.name),
+    );
     request.fields['upload_preset'] = uploadPreset;
-    final response = await request.send();
-    if (response.statusCode != 200) {
-      throw Exception('فشل رفع الصورة');
+    final response = await request.send().timeout(const Duration(minutes: 3));
+    final responseBody = await response.stream.bytesToString().timeout(
+      const Duration(minutes: 1),
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Cloudinary HTTP ${response.statusCode}: $responseBody');
     }
-    final jsonResponse = jsonDecode(await response.stream.bytesToString());
+    final jsonResponse = jsonDecode(responseBody);
     return jsonResponse['secure_url'] as String;
   }
 
@@ -169,10 +175,7 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
                 color: AppColors.primaryGold.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(
-                Icons.low_priority,
-                color: AppColors.lightGold,
-              ),
+              child: const Icon(Icons.low_priority, color: AppColors.lightGold),
             ),
             tooltip: 'ترتيب العروض',
           ),
@@ -235,9 +238,9 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
           const SizedBox(height: 8),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
+              // Avoid excluding older promo records without sort_order.
               stream: FirebaseFirestore.instance
                   .collection('promo_images')
-                  .orderBy('sort_order')
                   .snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
@@ -247,7 +250,24 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
                     ),
                   );
                 }
-                final docs = snapshot.data!.docs;
+                final docs = snapshot.data!.docs.toList()
+                  ..sort((a, b) {
+                    final ad = a.data() as Map<String, dynamic>;
+                    final bd = b.data() as Map<String, dynamic>;
+                    final ao = ad['sort_order'];
+                    final bo = bd['sort_order'];
+                    if (ao is num && bo is num) {
+                      final byOrder = ao.compareTo(bo);
+                      if (byOrder != 0) return byOrder;
+                    } else if ((ao is num) != (bo is num)) {
+                      return ao is num ? -1 : 1;
+                    }
+                    final at = ad['created_at'];
+                    final bt = bd['created_at'];
+                    final am = at is Timestamp ? at.millisecondsSinceEpoch : 0;
+                    final bm = bt is Timestamp ? bt.millisecondsSinceEpoch : 0;
+                    return bm.compareTo(am);
+                  });
 
                 if (docs.isEmpty) {
                   return const Center(
@@ -296,11 +316,10 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
                                   strokeWidth: 2,
                                 ),
                               ),
-                              errorWidget: (context, url, error) =>
-                                  const Icon(
-                                    Icons.broken_image_outlined,
-                                    color: AppColors.lightGold,
-                                  ),
+                              errorWidget: (context, url, error) => const Icon(
+                                Icons.broken_image_outlined,
+                                color: AppColors.lightGold,
+                              ),
                             ),
                           ),
                           Padding(

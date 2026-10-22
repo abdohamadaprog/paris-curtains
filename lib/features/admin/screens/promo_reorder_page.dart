@@ -24,19 +24,30 @@ class _PromoReorderPageState extends State<PromoReorderPage> {
   // 1. جلب الصور (مرتبة)
   Future<void> _fetchImages() async {
     setState(() => _isLoading = true);
-    var query = FirebaseFirestore.instance.collection('promo_images');
-
-    // محاولة الجلب بالترتيب المحفوظ
-    var snapshot = await query.orderBy('sort_order').get();
-
-    // لو مفيش ترتيب (أول مرة)، بنجيب بالأحدث
-    if (snapshot.docs.isEmpty) {
-      var timeSnapshot = await query
-          .orderBy('created_at', descending: true)
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('promo_images')
           .get();
-      _images = timeSnapshot.docs;
-    } else {
-      _images = snapshot.docs;
+      _images = snapshot.docs.toList()
+        ..sort((a, b) {
+          final ad = a.data();
+          final bd = b.data();
+          final ao = ad['sort_order'];
+          final bo = bd['sort_order'];
+          if (ao is num && bo is num) {
+            final byOrder = ao.compareTo(bo);
+            if (byOrder != 0) return byOrder;
+          } else if ((ao is num) != (bo is num)) {
+            return ao is num ? -1 : 1;
+          }
+          final at = ad['created_at'];
+          final bt = bd['created_at'];
+          final am = at is Timestamp ? at.millisecondsSinceEpoch : 0;
+          final bm = bt is Timestamp ? bt.millisecondsSinceEpoch : 0;
+          return bm.compareTo(am);
+        });
+    } catch (error) {
+      if (mounted) _showSnack('تعذر تحميل العروض: $error', Colors.red);
     }
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -65,11 +76,16 @@ class _PromoReorderPageState extends State<PromoReorderPage> {
   Future<void> _saveOrder() async {
     setState(() => _isLoading = true);
     try {
-      WriteBatch batch = FirebaseFirestore.instance.batch();
-      for (int i = 0; i < _images.length; i++) {
-        batch.update(_images[i].reference, {'sort_order': i});
+      for (var start = 0; start < _images.length; start += 450) {
+        final batch = FirebaseFirestore.instance.batch();
+        final end = (start + 450 < _images.length)
+            ? start + 450
+            : _images.length;
+        for (var i = start; i < end; i++) {
+          batch.update(_images[i].reference, {'sort_order': i});
+        }
+        await batch.commit();
       }
-      await batch.commit();
 
       if (mounted) {
         _showSnack("تم حفظ ترتيب العروض ✅", Colors.green);

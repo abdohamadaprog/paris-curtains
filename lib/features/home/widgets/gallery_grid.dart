@@ -49,9 +49,10 @@ class GalleryGrid extends StatelessWidget {
     final theme = Theme.of(context);
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      // Fetch without orderBy so legacy records missing created_at are not
+      // silently omitted by Firestore.
       stream: FirebaseFirestore.instance
           .collection('gallery_images')
-          .orderBy('created_at', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
@@ -89,7 +90,15 @@ class GalleryGrid extends StatelessWidget {
           return Center(child: CircularProgressIndicator(color: accentColor));
         }
 
-        final documents = snapshot.data?.docs ?? [];
+        final List<QueryDocumentSnapshot<Map<String, dynamic>>> documents = [...(snapshot.data?.docs ?? [])]
+          ..sort((a, b) {
+            final ad = a.data()['created_at'];
+            final bd = b.data()['created_at'];
+            final at = ad is Timestamp ? ad.millisecondsSinceEpoch : 0;
+            final bt = bd is Timestamp ? bd.millisecondsSinceEpoch : 0;
+            final byDate = bt.compareTo(at);
+            return byDate != 0 ? byDate : a.id.compareTo(b.id);
+          });
 
         final images = documents
             .where((document) {
@@ -193,8 +202,7 @@ class GalleryGrid extends StatelessWidget {
             final imageUrl = _getOptimizedUrl(originalUrl);
 
             return GestureDetector(
-              onTap: () =>
-                  _showImageViewer(context, imageUrls, titles, index),
+              onTap: () => _showImageViewer(context, imageUrls, titles, index),
               child: Hero(
                 tag: 'gallery_${document.id}',
                 child: ClipRRect(

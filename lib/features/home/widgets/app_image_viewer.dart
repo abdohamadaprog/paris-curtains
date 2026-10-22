@@ -89,8 +89,8 @@ class _AppImageViewerPageState extends State<AppImageViewerPage> {
 
     setState(() {
       _transform.value = Matrix4.identity()
-        ..translate(x, y)
-        ..scale(scale);
+        ..translateByDouble(x, y, 0.0, 1.0)
+        ..scaleByDouble(scale, scale, scale, 1.0);
       _zoomed = true;
     });
   }
@@ -120,7 +120,9 @@ class _AppImageViewerPageState extends State<AppImageViewerPage> {
       if (!hasAccess) {
         final granted = await Gal.requestAccess();
         if (!granted) {
-          throw Exception('مفيش صلاحية حفظ الصور. فعّل صلاحية المعرض من الإعدادات.');
+          throw Exception(
+            'مفيش صلاحية حفظ الصور. فعّل صلاحية المعرض من الإعدادات.',
+          );
         }
       }
 
@@ -186,7 +188,10 @@ class _AppImageViewerPageState extends State<AppImageViewerPage> {
                       strokeWidth: 2,
                     ),
                   )
-                : const Icon(Icons.download_rounded, color: AppColors.primaryGold),
+                : const Icon(
+                    Icons.download_rounded,
+                    color: AppColors.primaryGold,
+                  ),
           ),
         ],
       ),

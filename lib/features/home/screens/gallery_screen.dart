@@ -82,7 +82,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
     if (_bannerImages.length <= 1) return;
 
     _bannerTimer = Timer.periodic(const Duration(seconds: 7), (_) {
-      if (!mounted || !_bannerController.hasClients || _bannerImages.length <= 1) {
+      if (!mounted ||
+          !_bannerController.hasClients ||
+          _bannerImages.length <= 1) {
         return;
       }
 
@@ -104,10 +106,36 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> _galleryStream() {
-    return FirebaseFirestore.instance
-        .collection('gallery_images')
-        .orderBy('sort_order')
-        .snapshots();
+    // Do not order in Firestore: orderBy excludes legacy documents that lack
+    // sort_order. We sort locally so old images remain visible.
+    return FirebaseFirestore.instance.collection('gallery_images').snapshots();
+  }
+
+  int _compareGalleryDocs(
+    QueryDocumentSnapshot<Map<String, dynamic>> a,
+    QueryDocumentSnapshot<Map<String, dynamic>> b,
+  ) {
+    final ad = a.data();
+    final bd = b.data();
+    final ao = ad['sort_order'];
+    final bo = bd['sort_order'];
+    final aHasOrder = ao is num;
+    final bHasOrder = bo is num;
+
+    if (aHasOrder && bHasOrder) {
+      final order = (ao).compareTo(bo);
+      if (order != 0) return order;
+    } else if (aHasOrder != bHasOrder) {
+      // Explicitly ordered images come first; legacy images follow by date.
+      return aHasOrder ? -1 : 1;
+    }
+
+    final at = ad['created_at'];
+    final bt = bd['created_at'];
+    final aMillis = at is Timestamp ? at.millisecondsSinceEpoch : 0;
+    final bMillis = bt is Timestamp ? bt.millisecondsSinceEpoch : 0;
+    final byDate = bMillis.compareTo(aMillis);
+    return byDate != 0 ? byDate : a.id.compareTo(b.id);
   }
 
   String _optimizedUrl(String url) {
@@ -132,7 +160,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
       if (_selectedCategory == 'ستائر') return true;
 
       if (_selectedCategory == 'حلقات كبس ومواسير') {
-        return category == 'حلقات كبس ومواسير' || category == 'حلقات كبس' || category == 'مواسير';
+        return category == 'حلقات كبس ومواسير' ||
+            category == 'حلقات كبس' ||
+            category == 'مواسير';
       }
 
       return category == _selectedCategory;
@@ -185,7 +215,8 @@ class _GalleryScreenState extends State<GalleryScreen> {
           return const Center(child: CircularProgressIndicator(color: _gold));
         }
 
-        final allDocs = snapshot.data?.docs ?? [];
+        final List<QueryDocumentSnapshot<Map<String, dynamic>>> allDocs = [...(snapshot.data?.docs ?? [])]
+          ..sort(_compareGalleryDocs);
         final images = _filterImages(allDocs);
 
         return LayoutBuilder(
@@ -246,7 +277,8 @@ class _GalleryScreenState extends State<GalleryScreen> {
                                             Container(
                                               color: _cardDark,
                                               child: const Icon(
-                                                Icons.image_not_supported_outlined,
+                                                Icons
+                                                    .image_not_supported_outlined,
                                                 color: _gold,
                                                 size: 40,
                                               ),
@@ -279,26 +311,29 @@ class _GalleryScreenState extends State<GalleryScreen> {
                                   width: 205,
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'أجمل الستائر',
-                                        style: theme.textTheme.titleLarge?.copyWith(
-                                          color: _gold,
-                                          fontWeight: FontWeight.w700,
-                                        ),
+                                        style: theme.textTheme.titleLarge
+                                            ?.copyWith(
+                                              color: _gold,
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                       ),
                                       const SizedBox(height: 6),
                                       Text(
                                         'تصاميم عصرية تليق بمنزلك',
-                                        style: theme.textTheme.bodySmall?.copyWith(
-                                          color: Colors.white,
-                                        ),
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(color: Colors.white),
                                       ),
                                       const SizedBox(height: 10),
                                       OutlinedButton(
                                         onPressed: () {
-                                          setState(() => _selectedCategory = 'ستائر');
+                                          setState(
+                                            () => _selectedCategory = 'ستائر',
+                                          );
                                         },
                                         style: OutlinedButton.styleFrom(
                                           foregroundColor: _gold,
@@ -329,10 +364,14 @@ class _GalleryScreenState extends State<GalleryScreen> {
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: List.generate(
-                                  _bannerImages.isEmpty ? 1 : _bannerImages.length,
+                                  _bannerImages.isEmpty
+                                      ? 1
+                                      : _bannerImages.length,
                                   (index) => AnimatedContainer(
                                     duration: const Duration(milliseconds: 250),
-                                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 3,
+                                    ),
                                     width: _bannerIndex == index ? 19 : 6,
                                     height: 6,
                                     decoration: BoxDecoration(
@@ -355,10 +394,19 @@ class _GalleryScreenState extends State<GalleryScreen> {
                 // عنوان المجموعات وزر الإكسسوارات الصغير
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsetsDirectional.fromSTEB(14, 0, 14, 10),
+                    padding: const EdgeInsetsDirectional.fromSTEB(
+                      14,
+                      0,
+                      14,
+                      10,
+                    ),
                     child: Row(
                       children: [
-                        const Icon(Icons.grid_view_rounded, color: _gold, size: 21),
+                        const Icon(
+                          Icons.grid_view_rounded,
+                          color: _gold,
+                          size: 21,
+                        ),
                         const SizedBox(width: 7),
                         Expanded(
                           child: Text(
@@ -468,8 +516,12 @@ class _GalleryScreenState extends State<GalleryScreen> {
                                             begin: Alignment.topCenter,
                                             end: Alignment.bottomCenter,
                                             colors: [
-                                              Colors.black.withValues(alpha: 0.05),
-                                              Colors.black.withValues(alpha: 0.88),
+                                              Colors.black.withValues(
+                                                alpha: 0.05,
+                                              ),
+                                              Colors.black.withValues(
+                                                alpha: 0.88,
+                                              ),
                                             ],
                                           ),
                                         ),
@@ -492,7 +544,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
                                                       ? const Color(0xFFFFE8B2)
                                                       : Colors.white,
                                                   fontWeight: FontWeight.w600,
-                                                  fontSize: isAllCurtains ? 9 : 10,
+                                                  fontSize: isAllCurtains
+                                                      ? 9
+                                                      : 10,
                                                 ),
                                           ),
                                         ),
@@ -532,7 +586,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
                         const Spacer(),
                         Text(
                           '${images.length} صورة',
-                          style: theme.textTheme.bodySmall?.copyWith(color: _gold),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: _gold,
+                          ),
                         ),
                       ],
                     ),
@@ -554,109 +610,109 @@ class _GalleryScreenState extends State<GalleryScreen> {
                     : SliverPadding(
                         padding: const EdgeInsets.fromLTRB(14, 2, 14, 24),
                         sliver: SliverGrid(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                              final data = images[index].data();
-                              final url = _optimizedUrl(data['url'].toString());
-                              final category = (data['category'] ?? 'ستائر')
-                                  .toString();
+                          delegate: SliverChildBuilderDelegate((
+                            context,
+                            index,
+                          ) {
+                            final data = images[index].data();
+                            final url = _optimizedUrl(data['url'].toString());
+                            final category = (data['category'] ?? 'ستائر')
+                                .toString();
 
-                              return Material(
-                                color: isDark ? _cardDark : Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                clipBehavior: Clip.antiAlias,
-                                child: InkWell(
-                                  onTap: () => _openImage(images, index),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                        color: _gold.withValues(alpha: 0.55),
-                                      ),
-                                    ),
-                                    child: Stack(
-                                      fit: StackFit.expand,
-                                      children: [
-                                        Hero(
-                                          tag: url,
-                                          child: CachedNetworkImage(
-                                            imageUrl: url,
-                                            fit: BoxFit.cover,
-                                            placeholder: (context, url) =>
-                                                const Center(
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                        color: _gold,
-                                                        strokeWidth: 2,
-                                                      ),
-                                                ),
-                                            errorWidget: (context, url, error) =>
-                                                const Center(
-                                                  child: Icon(
-                                                    Icons.broken_image_outlined,
-                                                    color: Colors.grey,
-                                                    size: 36,
-                                                  ),
-                                                ),
-                                          ),
-                                        ),
-                                        const DecoratedBox(
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              begin: Alignment.topCenter,
-                                              end: Alignment.bottomCenter,
-                                              colors: [
-                                                Colors.transparent,
-                                                Color(0xD9000000),
-                                              ],
-                                              stops: [0.48, 1],
-                                            ),
-                                          ),
-                                        ),
-                                        Positioned(
-                                          right: 9,
-                                          left: 9,
-                                          bottom: 10,
-                                          child: Row(
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  category,
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: theme
-                                                      .textTheme
-                                                      .labelMedium
-                                                      ?.copyWith(
-                                                        color: Colors.white,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                      ),
-                                                ),
-                                              ),
-                                              const Icon(
-                                                Icons.zoom_in_rounded,
-                                                color: _gold,
-                                                size: 21,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
+                            return Material(
+                              color: isDark ? _cardDark : Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              clipBehavior: Clip.antiAlias,
+                              child: InkWell(
+                                onTap: () => _openImage(images, index),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: _gold.withValues(alpha: 0.55),
                                     ),
                                   ),
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      Hero(
+                                        tag: url,
+                                        child: CachedNetworkImage(
+                                          imageUrl: url,
+                                          fit: BoxFit.cover,
+                                          placeholder: (context, url) =>
+                                              const Center(
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      color: _gold,
+                                                      strokeWidth: 2,
+                                                    ),
+                                              ),
+                                          errorWidget: (context, url, error) =>
+                                              const Center(
+                                                child: Icon(
+                                                  Icons.broken_image_outlined,
+                                                  color: Colors.grey,
+                                                  size: 36,
+                                                ),
+                                              ),
+                                        ),
+                                      ),
+                                      const DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                            colors: [
+                                              Colors.transparent,
+                                              Color(0xD9000000),
+                                            ],
+                                            stops: [0.48, 1],
+                                          ),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        right: 9,
+                                        left: 9,
+                                        bottom: 10,
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                category,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: theme
+                                                    .textTheme
+                                                    .labelMedium
+                                                    ?.copyWith(
+                                                      color: Colors.white,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                              ),
+                                            ),
+                                            const Icon(
+                                              Icons.zoom_in_rounded,
+                                              color: _gold,
+                                              size: 21,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              );
-                            },
-                            childCount: images.length,
-                          ),
+                              ),
+                            );
+                          }, childCount: images.length),
                           gridDelegate:
                               SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: columns,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                            childAspectRatio: width < 380 ? 0.76 : 0.78,
-                          ),
+                                crossAxisCount: columns,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                                childAspectRatio: width < 380 ? 0.76 : 0.78,
+                              ),
                         ),
                       ),
               ],
@@ -722,4 +778,3 @@ class _MessageView extends StatelessWidget {
     );
   }
 }
-

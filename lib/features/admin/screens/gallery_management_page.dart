@@ -355,9 +355,9 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
           // 3. الشبكة
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
+              // Keep legacy image records even if created_at was never set.
               stream: FirebaseFirestore.instance
                   .collection('gallery_images')
-                  .orderBy('created_at', descending: true)
                   .snapshots(),
               builder: (ctx, snap) {
                 if (!snap.hasData) {
@@ -366,12 +366,22 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
                   );
                 }
 
-                var docs = snap.data!.docs.where((d) {
+                var docs = snap.data!.docs.toList()
+                  ..sort((a, b) {
+                    final ad = a.data() as Map<String, dynamic>;
+                    final bd = b.data() as Map<String, dynamic>;
+                    final at = ad['created_at'];
+                    final bt = bd['created_at'];
+                    final am = at is Timestamp ? at.millisecondsSinceEpoch : 0;
+                    final bm = bt is Timestamp ? bt.millisecondsSinceEpoch : 0;
+                    final byDate = bm.compareTo(am);
+                    return byDate != 0 ? byDate : a.id.compareTo(b.id);
+                  });
+                docs = docs.where((d) {
                   var data = d.data() as Map<String, dynamic>;
                   if (_selectedCategory == "الكل") {
                     return data['category'] != "إكسسوارات";
-                  }
-                  else if (_selectedCategory == "إكسسوارات") {
+                  } else if (_selectedCategory == "إكسسوارات") {
                     bool isAcc = data['category'] == "إكسسوارات";
                     if (_selectedAccessoryType != "الكل") {
                       return isAcc &&

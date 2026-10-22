@@ -48,18 +48,30 @@ class _GalleryReorderPageState extends State<GalleryReorderPage> {
 
   Future<void> _fetchImages() async {
     setState(() => _isLoading = true);
-    var query = await FirebaseFirestore.instance
-        .collection('gallery_images')
-        .orderBy('sort_order')
-        .get();
-    if (query.docs.isEmpty) {
-      var timeQuery = await FirebaseFirestore.instance
+    try {
+      final query = await FirebaseFirestore.instance
           .collection('gallery_images')
-          .orderBy('created_at', descending: true)
           .get();
-      _allImages = timeQuery.docs;
-    } else {
-      _allImages = query.docs;
+      _allImages = query.docs.toList()
+        ..sort((a, b) {
+          final ad = a.data();
+          final bd = b.data();
+          final ao = ad['sort_order'];
+          final bo = bd['sort_order'];
+          if (ao is num && bo is num) {
+            final byOrder = ao.compareTo(bo);
+            if (byOrder != 0) return byOrder;
+          } else if ((ao is num) != (bo is num)) {
+            return ao is num ? -1 : 1;
+          }
+          final at = ad['created_at'];
+          final bt = bd['created_at'];
+          final am = at is Timestamp ? at.millisecondsSinceEpoch : 0;
+          final bm = bt is Timestamp ? bt.millisecondsSinceEpoch : 0;
+          return bm.compareTo(am);
+        });
+    } catch (error) {
+      if (mounted) _snack('تعذر تحميل صور المعرض: $error', Colors.red);
     }
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -83,12 +95,18 @@ class _GalleryReorderPageState extends State<GalleryReorderPage> {
   Future<void> _saveOrder() async {
     setState(() => _isLoading = true);
     try {
-      WriteBatch batch = FirebaseFirestore.instance.batch();
-      // بنعيد ترقيم القائمة كلها من 0 للاخر
-      for (int i = 0; i < _allImages.length; i++) {
-        batch.update(_allImages[i].reference, {'sort_order': i});
+      // Firestore batches have a 500-write limit. Keep a safety margin and
+      // commit in chunks so a larger gallery can still be reordered.
+      for (var start = 0; start < _allImages.length; start += 450) {
+        final batch = FirebaseFirestore.instance.batch();
+        final end = (start + 450 < _allImages.length)
+            ? start + 450
+            : _allImages.length;
+        for (var i = start; i < end; i++) {
+          batch.update(_allImages[i].reference, {'sort_order': i});
+        }
+        await batch.commit();
       }
-      await batch.commit();
 
       if (mounted) {
         _snack("تم حفظ الترتيب بنجاح ✅", Colors.green);
@@ -110,8 +128,7 @@ class _GalleryReorderPageState extends State<GalleryReorderPage> {
       var data = doc.data() as Map<String, dynamic>;
       if (_selectedCategory == "الكل") {
         return data['category'] != "إكسسوارات";
-      }
-      else if (_selectedCategory == "إكسسوارات") {
+      } else if (_selectedCategory == "إكسسوارات") {
         bool isAcc = data['category'] == "إكسسوارات";
         if (_selectedAccessoryType != "الكل") {
           return isAcc && data['accessory_type'] == _selectedAccessoryType;
@@ -240,7 +257,9 @@ class _GalleryReorderPageState extends State<GalleryReorderPage> {
                             boxShadow: isSelected
                                 ? [
                                     BoxShadow(
-                                      color: AppColors.neonGreen.withValues(alpha: 0.4),
+                                      color: AppColors.neonGreen.withValues(
+                                        alpha: 0.4,
+                                      ),
                                       blurRadius: 15,
                                     ),
                                   ]

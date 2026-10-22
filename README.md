@@ -1,16 +1,33 @@
-# paris_curtian_app
+# Paris Curtains — تطبيق باريس للستاير
 
-A new Flutter project.
+تطبيق Flutter لعرض كتالوج الستائر والإكسسوارات، وإدارة الصور والعروض، ولوحة تحكم خاصة بالإدارة.
 
-## Getting Started
+## المتطلبات
 
-This project is a starting point for a Flutter application.
+- Flutter SDK متوافق مع قيد Dart الموجود في `pubspec.yaml`.
+- إعداد مشروع Firebase الصحيح للتطبيق، مع تفعيل Firebase Authentication وCloud Firestore.
+- إعداد Cloudinary ومراجعة `cloudName` و`uploadPreset` وسياسات الرفع قبل الاستخدام الفعلي.
 
-A few resources to get you started if this is your first Flutter project:
+## التشغيل محليًا
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+```bash
+flutter pub get
+flutter analyze
+flutter test
+flutter run
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## أجزاء المشروع
+
+- `lib/features/home/`: الصفحة الرئيسية والمعارض والبحث وعرض الصور.
+- `lib/features/admin/`: لوحة الإدارة، إدارة الصور والعروض، التحليلات، ومتابعة طابور الرفع.
+- `lib/features/clients/`: إدارة العملاء ومواعيد التركيب وحالة تنفيذ الشغل.
+- `lib/core/`: ألوان التطبيق والثيم والمكونات المشتركة.
+
+## ملاحظات مهمة قبل النشر
+
+1. راجع قواعد Firestore في Firebase Console. ملف قواعد Firestore غير موجود في هذه النسخة، لذلك لا يمكن اعتبار صلاحيات البيانات مراجَعة من هذا المستودع وحده.
+2. راجع إعدادات Cloudinary وقيود الرفع؛ `uploadPreset` ليس بديلًا عن ضبط حدود آمنة للرفع.
+3. إعداد Android الحالي يستخدم توقيع debug لبناء release التجريبي. لا تستخدمه كتوقيع إصدار إنتاجي؛ جهّز مفتاح توقيع خاصًا واحفظه خارج المستودع.
+4. طابور الرفع يحفظ بيانات العملية محليًا، لكن ملف الصورة المختار قد يكون مؤقتًا بحسب المنصة. لو لم يعد الملف متاحًا بعد إعادة فتح التطبيق، سيحتاج المستخدم لاختيار الصورة مرة أخرى. عند وجود رابط Cloudinary محفوظ، يحاول التطبيق إكمال حفظ بيانات Firestore دون إعادة رفع الصورة.
+5. بعد كل تعديل، شغّل `flutter analyze` والاختبارات وبناء المنصة المستهدفة على جهاز تطوير يحتوي على Flutter SDK.

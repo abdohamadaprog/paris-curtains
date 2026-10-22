@@ -5,7 +5,7 @@ class AppTheme {
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
-    fontFamily: 'Cairo',
+    fontFamily: 'Tajawal',
     scaffoldBackgroundColor: AppColors.background,
     colorScheme: ColorScheme.fromSeed(
       seedColor: AppColors.primaryGold,
@@ -29,7 +29,7 @@ class AppTheme {
   static ThemeData darkTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
-    fontFamily: 'Cairo',
+    fontFamily: 'Tajawal',
     scaffoldBackgroundColor: AppColors.bgDark,
     colorScheme: ColorScheme.fromSeed(
       seedColor: AppColors.primaryGold,
