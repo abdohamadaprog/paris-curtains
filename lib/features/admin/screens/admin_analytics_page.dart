@@ -47,7 +47,10 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
 
       for (var doc in clientSnap.docs) {
         var data = doc.data();
-        if (data['installation_date'] != null) {
+        final done = data['installation_done'] == true;
+        if (done) {
+          _archivedJobs++;
+        } else if (data['installation_date'] != null) {
           DateTime installDate = (data['installation_date'] as Timestamp)
               .toDate();
           if (installDate.isBefore(today)) {
@@ -56,7 +59,7 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
             _activeJobs++;
           }
         } else {
-          _activeJobs++; // لو مفيش تاريخ نعتبره شغل جاري
+          _activeJobs++;
         }
       }
 
@@ -74,9 +77,11 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
         }
       }
 
+      if (!mounted) return;
       setState(() => _isLoading = false);
     } catch (e) {
       debugPrint("Error calculating stats: $e");
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }
@@ -117,7 +122,7 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
                       _buildStatCard(
                         "إجمالي العملاء",
                         _totalClients.toString(),
-                        Colors.blueAccent,
+                        AppColors.primaryGold,
                         Icons.people,
                       ),
                       const SizedBox(width: 10),
@@ -198,8 +203,8 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
         decoration: BoxDecoration(
           color: AppColors.glassWhite,
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: color.withOpacity(0.5)),
-          boxShadow: [BoxShadow(color: color.withOpacity(0.1), blurRadius: 10)],
+          border: Border.all(color: color.withValues(alpha: 0.5)),
+          boxShadow: [BoxShadow(color: color.withValues(alpha: 0.1), blurRadius: 10)],
         ),
         child: Column(
           children: [
@@ -283,15 +288,15 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
   Color _getColorForCategory(String key) {
     switch (key) {
       case "ويفي":
-        return AppColors.neonCyan;
+        return AppColors.primaryGold;
       case "بلتكانة":
-        return AppColors.neonGold;
+        return AppColors.lightGold;
       case "مواسير":
-        return Colors.purpleAccent;
+        return const Color(0xFF8D6B3A);
       case "حلقات كبس":
-        return Colors.redAccent;
+        return AppColors.navyDark;
       case "إكسسوارات":
-        return AppColors.neonOrange;
+        return AppColors.success;
       default:
         return Colors.grey;
     }

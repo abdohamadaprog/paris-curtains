@@ -1,41 +1,52 @@
 import 'package:flutter/material.dart';
+import 'package:paris_curtian_app/core/constants/app_colors.dart';
 
 class AppTheme {
-  static const Color teal = Color(0xFF20B7B0);
-  static const Color navy = Color(0xFF101827);
-  static const Color gold = Color(0xFFC9A45C);
-
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
-    scaffoldBackgroundColor: const Color(0xFFF7F7F5),
+    fontFamily: 'Cairo',
+    scaffoldBackgroundColor: AppColors.background,
     colorScheme: ColorScheme.fromSeed(
-      seedColor: teal,
+      seedColor: AppColors.primaryGold,
+      primary: AppColors.primaryGold,
+      secondary: AppColors.navyDark,
       brightness: Brightness.light,
     ),
     appBarTheme: const AppBarTheme(
-      backgroundColor: Color(0xFFF7F7F5),
-      foregroundColor: navy,
+      backgroundColor: AppColors.background,
+      foregroundColor: AppColors.navyDark,
       elevation: 0,
       centerTitle: true,
     ),
-    cardTheme: const CardThemeData(elevation: 1, margin: EdgeInsets.zero),
+    cardTheme: const CardThemeData(
+      elevation: 3,
+      margin: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(20))),
+    ),
   );
 
   static ThemeData darkTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
-    scaffoldBackgroundColor: const Color(0xFF101116),
+    fontFamily: 'Cairo',
+    scaffoldBackgroundColor: AppColors.bgDark,
     colorScheme: ColorScheme.fromSeed(
-      seedColor: teal,
+      seedColor: AppColors.primaryGold,
+      primary: AppColors.primaryGold,
+      secondary: AppColors.lightGold,
       brightness: Brightness.dark,
     ),
     appBarTheme: const AppBarTheme(
-      backgroundColor: Color(0xFF101116),
+      backgroundColor: AppColors.bgDark,
       foregroundColor: Colors.white,
       elevation: 0,
       centerTitle: true,
     ),
-    cardTheme: const CardThemeData(elevation: 1, margin: EdgeInsets.zero),
+    cardTheme: const CardThemeData(
+      elevation: 3,
+      margin: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(20))),
+    ),
   );
 }

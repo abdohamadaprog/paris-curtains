@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/theme_manger.dart';
 import '../widgets/gallery_grid.dart';
 
@@ -11,7 +12,7 @@ class AccessoriesGalleryPage extends StatefulWidget {
 }
 
 class _AccessoriesGalleryPageState extends State<AccessoriesGalleryPage> {
-  static const Color _gold = Color(0xFFD2B477);
+  static const Color _gold = AppColors.primaryGold;
 
   String _selectedType = 'الكل';
   int _gridCount = 2;
@@ -79,7 +80,7 @@ class _AccessoriesGalleryPageState extends State<AccessoriesGalleryPage> {
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: _accessoryTypes.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (context, index) {
                     final type = _accessoryTypes[index];
                     final selected = _selectedType == type;
@@ -98,7 +99,7 @@ class _AccessoriesGalleryPageState extends State<AccessoriesGalleryPage> {
                       side: BorderSide(
                         color: selected
                             ? accent
-                            : theme.dividerColor.withOpacity(0.4),
+                            : theme.dividerColor.withValues(alpha: 0.4),
                       ),
                       labelStyle: TextStyle(
                         fontFamily: 'Cairo',
@@ -124,21 +125,19 @@ class _AccessoriesGalleryPageState extends State<AccessoriesGalleryPage> {
                     label: Text('×$_gridCount'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: textColor,
-                      side: BorderSide(color: accent.withOpacity(0.6)),
+                      side: BorderSide(color: accent.withValues(alpha: 0.6)),
                     ),
                   ),
                 ),
               ),
               const SizedBox(height: 6),
               Expanded(
-                child: SingleChildScrollView(
-                  child: GalleryGrid(
-                    category: 'إكسسوارات',
-                    accessoryType: _selectedType,
-                    isNeonMode: isDarkMode,
-                    accentColor: accent,
-                    crossAxisCount: _gridCount,
-                  ),
+                child: GalleryGrid(
+                  category: 'إكسسوارات',
+                  accessoryType: _selectedType,
+                  isNeonMode: isDarkMode,
+                  accentColor: accent,
+                  crossAxisCount: _gridCount,
                 ),
               ),
             ],

@@ -25,14 +25,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   final LocalAuthentication auth = LocalAuthentication();
 
   static const Color _bg = AppColors.bgDark;
-  static const Color _panel = Color(0xFF191923);
-  static const Color _panel2 = Color(0xFF22222E);
-  static const Color _gold = AppColors.neonGold;
-  static const Color _cyan = AppColors.neonCyan;
-  static const Color _purple = AppColors.neonPurple;
-  static const Color _green = AppColors.neonGreen;
-  static const Color _white = Color(0xFFF5F5F7);
-  static const Color _muted = Color(0xFFB0B0BE);
+  static const Color _panel = Color(0xFF161622);
+  static const Color _panel2 = Color(0xFF1E1E2C);
+  static const Color _gold = AppColors.primaryGold;
+  static const Color _cyan = AppColors.lightGold;
+  static const Color _purple = AppColors.primaryGold;
+  static const Color _green = AppColors.primaryGold;
+  static const Color _white = Color(0xFFF8F5EF);
+  static const Color _muted = Color(0xFFB8B5AF);
 
   @override
   Widget build(BuildContext context) {
@@ -157,35 +157,19 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   const SizedBox(height: 18),
 
                   _sectionTitle(
-                    'إعدادات وتقارير',
-                    'الأمان ومتابعة بيانات التطبيق',
+                    'إعدادات الأمان',
+                    'إعدادات البصمة وحماية البيانات',
                     Icons.admin_panel_settings_rounded,
                     _purple,
                   ),
                   const SizedBox(height: 14),
 
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _SecondaryAction(
-                          title: 'أمان التطبيق',
-                          subtitle: 'إعدادات البصمة',
-                          icon: Icons.fingerprint_rounded,
-                          color: _gold,
-                          onTap: _showSecurityDialog,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _SecondaryAction(
-                          title: 'تحليل البيانات',
-                          subtitle: 'عرض التقارير',
-                          icon: Icons.query_stats_rounded,
-                          color: _green,
-                          onTap: () => _navTo(const AdminAnalyticsPage()),
-                        ),
-                      ),
-                    ],
+                  _SecondaryAction(
+                    title: 'أمان التطبيق',
+                    subtitle: 'إعدادات البصمة',
+                    icon: Icons.fingerprint_rounded,
+                    color: _gold,
+                    onTap: _showSecurityDialog,
                   ),
 
                   const SizedBox(height: 24),
@@ -222,7 +206,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           colors: [Color(0xFF292536), Color(0xFF191923), AppColors.bgDark],
         ),
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
-        border: Border(bottom: BorderSide(color: _gold.withOpacity(0.4))),
+        border: Border(bottom: BorderSide(color: _gold.withValues(alpha: 0.4))),
       ),
       child: Column(
         children: [
@@ -232,9 +216,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: _gold.withOpacity(0.1),
+                  color: _gold.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: _gold.withOpacity(0.35)),
+                  border: Border.all(color: _gold.withValues(alpha: 0.35)),
                 ),
                 child: const Icon(
                   Icons.dashboard_customize_rounded,
@@ -291,9 +275,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.045),
+              color: Colors.white.withValues(alpha: 0.045),
               borderRadius: BorderRadius.circular(17),
-              border: Border.all(color: Colors.white.withOpacity(0.08)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
             ),
             child: const Row(
               children: [
@@ -302,7 +286,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     label: 'العملاء',
                     collection: 'clients',
                     icon: Icons.people_outline_rounded,
-                    color: AppColors.neonGold,
+                    color: AppColors.primaryGold,
                   ),
                 ),
                 SizedBox(
@@ -318,7 +302,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     label: 'صور المعرض',
                     collection: 'gallery_images',
                     icon: Icons.image_outlined,
-                    color: AppColors.neonCyan,
+                    color: AppColors.lightGold,
                   ),
                 ),
               ],
@@ -336,7 +320,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       decoration: BoxDecoration(
         color: _panel,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _gold.withOpacity(0.18)),
+        border: Border.all(color: _gold.withValues(alpha: 0.18)),
       ),
       child: const Row(
         children: [
@@ -383,9 +367,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.09),
+            color: color.withValues(alpha: 0.09),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withOpacity(0.25)),
+            border: Border.all(color: color.withValues(alpha: 0.25)),
           ),
           child: Icon(icon, color: color, size: 21),
         ),
@@ -439,7 +423,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(17),
-              border: Border.all(color: Colors.white.withOpacity(0.07)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
             ),
             child: Row(
               children: [
@@ -447,7 +431,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   width: 45,
                   height: 45,
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.09),
+                    color: color.withValues(alpha: 0.09),
                     borderRadius: BorderRadius.circular(13),
                   ),
                   child: Icon(icon, color: color, size: 24),
@@ -482,7 +466,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
                 Icon(
                   Icons.arrow_forward_ios_rounded,
-                  color: color.withOpacity(0.8),
+                  color: color.withValues(alpha: 0.8),
                   size: 15,
                 ),
               ],
@@ -509,7 +493,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(17),
-            border: Border.all(color: _gold.withOpacity(0.25)),
+            border: Border.all(color: _gold.withValues(alpha: 0.25)),
           ),
           child: const Row(
             children: [
@@ -562,7 +546,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(22),
-          side: BorderSide(color: _gold.withOpacity(0.25)),
+          side: BorderSide(color: _gold.withValues(alpha: 0.25)),
         ),
         title: const Row(
           children: [
@@ -630,6 +614,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         final canCheck = await auth.canCheckBiometrics;
         final isSupported = await auth.isDeviceSupported();
 
+        if (!mounted) return false;
+
         if (!canCheck && !isSupported) {
           _showSnack('البصمة غير متاحة على هذا الجهاز', AppColors.neonRed);
           return false;
@@ -676,7 +662,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         backgroundColor: _panel2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: color.withOpacity(0.35)),
+          side: BorderSide(color: color.withValues(alpha: 0.35)),
         ),
         content: Text(
           message,
@@ -713,7 +699,7 @@ class _QuickAction extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(17),
-            border: Border.all(color: color.withOpacity(0.23)),
+            border: Border.all(color: color.withValues(alpha: 0.23)),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -722,7 +708,7 @@ class _QuickAction extends StatelessWidget {
                 width: 43,
                 height: 43,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(13),
                 ),
                 child: Icon(icon, color: color, size: 23),
@@ -773,7 +759,7 @@ class _SecondaryAction extends StatelessWidget {
           padding: const EdgeInsets.all(13),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(17),
-            border: Border.all(color: Colors.white.withOpacity(0.07)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

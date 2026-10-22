@@ -1,11 +1,13 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/app_colors.dart';
-import 'promo_reorder_page.dart'; // ✅ استدعاء صفحة الترتيب
+import 'promo_reorder_page.dart';
 
 class PromoManagementPage extends StatefulWidget {
   const PromoManagementPage({super.key});
@@ -18,57 +20,115 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
   bool _isUploading = false;
   final ImagePicker _picker = ImagePicker();
 
-  final String cloudName = "dlmx10dic";
-  final String uploadPreset = "curtains_upload";
+  final String cloudName = 'dlmx10dic';
+  final String uploadPreset = 'curtains_upload';
+
+  Future<String> _uploadFile(XFile image) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/upload'),
+    );
+    request.files.add(await http.MultipartFile.fromPath('file', image.path));
+    request.fields['upload_preset'] = uploadPreset;
+    final response = await request.send();
+    if (response.statusCode != 200) {
+      throw Exception('فشل رفع الصورة');
+    }
+    final jsonResponse = jsonDecode(await response.stream.bytesToString());
+    return jsonResponse['secure_url'] as String;
+  }
 
   Future<void> _pickAndUpload() async {
-    final XFile? image = await _picker.pickImage(
+    final image = await _picker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 70,
+      imageQuality: 80,
     );
-    if (image == null) return;
+    if (image == null || !mounted) return;
 
     setState(() => _isUploading = true);
     try {
-      var request = http.MultipartRequest(
-        "POST",
-        Uri.parse("https://api.cloudinary.com/v1_1/$cloudName/image/upload"),
-      );
-      request.files.add(await http.MultipartFile.fromPath('file', image.path));
-      request.fields['upload_preset'] = uploadPreset;
-      var response = await request.send();
+      final url = await _uploadFile(image);
+      final snapshot = await FirebaseFirestore.instance
+          .collection('promo_images')
+          .get();
 
-      if (response.statusCode == 200) {
-        var jsonResponse = jsonDecode(await response.stream.bytesToString());
-        String url = jsonResponse['secure_url'];
+      await FirebaseFirestore.instance.collection('promo_images').add({
+        'url': url,
+        'created_at': FieldValue.serverTimestamp(),
+        'sort_order': snapshot.docs.length,
+      });
 
-        // حفظ الصورة مع وضع sort_order مبدئي (مثلاً 100 عشان تيجي في الآخر)
-        var snapshot = await FirebaseFirestore.instance
-            .collection('promo_images')
-            .get();
-        int newOrder = snapshot.docs.length;
-
-        await FirebaseFirestore.instance.collection('promo_images').add({
-          'url': url,
-          'created_at': FieldValue.serverTimestamp(),
-          'sort_order': newOrder,
-        });
-
-        if (mounted) _showSnack("تم رفع الصورة ✅", Colors.green);
-      } else {
-        throw Exception("فشل الرفع");
-      }
-    } catch (e) {
-      if (mounted) _showSnack("خطأ: $e", Colors.red);
+      if (mounted) _showSnack('تم رفع صورة العرض', AppColors.success);
+    } catch (error) {
+      if (mounted) _showSnack('خطأ: $error', AppColors.danger);
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
   }
 
+  Future<void> _replaceImage(DocumentSnapshot doc) async {
+    final image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+    if (image == null || !mounted) return;
+
+    setState(() => _isUploading = true);
+    try {
+      final url = await _uploadFile(image);
+      await doc.reference.update({
+        'url': url,
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+      if (mounted) _showSnack('تم تغيير صورة العرض', AppColors.success);
+    } catch (error) {
+      if (mounted) _showSnack('خطأ: $error', AppColors.danger);
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
+  Future<void> _deleteImage(DocumentSnapshot doc) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        title: const Text(
+          'حذف العرض؟',
+          style: TextStyle(fontFamily: 'Cairo', color: Colors.white),
+        ),
+        content: const Text(
+          'هتتشال الصورة من سلايدر الصفحة الرئيسية.',
+          style: TextStyle(fontFamily: 'Cairo', color: Color(0xFFB8B5AF)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(
+              'إلغاء',
+              style: TextStyle(fontFamily: 'Cairo', color: AppColors.lightGold),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'حذف',
+              style: TextStyle(fontFamily: 'Cairo', color: AppColors.danger),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+    await doc.reference.delete();
+    if (mounted) _showSnack('تم حذف العرض', AppColors.primaryGold);
+  }
+
   void _showSnack(String msg, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg, style: TextStyle(fontFamily: 'Cairo')),
+        content: Text(msg, style: const TextStyle(fontFamily: 'Cairo')),
         backgroundColor: color,
       ),
     );
@@ -79,8 +139,8 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
     return Scaffold(
       backgroundColor: AppColors.bgDark,
       appBar: AppBar(
-        title: Text(
-          "إضافة للعروض",
+        title: const Text(
+          'صور السلايدر والعروض',
           style: TextStyle(
             fontFamily: 'Cairo',
             fontWeight: FontWeight.bold,
@@ -93,8 +153,6 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
           icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-
-        // 🔥🔥 الزرار المطلوب (فوق على الشمال) 🔥🔥
         actions: [
           IconButton(
             onPressed: () {
@@ -108,55 +166,47 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
             icon: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.neonCyan.withOpacity(0.2),
+                color: AppColors.primaryGold.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
                 Icons.low_priority,
-                color: AppColors.neonCyan,
-              ), // أيقونة الترتيب
+                color: AppColors.lightGold,
+              ),
             ),
-            tooltip: "ترتيب وحذف العروض",
+            tooltip: 'ترتيب العروض',
           ),
           const SizedBox(width: 10),
         ],
       ),
       body: Column(
         children: [
-          // زر الرفع الكبير
           GestureDetector(
             onTap: _isUploading ? null : _pickAndUpload,
             child: Container(
               margin: const EdgeInsets.all(20),
               height: 120,
               decoration: BoxDecoration(
-                color: AppColors.glassWhite,
+                color: AppColors.surfaceDark,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: AppColors.neonGold,
-                  style: BorderStyle.solid,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.neonGold.withOpacity(0.1),
-                    blurRadius: 10,
-                  ),
-                ],
+                border: Border.all(color: AppColors.primaryGold),
               ),
               child: Center(
                 child: _isUploading
-                    ? const CircularProgressIndicator(color: AppColors.neonGold)
-                    : Column(
+                    ? const CircularProgressIndicator(
+                        color: AppColors.primaryGold,
+                      )
+                    : const Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.add_a_photo,
-                            color: AppColors.neonGold,
+                            color: AppColors.primaryGold,
                             size: 35,
                           ),
-                          const SizedBox(height: 10),
+                          SizedBox(height: 10),
                           Text(
-                            "اضغط لرفع صورة جديدة",
+                            'اضغط لرفع صورة عرض جديدة',
                             style: TextStyle(
                               fontFamily: 'Cairo',
                               color: Colors.white,
@@ -168,48 +218,132 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
               ),
             ),
           ),
-
-          const Divider(color: Colors.white10),
-
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                'تقدر تغير أو تمسح أي صورة ظاهرة في الهوم من هنا',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  color: Color(0xFFB8B5AF),
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              // عرض معاينة بسيطة للصور (مرتبة بالأحدث هنا للسهولة)
               stream: FirebaseFirestore.instance
                   .collection('promo_images')
-                  .orderBy('created_at', descending: true)
+                  .orderBy('sort_order')
                   .snapshots(),
               builder: (context, snapshot) {
-                if (!snapshot.hasData)
+                if (!snapshot.hasData) {
                   return const Center(
-                    child: CircularProgressIndicator(color: AppColors.neonGold),
-                  );
-                var docs = snapshot.data!.docs;
-
-                if (docs.isEmpty)
-                  return Center(
-                    child: Text(
-                      "المعرض فارغ",
-                      style: TextStyle(fontFamily: 'Cairo', color: Colors.grey),
+                    child: CircularProgressIndicator(
+                      color: AppColors.primaryGold,
                     ),
                   );
+                }
+                final docs = snapshot.data!.docs;
+
+                if (docs.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'مفيش صور عروض حالياً',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        color: Color(0xFFB8B5AF),
+                      ),
+                    ),
+                  );
+                }
 
                 return GridView.builder(
                   padding: const EdgeInsets.all(20),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                    childAspectRatio: 1.5,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 0.95,
                   ),
                   itemCount: docs.length,
                   itemBuilder: (context, index) {
+                    final doc = docs[index];
+                    final url = (doc['url'] ?? '').toString();
+
                     return Container(
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        image: DecorationImage(
-                          image: NetworkImage(docs[index]['url']),
-                          fit: BoxFit.cover,
+                        color: AppColors.surfaceDark,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: AppColors.primaryGold.withValues(alpha: 0.45),
                         ),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: CachedNetworkImage(
+                              imageUrl: url,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => const Center(
+                                child: CircularProgressIndicator(
+                                  color: AppColors.primaryGold,
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                              errorWidget: (context, url, error) =>
+                                  const Icon(
+                                    Icons.broken_image_outlined,
+                                    color: AppColors.lightGold,
+                                  ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 6,
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: TextButton.icon(
+                                    onPressed: _isUploading
+                                        ? null
+                                        : () => _replaceImage(doc),
+                                    icon: const Icon(
+                                      Icons.swap_horiz_rounded,
+                                      size: 16,
+                                      color: AppColors.lightGold,
+                                    ),
+                                    label: const Text(
+                                      'تغيير',
+                                      style: TextStyle(
+                                        fontFamily: 'Cairo',
+                                        color: AppColors.lightGold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'حذف',
+                                  onPressed: _isUploading
+                                      ? null
+                                      : () => _deleteImage(doc),
+                                  icon: const Icon(
+                                    Icons.delete_outline_rounded,
+                                    color: AppColors.danger,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   },

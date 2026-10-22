@@ -38,6 +38,7 @@ class _PromoReorderPageState extends State<PromoReorderPage> {
     } else {
       _images = snapshot.docs;
     }
+    if (!mounted) return;
     setState(() => _isLoading = false);
   }
 
@@ -113,9 +114,11 @@ class _PromoReorderPageState extends State<PromoReorderPage> {
         ) ??
         false;
 
+    if (!mounted) return;
     if (confirm) {
       setState(() => _isLoading = true);
       await _images[index].reference.delete(); // حذف من الفايربيس
+      if (!mounted) return;
       setState(() {
         _images.removeAt(index); // حذف من الشاشة
         _isLoading = false;

@@ -1,17 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-/// In-memory upload queue shared by the upload page, dashboard and tracker.
-/// Jobs survive navigation while the Flutter app remains alive, but not a
-/// web reload, tab close, browser crash, or process termination.
+/// Persistent upload queue shared by the upload page, dashboard and tracker.
+/// Jobs are saved to SharedPreferences so pending or failed jobs survive app restarts.
 class UploadQueueService extends ChangeNotifier {
-  UploadQueueService._();
+  UploadQueueService._() {
+    _loadPersistedQueue();
+  }
 
   static final UploadQueueService instance = UploadQueueService._();
 
@@ -19,6 +20,7 @@ class UploadQueueService extends ChangeNotifier {
       'https://api.cloudinary.com/v1_1/dlmx10dic/image/upload';
 
   static const String uploadPreset = 'curtains_upload';
+  static const String _prefsKey = 'persisted_upload_queue';
 
   final List<UploadQueueItem> _items = <UploadQueueItem>[];
 
@@ -47,6 +49,44 @@ class UploadQueueService extends ChangeNotifier {
 
   bool get hasFailures => failed > 0;
 
+  Future<void> _loadPersistedQueue() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? jsonString = prefs.getString(_prefsKey);
+      if (jsonString != null && jsonString.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(jsonString);
+        for (final itemMap in decoded) {
+          if (itemMap is Map<String, dynamic>) {
+            final item = UploadQueueItem.fromJson(itemMap);
+            // Only add items that weren't successfully saved yet
+            if (item.status != UploadItemStatus.success) {
+              _items.add(item);
+            }
+          }
+        }
+        _notify();
+        if (_items.any((e) => e.status == UploadItemStatus.pending || e.status == UploadItemStatus.saving)) {
+          unawaited(_processPending());
+        }
+      }
+    } catch (e) {
+      debugPrint('[UPLOAD QUEUE] Failed to load persisted queue: $e');
+    }
+  }
+
+  Future<void> _saveQueueToPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final pendingOrFailed = _items
+          .where((e) => e.status != UploadItemStatus.success)
+          .map((e) => e.toJson())
+          .toList();
+      await prefs.setString(_prefsKey, jsonEncode(pendingOrFailed));
+    } catch (e) {
+      debugPrint('[UPLOAD QUEUE] Failed to persist queue: $e');
+    }
+  }
+
   /// Adds files to the shared queue.
   Future<void> enqueue({
     required List<XFile> files,
@@ -54,6 +94,7 @@ class UploadQueueService extends ChangeNotifier {
     required double rating,
     required bool isAccessory,
     String? accessoryType,
+    Map<String, String>? fileAccessoryTypes,
     String? heavyFabric,
     String? lightFabric,
   }) async {
@@ -62,6 +103,8 @@ class UploadQueueService extends ChangeNotifier {
     final jobItems = <UploadQueueItem>[];
 
     for (final file in files) {
+      final specificAccessoryType = fileAccessoryTypes?[file.path] ?? accessoryType;
+
       jobItems.add(
         UploadQueueItem(
           file: file,
@@ -75,7 +118,7 @@ class UploadQueueService extends ChangeNotifier {
           category: category,
           rating: rating,
           isAccessory: isAccessory,
-          accessoryType: accessoryType,
+          accessoryType: specificAccessoryType,
           heavyFabric: heavyFabric,
           lightFabric: lightFabric,
         ),
@@ -376,7 +419,10 @@ class UploadQueueService extends ChangeNotifier {
   }
 
   void _notify() {
-    if (!_disposed) notifyListeners();
+    if (!_disposed) {
+      _saveQueueToPrefs();
+      notifyListeners();
+    }
   }
 
   @override
@@ -412,6 +458,39 @@ class UploadQueueItem {
   UploadItemStatus status = UploadItemStatus.pending;
   String? cloudinaryUrl;
   String? error;
+
+  Map<String, dynamic> toJson() => {
+        'path': file.path,
+        'filename': filename,
+        'documentId': documentId,
+        'category': category,
+        'rating': rating,
+        'isAccessory': isAccessory,
+        'accessoryType': accessoryType,
+        'heavyFabric': heavyFabric,
+        'lightFabric': lightFabric,
+        'status': status.index,
+        'cloudinaryUrl': cloudinaryUrl,
+        'error': error,
+      };
+
+  factory UploadQueueItem.fromJson(Map<String, dynamic> json) {
+    final item = UploadQueueItem(
+      file: XFile(json['path'] ?? ''),
+      filename: json['filename'] ?? 'unknown',
+      documentId: json['documentId'] ?? '',
+      category: json['category'] ?? '',
+      rating: (json['rating'] as num?)?.toDouble() ?? 5.0,
+      isAccessory: json['isAccessory'] ?? false,
+      accessoryType: json['accessoryType'],
+      heavyFabric: json['heavyFabric'],
+      lightFabric: json['lightFabric'],
+    );
+    item.status = UploadItemStatus.values[json['status'] ?? 0];
+    item.cloudinaryUrl = json['cloudinaryUrl'];
+    item.error = json['error'];
+    return item;
+  }
 }
 
 enum UploadItemStatus { pending, uploading, saving, success, failed }

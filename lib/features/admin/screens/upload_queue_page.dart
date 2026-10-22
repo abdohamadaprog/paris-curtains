@@ -179,7 +179,7 @@ class _UploadQueuePageState extends State<UploadQueuePage> {
         borderRadius: BorderRadius.circular(13),
         border: Border.all(
           color: item.status == UploadItemStatus.failed
-              ? Colors.redAccent.withOpacity(.45)
+              ? Colors.redAccent.withValues(alpha: .45)
               : Colors.white10,
         ),
       ),

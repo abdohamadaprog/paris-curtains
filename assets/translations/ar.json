@@ -1,0 +1,20 @@
+{
+  "app_title": "باريس للستاير",
+  "home": "الرئيسية",
+  "admin_dashboard": "لوحة التحكم",
+  "clients": "العملاء",
+  "gallery": "المعرض",
+  "settings": "الإعدادات",
+  "language": "اللغة",
+  "welcome_admin": "أهلاً، م/ عبدالرحمن",
+  "installation_agenda": "الأجندة",
+  "reports": "التقارير",
+  "add_client": "إضافة عميل",
+  "edit_client": "تعديل بيانات العميل",
+  "delete_client": "حذف العميل",
+  "phone": "رقم الهاتف",
+  "address": "العنوان",
+  "notes": "ملاحظات",
+  "save": "حفظ",
+  "cancel": "إلغاء"
+}

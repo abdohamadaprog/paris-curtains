@@ -61,6 +61,7 @@ class _GalleryReorderPageState extends State<GalleryReorderPage> {
     } else {
       _allImages = query.docs;
     }
+    if (!mounted) return;
     setState(() => _isLoading = false);
   }
 
@@ -107,12 +108,14 @@ class _GalleryReorderPageState extends State<GalleryReorderPage> {
   Widget build(BuildContext context) {
     var displayList = _allImages.where((doc) {
       var data = doc.data() as Map<String, dynamic>;
-      if (_selectedCategory == "الكل")
+      if (_selectedCategory == "الكل") {
         return data['category'] != "إكسسوارات";
+      }
       else if (_selectedCategory == "إكسسوارات") {
         bool isAcc = data['category'] == "إكسسوارات";
-        if (_selectedAccessoryType != "الكل")
+        if (_selectedAccessoryType != "الكل") {
           return isAcc && data['accessory_type'] == _selectedAccessoryType;
+        }
         return isAcc;
       }
       return data['category'] == _selectedCategory;
@@ -237,9 +240,7 @@ class _GalleryReorderPageState extends State<GalleryReorderPage> {
                             boxShadow: isSelected
                                 ? [
                                     BoxShadow(
-                                      color: AppColors.neonGreen.withOpacity(
-                                        0.4,
-                                      ),
+                                      color: AppColors.neonGreen.withValues(alpha: 0.4),
                                       blurRadius: 15,
                                     ),
                                   ]
@@ -260,7 +261,7 @@ class _GalleryReorderPageState extends State<GalleryReorderPage> {
                               if (isSelected)
                                 Container(
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.6),
+                                    color: Colors.black.withValues(alpha: 0.6),
                                     borderRadius: BorderRadius.circular(7),
                                   ),
                                   child: const Center(
@@ -353,7 +354,7 @@ class _GalleryReorderPageState extends State<GalleryReorderPage> {
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.neonCyan
-              : Colors.white.withOpacity(0.05),
+              : Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected ? AppColors.neonCyan : Colors.white12,

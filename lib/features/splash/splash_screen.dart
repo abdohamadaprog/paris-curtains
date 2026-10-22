@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/constants/app_colors.dart';
 import '../home/home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -19,9 +20,9 @@ class _SplashScreenState extends State<SplashScreen>
 
   Timer? _navigationTimer;
 
-  static const Color gold = Color(0xFFD2B477);
-  static const Color darkBackground = Color(0xFF11100E);
-  static const Color lightBackground = Color(0xFFFAF7F0);
+  static const Color gold = AppColors.primaryGold;
+  static const Color darkBackground = AppColors.bgDark;
+  static const Color lightBackground = AppColors.background;
 
   @override
   void initState() {
@@ -29,22 +30,25 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 1000),
     );
 
     _fadeAnimation = CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeInOut,
+      curve: const Interval(0.0, 0.6, curve: Curves.easeIn),
     );
 
     _scaleAnimation = Tween<double>(
-      begin: 0.94,
+      begin: 0.8,
       end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.0, 0.6, curve: Curves.easeOutBack),
+    ));
 
     _controller.forward();
 
-    _navigationTimer = Timer(const Duration(milliseconds: 2800), () {
+    _navigationTimer = Timer(const Duration(milliseconds: 1200), () {
       if (!mounted) return;
 
       Navigator.of(context).pushReplacement(
@@ -54,7 +58,7 @@ class _SplashScreenState extends State<SplashScreen>
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(opacity: animation, child: child);
           },
-          transitionDuration: const Duration(milliseconds: 600),
+          transitionDuration: const Duration(milliseconds: 300),
         ),
       );
     });

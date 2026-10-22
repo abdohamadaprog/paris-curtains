@@ -19,8 +19,8 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
   final List<String> _categories = [
     "الكل",
     "ويفي",
-    "حلقات كبس",
-    "مواسير",
+    "دابل ويفي",
+    "حلقات كبس ومواسير",
     "بلتكانة",
     "إكسسوارات",
   ];
@@ -64,7 +64,7 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
             backgroundColor: const Color(0xFF1A1A24),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              side: BorderSide(color: AppColors.neonRed.withOpacity(0.5)),
+              side: BorderSide(color: AppColors.neonRed.withValues(alpha: 0.5)),
             ),
             title: Text(
               "حذف الصورة؟",
@@ -108,6 +108,7 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
         ) ??
         false;
 
+    if (!mounted) return;
     if (confirm) {
       await FirebaseFirestore.instance
           .collection('gallery_images')
@@ -266,6 +267,7 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
                         'heavy_fabric': heavy,
                         'light_fabric': light,
                       });
+                      if (!mounted) return;
                       Navigator.pop(context);
                       _snack("تم التعديل بامتياز ✨", AppColors.neonGreen);
                     },
@@ -358,26 +360,29 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
                   .orderBy('created_at', descending: true)
                   .snapshots(),
               builder: (ctx, snap) {
-                if (!snap.hasData)
+                if (!snap.hasData) {
                   return const Center(
                     child: CircularProgressIndicator(color: AppColors.neonGold),
                   );
+                }
 
                 var docs = snap.data!.docs.where((d) {
                   var data = d.data() as Map<String, dynamic>;
-                  if (_selectedCategory == "الكل")
+                  if (_selectedCategory == "الكل") {
                     return data['category'] != "إكسسوارات";
+                  }
                   else if (_selectedCategory == "إكسسوارات") {
                     bool isAcc = data['category'] == "إكسسوارات";
-                    if (_selectedAccessoryType != "الكل")
+                    if (_selectedAccessoryType != "الكل") {
                       return isAcc &&
                           data['accessory_type'] == _selectedAccessoryType;
+                    }
                     return isAcc;
                   }
                   return data['category'] == _selectedCategory;
                 }).toList();
 
-                if (docs.isEmpty)
+                if (docs.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -398,6 +403,7 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
                       ],
                     ),
                   );
+                }
 
                 return GridView.builder(
                   padding: const EdgeInsets.symmetric(
@@ -422,7 +428,7 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
                         color: const Color(0xFF1E1E2C),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.3),
+                            color: Colors.black.withValues(alpha: 0.3),
                             blurRadius: 5,
                           ),
                         ],
@@ -503,7 +509,7 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.neonGold
-              : Colors.white.withOpacity(0.05),
+              : Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(25),
           border: Border.all(
             color: isSelected ? AppColors.neonGold : Colors.white12,
@@ -590,7 +596,7 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 15),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: Colors.white24),
       ),

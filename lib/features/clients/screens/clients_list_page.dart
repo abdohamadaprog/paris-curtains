@@ -34,6 +34,9 @@ class _ClientsListPageState extends State<ClientsListPage>
 
   Future<void> _addClient() async {
     final nameController = TextEditingController();
+    final phoneController = TextEditingController();
+    final addressController = TextEditingController();
+    final notesController = TextEditingController();
     DateTime? installationDate;
     final formKey = GlobalKey<FormState>();
     final result = await showDialog<bool>(
@@ -42,58 +45,68 @@ class _ClientsListPageState extends State<ClientsListPage>
         builder: (context, setDialogState) => AlertDialog(
           backgroundColor: const Color(0xFF20202B),
           title: const Text('عميل جديد', style: TextStyle(color: Colors.white)),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nameController,
-                  autofocus: true,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: _inputDecoration('اسم العميل'),
-                  validator: (v) =>
-                      v == null || v.trim().isEmpty ? 'اكتب اسم العميل' : null,
-                ),
-                const SizedBox(height: 12),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.calendar_month, color: _gold),
-                  title: const Text(
-                    'تاريخ التركيب',
-                    style: TextStyle(color: Colors.white),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: nameController,
+                    autofocus: true,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _inputDecoration('اسم العميل'),
+                    validator: (v) => v == null || v.trim().isEmpty ? 'اكتب اسم العميل' : null,
                   ),
-                  subtitle: Text(
-                    installationDate == null
-                        ? 'اختياري'
-                        : DateFormat('yyyy-MM-dd').format(installationDate!),
-                    style: const TextStyle(color: _gold),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: phoneController,
+                    keyboardType: TextInputType.phone,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _inputDecoration('رقم الهاتف'),
                   ),
-                  onTap: () async {
-                    final now = DateTime.now();
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: installationDate ?? now,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null)
-                      setDialogState(() => installationDate = picked);
-                  },
-                ),
-                if (installationDate != null)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () =>
-                          setDialogState(() => installationDate = null),
-                      child: const Text(
-                        'إلغاء التاريخ',
-                        style: TextStyle(color: Colors.white70),
-                      ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: addressController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _inputDecoration('العنوان'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: notesController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _inputDecoration('ملاحظات'),
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.calendar_month, color: _gold),
+                    title: const Text(
+                      'تاريخ التركيب',
+                      style: TextStyle(color: Colors.white),
                     ),
+                    subtitle: Text(
+                      installationDate == null
+                          ? 'اختياري'
+                          : DateFormat('yyyy-MM-dd').format(installationDate!),
+                      style: const TextStyle(color: _gold),
+                    ),
+                    onTap: () async {
+                      final now = DateTime.now();
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: installationDate ?? now,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2100),
+                      );
+                      if (picked != null) {
+                        setDialogState(() => installationDate = picked);
+                      }
+                    },
                   ),
-              ],
+                ],
+              ),
             ),
           ),
           actions: [
@@ -107,8 +120,9 @@ class _ClientsListPageState extends State<ClientsListPage>
                 foregroundColor: Colors.black,
               ),
               onPressed: () {
-                if (formKey.currentState!.validate())
+                if (formKey.currentState!.validate()) {
                   Navigator.pop(dialogContext, true);
+                }
               },
               child: const Text('حفظ'),
             ),
@@ -121,10 +135,14 @@ class _ClientsListPageState extends State<ClientsListPage>
       try {
         await FirebaseFirestore.instance.collection('clients').add({
           'name': nameController.text.trim(),
+          'phone': phoneController.text.trim(),
+          'address': addressController.text.trim(),
+          'notes': notesController.text.trim(),
           'created_at': FieldValue.serverTimestamp(),
           'installation_date': installationDate == null
               ? null
               : Timestamp.fromDate(installationDate!),
+          'installation_done': false,
         });
         if (mounted) _message('تم إضافة العميل بنجاح');
       } catch (e) {
@@ -132,6 +150,9 @@ class _ClientsListPageState extends State<ClientsListPage>
       }
     }
     nameController.dispose();
+    phoneController.dispose();
+    addressController.dispose();
+    notesController.dispose();
   }
 
   Future<void> _editClient(String id, String currentName) async {
@@ -290,17 +311,19 @@ class _ClientsListPageState extends State<ClientsListPage>
                   .collection('clients')
                   .snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.hasError)
+                if (snapshot.hasError) {
                   return const Center(
                     child: Text(
                       'حصل خطأ أثناء تحميل العملاء',
                       style: TextStyle(color: Colors.redAccent),
                     ),
                   );
-                if (snapshot.connectionState == ConnectionState.waiting)
+                }
+                if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
                     child: CircularProgressIndicator(color: _gold),
                   );
+                }
                 final docs = snapshot.data?.docs ?? [];
                 final clients = docs.where((doc) {
                   final name = (doc.data()['name'] ?? '').toString();
@@ -359,13 +382,14 @@ class _ClientsListPageState extends State<ClientsListPage>
     List<QueryDocumentSnapshot<Map<String, dynamic>>> clients,
     bool archived,
   ) {
-    if (clients.isEmpty)
+    if (clients.isEmpty) {
       return Center(
         child: Text(
           archived ? 'الأرشيف فارغ' : 'لا يوجد شغل حالي',
           style: const TextStyle(color: Colors.white60, fontSize: 16),
         ),
       );
+    }
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 90),
       itemCount: clients.length,
@@ -374,6 +398,7 @@ class _ClientsListPageState extends State<ClientsListPage>
         final data = doc.data();
         final name = (data['name'] ?? 'بدون اسم').toString();
         final date = _dateFrom(data['installation_date']);
+        final done = data['installation_done'] == true;
         return Card(
           color: const Color(0xFF20202B),
           margin: const EdgeInsets.symmetric(vertical: 6),
@@ -383,7 +408,7 @@ class _ClientsListPageState extends State<ClientsListPage>
           ),
           child: ListTile(
             leading: CircleAvatar(
-              backgroundColor: _gold.withOpacity(.15),
+              backgroundColor: _gold.withValues(alpha: .15),
               child: Text(
                 name.isNotEmpty ? name.characters.first : '?',
                 style: const TextStyle(
@@ -400,20 +425,34 @@ class _ClientsListPageState extends State<ClientsListPage>
               ),
             ),
             subtitle: Text(
-              date == null
-                  ? 'لم يتم تحديد موعد تركيب'
-                  : 'موعد التركيب: ${DateFormat('yyyy/MM/dd').format(date)}',
-              style: const TextStyle(color: Colors.white60),
+              [
+                if (date == null)
+                  'لم يتم تحديد موعد تركيب'
+                else
+                  'موعد التركيب: ${DateFormat('yyyy/MM/dd').format(date)}',
+                done ? 'الشغل اتعمل' : 'لسه مش معمول',
+              ].join(' • '),
+              style: TextStyle(
+                color: done ? const Color(0xFF72C69A) : Colors.white60,
+              ),
             ),
             trailing: PopupMenuButton<String>(
               iconColor: Colors.white70,
               color: const Color(0xFF30303D),
-              onSelected: (value) {
+              onSelected: (value) async {
                 if (value == 'edit') _editClient(doc.id, name);
                 if (value == 'delete') _deleteClient(doc.id, name);
+                if (value == 'done') {
+                  await doc.reference.update({
+                    'installation_done': !done,
+                    'installation_done_at': !done
+                        ? FieldValue.serverTimestamp()
+                        : null,
+                  });
+                }
               },
-              itemBuilder: (_) => const [
-                PopupMenuItem(
+              itemBuilder: (_) => [
+                const PopupMenuItem(
                   value: 'edit',
                   child: Text(
                     'تعديل الاسم',
@@ -421,6 +460,13 @@ class _ClientsListPageState extends State<ClientsListPage>
                   ),
                 ),
                 PopupMenuItem(
+                  value: 'done',
+                  child: Text(
+                    done ? 'إلغاء تنفيذ الشغل' : 'تسجيل إن الشغل اتعمل',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                const PopupMenuItem(
                   value: 'delete',
                   child: Text(
                     'حذف العميل',

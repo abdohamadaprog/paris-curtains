@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -52,8 +51,8 @@ class _UploadImagePageState extends State<UploadImagePage> {
 
   final List<String> _curtainCategories = [
     'ويفي',
-    'حلقات كبس',
-    'مواسير',
+    'دابل ويفي',
+    'حلقات كبس ومواسير',
     'بلتكانة',
   ];
 
@@ -69,6 +68,7 @@ class _UploadImagePageState extends State<UploadImagePage> {
   String? _selectedHeavy;
   String? _selectedLight;
   String? _selectedAccessoryType;
+  final Map<String, String> _imageAccessoryTypes = {};
 
   double _rating = 5;
 
@@ -201,7 +201,7 @@ class _UploadImagePageState extends State<UploadImagePage> {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: UploadStyle.gold.withOpacity(0.1),
+            color: UploadStyle.gold.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Icon(icon, color: UploadStyle.goldLight),
@@ -400,64 +400,24 @@ class _UploadImagePageState extends State<UploadImagePage> {
       children: [
         _sectionTitle(
           'إضافة إكسسوارات',
-          'اختار النوع وراجع الصور قبل النشر',
+          'حدد نوع الإكسسوار لكل صورة بجانبها، ثم انشر العمل',
           Icons.category_outlined,
         ),
         const SizedBox(height: 20),
-        InkWell(
-          onTap: _isUploading ? null : _showAccessoryTypeSheet,
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: UploadStyle.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: _selectedAccessoryType == null
-                    ? UploadStyle.border
-                    : UploadStyle.gold,
+        Row(
+          children: [
+            Expanded(
+              child: _buildPickerCard(
+                title: 'إضافة صور أخرى',
+                subtitle: 'اختار صور جديدة للإكسسوارات',
+                icon: Icons.add_photo_alternate_outlined,
+                onTap: _pickImages,
               ),
             ),
-            child: Row(
-              children: [
-                const Icon(Icons.widgets_outlined, color: UploadStyle.gold),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('نوع الإكسسوار', style: UploadStyle.body),
-                      const SizedBox(height: 3),
-                      Text(
-                        _selectedAccessoryType ?? 'اضغط لاختيار النوع',
-                        style: TextStyle(
-                          fontFamily: 'Cairo',
-                          fontWeight: FontWeight.bold,
-                          color: _selectedAccessoryType == null
-                              ? UploadStyle.textSecondary
-                              : UploadStyle.goldLight,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: UploadStyle.textSecondary,
-                ),
-              ],
-            ),
-          ),
+          ],
         ),
         const SizedBox(height: 18),
-        _buildPickerCard(
-          title: 'إضافة صور أخرى',
-          subtitle: 'اختار صور إضافية للإكسسوار',
-          icon: Icons.add_photo_alternate_outlined,
-          onTap: _pickImages,
-        ),
-        const SizedBox(height: 16),
-        _buildSelectedImages(),
+        _buildAccessoryImagesList(),
         const SizedBox(height: 24),
         _buildRatingCard(),
         const SizedBox(height: 24),
@@ -484,6 +444,229 @@ class _UploadImagePageState extends State<UploadImagePage> {
     );
   }
 
+  Widget _buildAccessoryImagesList() {
+    if (_selectedImages.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: UploadStyle.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: UploadStyle.border),
+        ),
+        child: const Column(
+          children: [
+            Icon(
+              Icons.photo_size_select_actual_outlined,
+              size: 34,
+              color: UploadStyle.textSecondary,
+            ),
+            SizedBox(height: 8),
+            Text('لسه مفيش صور مختارة', style: UploadStyle.body),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text('الصور وتحديد الأنواع', style: UploadStyle.heading),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+              decoration: BoxDecoration(
+                color: UploadStyle.gold.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                '${_selectedImages.length} صورة',
+                style: const TextStyle(
+                  fontFamily: 'Cairo',
+                  color: UploadStyle.goldLight,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _selectedImages.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final file = _selectedImages[index];
+            final currentType = _imageAccessoryTypes[file.path];
+
+            return Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: UploadStyle.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: UploadStyle.border),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(
+                          width: 92,
+                          height: 92,
+                          child: _buildImagePreview(file),
+                        ),
+                      ),
+                      Positioned(
+                        top: 2,
+                        right: 2,
+                        child: InkWell(
+                          onTap: _isUploading
+                              ? null
+                              : () {
+                                  setState(() {
+                                    final removed = _selectedImages.removeAt(
+                                      index,
+                                    );
+                                    _imageBytesCache.remove(removed.path);
+                                    _imageAccessoryTypes.remove(removed.path);
+                                  });
+                                },
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: const BoxDecoration(
+                              color: Colors.black87,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close_rounded,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'صورة رقم ${index + 1}',
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            fontSize: 12,
+                            color: UploadStyle.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          key: ValueKey('${file.path}-$currentType'),
+                          initialValue: currentType,
+                          isExpanded: true,
+                          dropdownColor: UploadStyle.surfaceLight,
+                          hint: const Text(
+                            'حدد نوع الإكسسوار',
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              color: UploadStyle.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: UploadStyle.surfaceLight,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: currentType == null
+                                    ? UploadStyle.border
+                                    : UploadStyle.gold,
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                color: UploadStyle.gold,
+                              ),
+                            ),
+                          ),
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: UploadStyle.gold,
+                          ),
+                          items: _accessoryTypes
+                              .map(
+                                (type) => DropdownMenuItem(
+                                  value: type,
+                                  child: Text(
+                                    type,
+                                    style: const TextStyle(
+                                      fontFamily: 'Cairo',
+                                      color: UploadStyle.textPrimary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: _isUploading
+                              ? null
+                              : (value) {
+                                  if (value == null) return;
+                                  setState(() {
+                                    _imageAccessoryTypes[file.path] = value;
+                                    _selectedAccessoryType = value;
+                                  });
+                                },
+                        ),
+                        if (currentType != null && _selectedImages.length > 1)
+                          TextButton(
+                            onPressed: _isUploading
+                                ? null
+                                : () {
+                                    setState(() {
+                                      for (final image in _selectedImages) {
+                                        _imageAccessoryTypes[image.path] =
+                                            currentType;
+                                      }
+                                      _selectedAccessoryType = currentType;
+                                    });
+                                  },
+                            child: const Text(
+                              'تطبيق النوع على كل الصور',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                color: UploadStyle.goldLight,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
   Widget _buildPickerCard({
     required String title,
     required String subtitle,
@@ -500,7 +683,7 @@ class _UploadImagePageState extends State<UploadImagePage> {
           decoration: BoxDecoration(
             color: UploadStyle.surface,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: UploadStyle.gold.withOpacity(0.55)),
+            border: Border.all(color: UploadStyle.gold.withValues(alpha: 0.55)),
           ),
           child: Column(
             children: [
@@ -508,7 +691,7 @@ class _UploadImagePageState extends State<UploadImagePage> {
                 width: 58,
                 height: 58,
                 decoration: BoxDecoration(
-                  color: UploadStyle.gold.withOpacity(0.1),
+                  color: UploadStyle.gold.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: Icon(icon, size: 30, color: UploadStyle.goldLight),
@@ -592,7 +775,7 @@ class _UploadImagePageState extends State<UploadImagePage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
               decoration: BoxDecoration(
-                color: UploadStyle.gold.withOpacity(0.12),
+                color: UploadStyle.gold.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -631,7 +814,7 @@ class _UploadImagePageState extends State<UploadImagePage> {
                   top: 5,
                   right: 5,
                   child: Material(
-                    color: Colors.black.withOpacity(0.72),
+                    color: Colors.black.withValues(alpha: 0.72),
                     shape: const CircleBorder(),
                     child: InkWell(
                       customBorder: const CircleBorder(),
@@ -663,7 +846,7 @@ class _UploadImagePageState extends State<UploadImagePage> {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.7),
+                      color: Colors.black.withValues(alpha: 0.7),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -853,7 +1036,7 @@ class _UploadImagePageState extends State<UploadImagePage> {
           return Image.memory(
             snapshot.data!,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => _imagePreviewError(),
+            errorBuilder: (_, _, _) => _imagePreviewError(),
           );
         }
 
@@ -1022,14 +1205,6 @@ class _UploadImagePageState extends State<UploadImagePage> {
     }
   }
 
-  Future<void> _showAccessoryTypeSheet() async {
-    await _showSelectionSheet(
-      'اختار نوع الإكسسوار',
-      _accessoryTypes,
-      (value) => setState(() => _selectedAccessoryType = value),
-    );
-  }
-
   Future<void> _uploadAllImages() async {
     if (_isUploading) return;
 
@@ -1038,9 +1213,16 @@ class _UploadImagePageState extends State<UploadImagePage> {
       return;
     }
 
-    if (_isAccessoryMode && _selectedAccessoryType == null) {
-      _showMessage('حدد نوع الإكسسوار الأول.', isError: true);
-      return;
+    if (_isAccessoryMode) {
+      for (final file in _selectedImages) {
+        if (_imageAccessoryTypes[file.path] == null) {
+          _showMessage(
+            'يجب تحديد نوع الإكسسوار لكل الصور المختارة.',
+            isError: true,
+          );
+          return;
+        }
+      }
     }
 
     if (!_isAccessoryMode &&
@@ -1062,6 +1244,7 @@ class _UploadImagePageState extends State<UploadImagePage> {
         rating: _rating,
         isAccessory: _isAccessoryMode,
         accessoryType: _selectedAccessoryType,
+        fileAccessoryTypes: _isAccessoryMode ? _imageAccessoryTypes : null,
         heavyFabric: _selectedHeavy,
         lightFabric: _selectedLight,
       );
@@ -1089,37 +1272,6 @@ class _UploadImagePageState extends State<UploadImagePage> {
         isError: true,
       );
     }
-  }
-
-  String _friendlyUploadError(Object error) {
-    final raw = error.toString();
-    final cloudinaryStart = raw.indexOf('{');
-
-    if (cloudinaryStart >= 0) {
-      try {
-        final decoded = jsonDecode(raw.substring(cloudinaryStart));
-
-        if (decoded is Map &&
-            decoded['error'] is Map &&
-            decoded['error']['message'] != null) {
-          return decoded['error']['message'].toString();
-        }
-      } catch (_) {}
-    }
-
-    if (raw.contains('SocketException') || raw.contains('Failed host lookup')) {
-      return 'مشكلة اتصال بالإنترنت أو تعذّر الوصول إلى خادم الصور.';
-    }
-
-    if (raw.contains('TimeoutException')) {
-      return 'انتهت مهلة الرفع؛ جرّب مرة أخرى.';
-    }
-
-    if (raw.contains('FirebaseException')) {
-      return 'تعذّر حفظ بيانات الصورة في Firebase: $raw';
-    }
-
-    return raw.replaceFirst('Exception: ', '').replaceFirst('Bad state: ', '');
   }
 
   void _showMessage(String message, {required bool isError}) {
@@ -1260,12 +1412,12 @@ class _BackgroundGlow extends StatelessWidget {
           Positioned(
             top: -100,
             left: -100,
-            child: _glow(UploadStyle.gold.withOpacity(0.055)),
+            child: _glow(UploadStyle.gold.withValues(alpha: 0.055)),
           ),
           Positioned(
             bottom: -130,
             right: -110,
-            child: _glow(AppColors.primaryGold.withOpacity(0.045)),
+            child: _glow(AppColors.primaryGold.withValues(alpha: 0.045)),
           ),
         ],
       ),

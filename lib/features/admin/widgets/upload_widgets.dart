@@ -144,7 +144,7 @@ class NeonButton extends StatelessWidget {
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
           elevation: isPrimary ? 2 : 0,
-          shadowColor: UploadStyle.gold.withOpacity(0.16),
+          shadowColor: UploadStyle.gold.withValues(alpha: 0.16),
           backgroundColor: isPrimary ? UploadStyle.gold : UploadStyle.surface,
           foregroundColor: isPrimary
               ? UploadStyle.background
@@ -199,7 +199,7 @@ class GlassSelectionCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 12),
           decoration: BoxDecoration(
             color: selected
-                ? UploadStyle.gold.withOpacity(0.08)
+                ? UploadStyle.gold.withValues(alpha: 0.08)
                 : UploadStyle.surface,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
@@ -277,7 +277,7 @@ class CategoryOptionCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
           decoration: BoxDecoration(
             color: isSelected
-                ? UploadStyle.gold.withOpacity(0.09)
+                ? UploadStyle.gold.withValues(alpha: 0.09)
                 : UploadStyle.surface,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(

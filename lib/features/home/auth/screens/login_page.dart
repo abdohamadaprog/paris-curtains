@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:local_auth/local_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../admin/screens/admin_dashboard_page.dart';
@@ -13,6 +15,7 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   static const String _adminEmail = 'abdohamadagpt@gmail.com';
+  final LocalAuthentication auth = LocalAuthentication();
 
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
@@ -26,6 +29,44 @@ class _LoginPageState extends State<LoginPage> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loginWithBiometrics() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final bool isBiometricEnabled = prefs.getBool('biometric_enabled') ?? false;
+
+      if (!isBiometricEnabled) {
+        _showMessage('يجب تفعيل الدخول بالبصمة أولاً من لوحة الإدارة.');
+        return;
+      }
+
+      final bool canCheckBiometrics = await auth.canCheckBiometrics;
+      final bool isDeviceSupported = await auth.isDeviceSupported();
+
+      if (!canCheckBiometrics && !isDeviceSupported) {
+        _showMessage('البصمة غير متاحة على هذا الجهاز.');
+        return;
+      }
+
+      final bool didAuthenticate = await auth.authenticate(
+        localizedReason: 'قم بتأكيد هويتك لدخول لوحة الإدارة',
+        options: const AuthenticationOptions(
+          biometricOnly: true,
+          stickyAuth: true,
+        ),
+      );
+
+      if (didAuthenticate) {
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute<void>(builder: (_) => const AdminDashboardPage()),
+        );
+      }
+    } catch (e) {
+      debugPrint('[AUTH ERROR] $e');
+      _showMessage('حدث خطأ أثناء المصادقة الحيوية.');
+    }
   }
 
   Future<void> _login() async {
@@ -148,22 +189,25 @@ class _LoginPageState extends State<LoginPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Center(
-                        child: Container(
-                          width: 96,
-                          height: 96,
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: gold, width: 2),
-                          ),
-                          child: ClipOval(
-                            child: Image.asset(
-                              'assets/images/paris1.png',
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, error, stackTrace) => Icon(
-                                Icons.curtains_rounded,
-                                color: gold,
-                                size: 48,
+                        child: GestureDetector(
+                          onLongPress: _loginWithBiometrics,
+                          child: Container(
+                            width: 96,
+                            height: 96,
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: gold, width: 2),
+                            ),
+                            child: ClipOval(
+                              child: Image.asset(
+                                'assets/images/paris1.png',
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, error, stackTrace) => Icon(
+                                  Icons.curtains_rounded,
+                                  color: gold,
+                                  size: 48,
+                                ),
                               ),
                             ),
                           ),

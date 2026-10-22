@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
+import 'app_image_viewer.dart';
 
 class GalleryGrid extends StatelessWidget {
   final String category;
@@ -29,51 +30,17 @@ class GalleryGrid extends StatelessWidget {
     return originalUrl.replaceFirst('/upload/', '/upload/q_auto/');
   }
 
-  void _showImageViewer(BuildContext context, String imageUrl) {
-    showDialog<void>(
-      context: context,
-      barrierColor: Colors.black87,
-      builder: (dialogContext) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          insetPadding: const EdgeInsets.all(12),
-          child: Stack(
-            alignment: Alignment.topRight,
-            children: [
-              InteractiveViewer(
-                minScale: 1,
-                maxScale: 4,
-                child: CachedNetworkImage(
-                  imageUrl: imageUrl,
-                  fit: BoxFit.contain,
-                  placeholder: (context, url) {
-                    return const Center(
-                      child: CircularProgressIndicator(color: Colors.white),
-                    );
-                  },
-                  errorWidget: (context, url, error) {
-                    return const Center(
-                      child: Icon(
-                        Icons.broken_image_outlined,
-                        color: Colors.white,
-                        size: 48,
-                      ),
-                    );
-                  },
-                ),
-              ),
-              IconButton(
-                tooltip: 'إغلاق',
-                onPressed: () {
-                  Navigator.of(dialogContext).pop();
-                },
-                icon: const Icon(Icons.close, color: Colors.white, size: 30),
-              ),
-            ],
-          ),
-        );
-      },
+  void _showImageViewer(
+    BuildContext context,
+    List<String> imageUrls,
+    List<String> titles,
+    int index,
+  ) {
+    AppImageViewerPage.open(
+      context,
+      imageUrls: imageUrls,
+      titles: titles,
+      initialIndex: index,
     );
   }
 
@@ -84,7 +51,7 @@ class GalleryGrid extends StatelessWidget {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('gallery_images')
-          .orderBy('sort_order')
+          .orderBy('created_at', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
@@ -193,8 +160,24 @@ class GalleryGrid extends StatelessWidget {
           );
         }
 
+        final imageUrls = images
+            .map((doc) => (doc.data()['url'] ?? '').toString())
+            .toList();
+        final titles = images
+            .map(
+              (doc) =>
+                  (doc.data()['accessory_type'] ??
+                          doc.data()['category'] ??
+                          'إكسسوار')
+                      .toString(),
+            )
+            .toList();
+
         return GridView.builder(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
           itemCount: images.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
@@ -210,7 +193,8 @@ class GalleryGrid extends StatelessWidget {
             final imageUrl = _getOptimizedUrl(originalUrl);
 
             return GestureDetector(
-              onTap: () => _showImageViewer(context, imageUrl),
+              onTap: () =>
+                  _showImageViewer(context, imageUrls, titles, index),
               child: Hero(
                 tag: 'gallery_${document.id}',
                 child: ClipRRect(
