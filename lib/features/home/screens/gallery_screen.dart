@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/image_url.dart';
 import '../widgets/app_image_viewer.dart';
 import '../widgets/gallery_widgets.dart';
 import 'accessories_gallery_page.dart';
@@ -134,13 +135,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
     final bMillis = bt is Timestamp ? bt.millisecondsSinceEpoch : 0;
     final byDate = bMillis.compareTo(aMillis);
     return byDate != 0 ? byDate : a.id.compareTo(b.id);
-  }
-
-  String _optimizedUrl(String url) {
-    if (url.contains('cloudinary.com') && url.contains('/upload/')) {
-      return url.replaceFirst('/upload/', '/upload/q_auto/');
-    }
-    return url;
   }
 
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _filterImages(
@@ -318,7 +312,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
                             index,
                           ) {
                             final data = images[index].data();
-                            final url = _optimizedUrl(data['url'].toString());
+                            final url = ImageUrl.thumbnail(
+                              data['url'].toString(),
+                            );
                             final category = (data['category'] ?? 'ستائر')
                                 .toString();
 

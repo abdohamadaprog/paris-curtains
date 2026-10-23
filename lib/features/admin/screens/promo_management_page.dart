@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/image_url.dart';
 import 'promo_reorder_page.dart';
 
 class PromoManagementPage extends StatefulWidget {
@@ -307,7 +308,7 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
                         children: [
                           Expanded(
                             child: CachedNetworkImage(
-                              imageUrl: url,
+                              imageUrl: ImageUrl.thumbnail(url, width: 700),
                               width: double.infinity,
                               fit: BoxFit.cover,
                               placeholder: (context, url) => const Center(

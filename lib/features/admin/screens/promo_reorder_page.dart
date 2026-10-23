@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/image_url.dart';
 
 class PromoReorderPage extends StatefulWidget {
   const PromoReorderPage({super.key});
@@ -253,7 +254,10 @@ class _PromoReorderPageState extends State<PromoReorderPage> {
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(13),
                                 child: Image.network(
-                                  doc['url'],
+                                  ImageUrl.thumbnail(
+                                    doc['url'].toString(),
+                                    width: 700,
+                                  ),
                                   height: 160,
                                   width: double.infinity,
                                   fit: BoxFit.cover,

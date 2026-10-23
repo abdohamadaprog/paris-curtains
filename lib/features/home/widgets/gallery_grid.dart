@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/image_url.dart';
 import 'app_image_viewer.dart';
 import 'gallery_widgets.dart';
 
@@ -16,15 +17,6 @@ class GalleryGrid extends StatelessWidget {
     this.accessoryType,
     this.crossAxisCount = 2,
   });
-
-  String _getOptimizedUrl(String originalUrl) {
-    if (!originalUrl.contains('cloudinary.com') ||
-        !originalUrl.contains('/upload/')) {
-      return originalUrl;
-    }
-
-    return originalUrl.replaceFirst('/upload/', '/upload/q_auto/');
-  }
 
   void _showImageViewer(
     BuildContext context,
@@ -157,7 +149,7 @@ class GalleryGrid extends StatelessWidget {
             final originalUrl = data['url']?.toString().trim() ?? '';
 
             return GalleryImageCard(
-              imageUrl: _getOptimizedUrl(originalUrl),
+              imageUrl: ImageUrl.thumbnail(originalUrl),
               category: titles[index],
               isDark: isDark,
               compact: crossAxisCount >= 3,

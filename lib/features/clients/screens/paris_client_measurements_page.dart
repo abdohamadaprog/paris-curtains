@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../core/constants/app_colors.dart';
+
 /// شاشة أولية قابلة للدمج داخل تطبيق Paris Curtains.
 /// تحفظ بيانات المقاسات داخل مستند العميل في Firestore. يتطلب cloud_firestore.
 class ParisClientMeasurementsPage extends StatefulWidget {
@@ -28,18 +30,21 @@ class ParisClientMeasurementsPage extends StatefulWidget {
 
 class _ParisClientMeasurementsPageState
     extends State<ParisClientMeasurementsPage> {
-  static const _gold = Color(0xFFFFD45A);
-  static const _neon = Color(0xFF27E7F2);
-  static const _bg = Color(0xFF090D14);
-  static const _panel = Color(0xFF111925);
+  static const _gold = AppColors.primaryGold;
+  static const _neon = AppColors.lightGold;
+  static const _bg = AppColors.bgDark;
+  static const _panel = AppColors.surfaceDark;
 
   late final TextEditingController _nameController;
   late DateTime? _installationDate;
   final List<_Measurement> _measurements = [_Measurement()];
   final List<_Balcony> _balconies = [];
   final List<_DeletedCard> _trash = [];
+  int _nextId = 1;
   bool _saving = false;
   bool _showTrash = false;
+  bool _loaded = false;
+  bool _loadFailed = false;
 
   @override
   void initState() {
@@ -65,12 +70,17 @@ class _ParisClientMeasurementsPageState
   }
 
   Future<void> _loadSavedData() async {
+    _loadFailed = false;
     try {
       final doc = await FirebaseFirestore.instance
           .collection('clients')
           .doc(widget.clientId)
           .get();
-      if (!mounted || !doc.exists) return;
+      if (!mounted) return;
+      if (!doc.exists) {
+        setState(() => _loaded = true);
+        return;
+      }
       final data = doc.data() ?? <String, dynamic>{};
       final loadedMeasurements = <_Measurement>[];
       final loadedBalconies = <_Balcony>[];
@@ -96,8 +106,9 @@ class _ParisClientMeasurementsPageState
         loadedMeasurements.add(m);
       }
       for (final raw in (data['deleted_cards'] as List? ?? const [])) {
-        if (raw is Map)
+        if (raw is Map) {
           loadedTrash.add(_DeletedCard.fromMap(Map<String, dynamic>.from(raw)));
+        }
       }
       for (final raw in (data['balconies'] as List? ?? const [])) {
         if (raw is! Map) continue;
@@ -134,9 +145,21 @@ class _ParisClientMeasurementsPageState
         _nameController.text = (data['name'] ?? widget.clientName).toString();
         final date = data['installation_date'];
         if (date is Timestamp) _installationDate = date.toDate();
+        _loaded = true;
       });
-    } catch (_) {
-      /* Keep the editable screen usable if offline; saving will report errors. */
+    } catch (e) {
+      debugPrint('Failed to load client data: $e');
+      if (!mounted) return;
+      _loadFailed = true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('تعذر تحميل بيانات العميل. تأكد من الاتصال.'),
+          action: SnackBarAction(
+            label: 'إعادة المحاولة',
+            onPressed: _loadSavedData,
+          ),
+        ),
+      );
     }
   }
 
@@ -181,6 +204,7 @@ class _ParisClientMeasurementsPageState
       item.name.text = '';
       item.width.text = '';
       item.height.text = '';
+      _nextId++;
       _measurements.add(item);
     });
   }
@@ -191,6 +215,27 @@ class _ParisClientMeasurementsPageState
 
   Future<void> _saveData() async {
     if (_saving) return;
+
+    // لا نحفظ قبل نجاح تحميل البيانات حتى لا نكتب فوق مقاسات العميل.
+    if (!_loaded) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _loadFailed
+                ? 'تعذر تحميل بيانات العميل، أعد المحاولة قبل الحفظ حتى لا تضيع بياناته.'
+                : 'جاري تحميل بيانات العميل، انتظر لحظة ثم احفظ.',
+          ),
+          action: _loadFailed
+              ? SnackBarAction(
+                  label: 'إعادة المحاولة',
+                  onPressed: _loadSavedData,
+                )
+              : null,
+        ),
+      );
+      return;
+    }
+
     setState(() => _saving = true);
     try {
       final measurements = _measurements.map((m) {
@@ -240,15 +285,20 @@ class _ParisClientMeasurementsPageState
             'deleted_cards': _trash.map((t) => t.toMap()).toList(),
             'measurements_updated_at': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('تم حفظ بيانات العميل والمقاسات')),
         );
+      }
     } catch (e) {
-      if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('تعذر الحفظ: $e')));
+      debugPrint('Failed to save client data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تعذر الحفظ. تأكد من الاتصال وحاول مرة أخرى.'),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -333,19 +383,22 @@ class _ParisClientMeasurementsPageState
                   // Measurement cards can be reordered among measurement positions only;
                   // balcony cards are not passed into the measurements list by mistake.
                   if (oldIndex >= _measurements.length ||
-                      newIndex > _measurements.length)
+                      newIndex > _measurements.length) {
                     return;
+                  }
                   setState(() {
                     if (newIndex > oldIndex) newIndex--;
-                    if (newIndex < 0 || newIndex >= _measurements.length)
+                    if (newIndex < 0 || newIndex >= _measurements.length) {
                       return;
+                    }
                     final item = _measurements.removeAt(oldIndex);
                     _measurements.insert(newIndex, item);
                   });
                 },
                 itemBuilder: (context, index) {
-                  if (index < _measurements.length)
+                  if (index < _measurements.length) {
                     return _measurementCard(_measurements[index], index);
+                  }
                   final bIndex = index - _measurements.length;
                   return _balconyCard(
                     _balconies[bIndex],
@@ -521,8 +574,9 @@ class _ParisClientMeasurementsPageState
         ],
       ),
     );
-    if (result != null && result.trim().isNotEmpty)
+    if (result != null && result.trim().isNotEmpty) {
       setState(() => _nameController.text = result.trim());
+    }
     controller.dispose();
   }
 
@@ -575,10 +629,11 @@ class _ParisClientMeasurementsPageState
   void _restoreTrash(_DeletedCard card) {
     setState(() {
       _trash.remove(card);
-      if (card.type == 'measurement')
+      if (card.type == 'measurement') {
         _measurements.add(card.toMeasurement());
-      else
+      } else {
         _balconies.add(card.toBalcony());
+      }
     });
   }
 

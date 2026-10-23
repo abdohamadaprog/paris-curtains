@@ -227,6 +227,7 @@ class _AppImageViewerPageState extends State<AppImageViewerPage> {
                     child: Center(
                       child: CachedNetworkImage(
                         imageUrl: url,
+                        memCacheWidth: 1800,
                         fit: BoxFit.contain,
                         placeholder: (context, url) => const Center(
                           child: CircularProgressIndicator(

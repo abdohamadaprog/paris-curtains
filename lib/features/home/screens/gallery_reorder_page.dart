@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/image_url.dart';
 
 class GalleryReorderPage extends StatefulWidget {
   const GalleryReorderPage({super.key});
@@ -271,7 +272,9 @@ class _GalleryReorderPageState extends State<GalleryReorderPage> {
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(7),
                                 child: CachedNetworkImage(
-                                  imageUrl: data['url'],
+                                  imageUrl: ImageUrl.thumbnail(
+                                    data['url'].toString(),
+                                  ),
                                   fit: BoxFit.cover,
                                   placeholder: (c, u) =>
                                       Container(color: Colors.white10),

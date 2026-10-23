@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/image_url.dart';
 
 /// نص بتدرج ذهبي فاخر.
 class GoldText extends StatelessWidget {
@@ -231,7 +232,8 @@ class PromoBanner extends StatelessWidget {
                   }
 
                   return CachedNetworkImage(
-                    imageUrl: images[i],
+                    imageUrl: ImageUrl.banner(images[i]),
+                    memCacheWidth: 1000,
                     fit: BoxFit.cover,
                     placeholder: (context, url) =>
                         const ColoredBox(color: AppColors.bgDark),
@@ -398,7 +400,8 @@ class CategoryTile extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             CachedNetworkImage(
-              imageUrl: imageUrl,
+              imageUrl: ImageUrl.thumbnail(imageUrl, width: 300),
+              memCacheWidth: 300,
               fit: BoxFit.cover,
               placeholder: (context, url) =>
                   const ColoredBox(color: AppColors.surfaceDark),
@@ -519,6 +522,7 @@ class GalleryImageCard extends StatelessWidget {
             children: [
               CachedNetworkImage(
                 imageUrl: imageUrl,
+                memCacheWidth: 700,
                 fit: BoxFit.cover,
                 placeholder: (context, url) => const ColoredBox(
                   color: AppColors.surfaceDark,
