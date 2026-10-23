@@ -15,14 +15,15 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  late final Animation<double> _fadeAnimation;
-  late final Animation<double> _scaleAnimation;
+  late final Animation<double> _logoFade;
+  late final Animation<double> _logoScale;
+  late final Animation<double> _titleFade;
+  late final Animation<Offset> _titleSlide;
+  late final Animation<double> _taglineFade;
 
   Timer? _navigationTimer;
 
   static const Color gold = AppColors.primaryGold;
-  static const Color darkBackground = AppColors.bgDark;
-  static const Color lightBackground = AppColors.background;
 
   @override
   void initState() {
@@ -30,25 +31,39 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 1100),
     );
 
-    _fadeAnimation = CurvedAnimation(
+    _logoFade = CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0.0, 0.6, curve: Curves.easeIn),
+      curve: const Interval(0.0, 0.5, curve: Curves.easeIn),
     );
 
-    _scaleAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.0,
-    ).animate(CurvedAnimation(
+    _logoScale = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.5, curve: Curves.easeOutBack),
+      ),
+    );
+
+    final titleCurve = CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0.0, 0.6, curve: Curves.easeOutBack),
-    ));
+      curve: const Interval(0.25, 0.7, curve: Curves.easeOut),
+    );
+    _titleFade = titleCurve;
+    _titleSlide = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(titleCurve);
+
+    _taglineFade = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.55, 0.95, curve: Curves.easeIn),
+    );
 
     _controller.forward();
 
-    _navigationTimer = Timer(const Duration(milliseconds: 1200), () {
+    _navigationTimer = Timer(const Duration(milliseconds: 1300), () {
       if (!mounted) return;
 
       Navigator.of(context).pushReplacement(
@@ -74,9 +89,8 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final backgroundColor = isDark ? darkBackground : lightBackground;
-
+    final backgroundColor = isDark ? AppColors.bgDark : AppColors.background;
+    final titleColor = isDark ? AppColors.lightGold : AppColors.goldDeep;
     final mainTextColor = isDark
         ? const Color(0xFFF8F2E7)
         : const Color(0xFF29241B);
@@ -114,136 +128,189 @@ class _SplashScreenState extends State<SplashScreen>
             ),
 
             SafeArea(
-              child: Center(
-                child: FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: ScaleTransition(
-                    scale: _scaleAnimation,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // إطار اللوجو
-                        Container(
-                          width: 154,
-                          height: 154,
-                          padding: const EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: gold, width: 1.5),
-                            boxShadow: [
-                              BoxShadow(
-                                color: gold.withValues(alpha: 0.13),
-                                blurRadius: 28,
-                                spreadRadius: 2,
+                        // إطار اللوجو بحلقة ذهبية متدرجة
+                        FadeTransition(
+                          opacity: _logoFade,
+                          child: ScaleTransition(
+                            scale: _logoScale,
+                            child: Container(
+                              width: 158,
+                              height: 158,
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: AppColors.goldGradient,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: gold.withValues(alpha: 0.28),
+                                    blurRadius: 40,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
                               ),
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: backgroundColor,
+                                ),
+                                child: ClipOval(
+                                  child: Image.asset(
+                                    'assets/images/paris1.png',
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return const Icon(
+                                        Icons.curtains,
+                                        size: 68,
+                                        color: gold,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 28),
+
+                        // اسم باريس
+                        FadeTransition(
+                          opacity: _titleFade,
+                          child: SlideTransition(
+                            position: _titleSlide,
+                            child: Text(
+                              'باريس',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: 'Aref Ruqaa',
+                                fontSize: 58,
+                                height: 1.35,
+                                fontWeight: FontWeight.bold,
+                                color: titleColor,
+                                shadows: [
+                                  Shadow(
+                                    color: gold.withValues(alpha: 0.3),
+                                    blurRadius: 18,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 6),
+
+                        // فاصل زخرفي + الشعار + شريط التحميل
+                        FadeTransition(
+                          opacity: _taglineFade,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _dividerLine(),
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                    ),
+                                    child: Icon(
+                                      Icons.auto_awesome,
+                                      size: 15,
+                                      color: gold,
+                                    ),
+                                  ),
+                                  _dividerLine(),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'لمسة من الفخامة',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontFamily: 'Tajawal',
+                                  fontSize: 19,
+                                  color: mainTextColor,
+                                ),
+                              ),
+                              const SizedBox(height: 40),
+                              _progressBar(),
                             ],
-                          ),
-                          child: Container(
-                            padding: const EdgeInsets.all(5),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: gold.withValues(alpha: 0.35),
-                                width: 1,
-                              ),
-                            ),
-                            child: ClipOval(
-                              child: Image.asset(
-                                'assets/images/paris1.png',
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return const Icon(
-                                    Icons.curtains,
-                                    size: 68,
-                                    color: gold,
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 30),
-
-                        // اسم باريس في منتصف الشاشة
-                        Text(
-                          'باريس',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: 'Aref Ruqaa',
-                            fontSize: 58,
-                            height: 1.35,
-                            fontWeight: FontWeight.bold,
-                            color: gold,
-                            shadows: [
-                              Shadow(
-                                color: gold.withValues(alpha: 0.22),
-                                blurRadius: 18,
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 8),
-
-                        // فاصل زخرفي ذهبي
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 42,
-                              height: 1,
-                              color: gold.withValues(alpha: 0.7),
-                            ),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 12),
-                              child: Icon(
-                                Icons.auto_awesome,
-                                size: 15,
-                                color: gold,
-                              ),
-                            ),
-                            Container(
-                              width: 42,
-                              height: 1,
-                              color: gold.withValues(alpha: 0.7),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 17),
-
-                        Text(
-                          'لمسة من الفخامة',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: 'Tajawal',
-                            fontSize: 19,
-                            letterSpacing: 0.5,
-                            color: mainTextColor,
-                          ),
-                        ),
-
-                        const SizedBox(height: 48),
-
-                        // مؤشر تحميل بسيط وأنيق
-                        SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 1.8,
-                            color: gold.withValues(alpha: 0.9),
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
+
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 28),
+                      child: FadeTransition(
+                        opacity: _taglineFade,
+                        child: Text(
+                          'PARIS  •  CURTAINS',
+                          style: TextStyle(
+                            fontSize: 11,
+                            letterSpacing: 5,
+                            fontWeight: FontWeight.w600,
+                            color: gold.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _dividerLine() {
+    return Container(width: 42, height: 1, color: gold.withValues(alpha: 0.7));
+  }
+
+  Widget _progressBar() {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(3),
+          child: SizedBox(
+            width: 120,
+            height: 3,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: ColoredBox(color: gold.withValues(alpha: 0.18)),
+                ),
+                Positioned.fill(
+                  child: FractionallySizedBox(
+                    alignment: AlignmentDirectional.centerStart,
+                    widthFactor: _controller.value,
+                    child: const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: AppColors.goldGradient,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

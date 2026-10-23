@@ -38,7 +38,6 @@ class _ParisClientMeasurementsPageState
   final List<_Measurement> _measurements = [_Measurement()];
   final List<_Balcony> _balconies = [];
   final List<_DeletedCard> _trash = [];
-  int _nextId = 1;
   bool _saving = false;
   bool _showTrash = false;
 
@@ -182,7 +181,6 @@ class _ParisClientMeasurementsPageState
       item.name.text = '';
       item.width.text = '';
       item.height.text = '';
-      _nextId++;
       _measurements.add(item);
     });
   }

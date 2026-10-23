@@ -99,7 +99,6 @@ class HomeAppBar extends StatelessWidget {
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w800,
                         height: 1.1,
-                        letterSpacing: 2.0,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -114,7 +113,6 @@ class HomeAppBar extends StatelessWidget {
                             color: theme.colorScheme.onSurface.withValues(
                               alpha: 0.6,
                             ),
-                            letterSpacing: 0.8,
                           ),
                         ),
                       ],
