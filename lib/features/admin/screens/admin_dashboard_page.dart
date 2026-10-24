@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import '../../../core/constants/app_colors.dart';
 import '../../clients/screens/clients_list_page.dart';
 import '../../home/home_screen.dart';
 import '../../home/screens/gallery_reorder_page.dart';
-import '../widgets/admin_cards.dart';
+
 import 'admin_analytics_page.dart';
 import 'upload_image_page.dart';
 import 'gallery_management_page.dart';
 import 'installation_agenda_page.dart';
 import 'promo_management_page.dart';
 import 'upload_queue_page.dart';
+import 'featured_works_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -23,7 +23,6 @@ class AdminDashboardPage extends StatefulWidget {
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
   final LocalAuthentication auth = LocalAuthentication();
-
   static const Color _bg = AppColors.bgDark;
   static const Color _panel = Color(0xFF161622);
   static const Color _panel2 = Color(0xFF1E1E2C);
@@ -50,7 +49,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 delegate: SliverChildListDelegate([
                   _buildWelcome(),
                   const SizedBox(height: 24),
-
                   _sectionTitle(
                     'الوصول السريع',
                     'أهم المهام في ضغطة واحدة',
@@ -58,13 +56,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     _gold,
                   ),
                   const SizedBox(height: 14),
-
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final columns = constraints.maxWidth >= 520 ? 4 : 2;
                       final itemWidth =
                           (constraints.maxWidth - (columns - 1) * 12) / columns;
-
                       return Wrap(
                         spacing: 12,
                         runSpacing: 12,
@@ -110,9 +106,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       );
                     },
                   ),
-
                   const SizedBox(height: 26),
-
                   _sectionTitle(
                     'إدارة المعرض والمحتوى',
                     'تحكم في الصور وطريقة عرضها',
@@ -121,14 +115,22 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   ),
                   const SizedBox(height: 14),
 
+                  // بند تحديد أحدث الأعمال في الرئيسية
+                  _buildFeatureCard(
+                    title: 'أحدث الأعمال (25 صورة للرئيسية)',
+                    subtitle: 'تحديد الصور المميزة التي تظهر في واجهة التطبيق',
+                    icon: Icons.star_rounded,
+                    color: _gold,
+                    onTap: () => _navTo(const FeaturedWorksPage()),
+                  ),
+
                   _buildFeatureCard(
                     title: 'إدارة المعرض',
-                    subtitle: 'تعديل الصور الموجودة في المعرض',
+                    subtitle: 'تعديل وحذف الصور الموجودة في المعرض',
                     icon: Icons.grid_view_rounded,
                     color: _cyan,
                     onTap: () => _navTo(const GalleryManagementPage()),
                   ),
-
                   _buildFeatureCard(
                     title: 'ترتيب الصور',
                     subtitle: 'تغيير ترتيب ظهور الصور',
@@ -136,26 +138,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     color: _green,
                     onTap: () => _navTo(const GalleryReorderPage()),
                   ),
-
                   _buildFeatureCard(
                     title: 'صور السلايدر والعروض',
-                    subtitle: 'إدارة الصور الظاهرة في الواجهة',
+                    subtitle: 'إدارة الصور الظاهرة في البانر العلوي',
                     icon: Icons.view_carousel_rounded,
                     color: _gold,
                     onTap: () => _navTo(const PromoManagementPage()),
                   ),
-
-                  // متابعة عمليات رفع الصور
                   _buildFeatureCard(
                     title: 'متابعة رفع الصور',
-                    subtitle: 'عرض حالة الرفع وإعادة محاولة الصور الفاشلة',
+                    subtitle: 'عرض حالة طابور الرفع وإعادة محاولة الفاشلة',
                     icon: Icons.cloud_sync_rounded,
                     color: _purple,
                     onTap: () => _navTo(const UploadQueuePage()),
                   ),
-
                   const SizedBox(height: 18),
-
                   _sectionTitle(
                     'إعدادات الأمان',
                     'إعدادات البصمة وحماية البيانات',
@@ -163,19 +160,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     _purple,
                   ),
                   const SizedBox(height: 14),
-
                   _SecondaryAction(
                     title: 'أمان التطبيق',
-                    subtitle: 'إعدادات البصمة',
+                    subtitle: 'إعدادات البصمة لحماية لوحة الإدارة',
                     icon: Icons.fingerprint_rounded,
                     color: _gold,
                     onTap: _showSecurityDialog,
                   ),
-
                   const SizedBox(height: 24),
                   _buildHomeButton(),
                   const SizedBox(height: 18),
-
                   const Center(
                     child: Text(
                       'PARIS CURTAINS • ADMIN',
@@ -218,95 +212,33 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 decoration: BoxDecoration(
                   color: _gold.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: _gold.withValues(alpha: 0.35)),
+                  border: Border.all(color: _gold.withValues(alpha: 0.3)),
                 ),
-                child: const Icon(
-                  Icons.dashboard_customize_rounded,
-                  color: _gold,
-                  size: 24,
-                ),
+                child: const Icon(Icons.shield_rounded, color: _gold, size: 24),
               ),
-              const SizedBox(width: 12),
-
-              const Expanded(
+              const SizedBox(width: 14),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                  children: const [
                     Text(
-                      'PARIS CURTAINS',
+                      'لوحة تحكم باريس للستاير',
                       style: TextStyle(
-                        color: AppColors.lightGold,
-                        fontSize: 10,
+                        fontFamily: 'Aref Ruqaa',
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        letterSpacing: 1.3,
+                        color: _gold,
                       ),
                     ),
-                    SizedBox(height: 3),
+                    SizedBox(height: 2),
                     Text(
-                      'لوحة التحكم',
-                      style: TextStyle(
-                        fontFamily: 'Cairo',
-                        color: _white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      'إدارة المحتوى والعملاء وجدول التركيبات',
+                      style: TextStyle(fontSize: 11, color: _muted),
                     ),
                   ],
                 ),
               ),
-
-              Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: _gold, width: 1.4),
-                ),
-                child: const CircleAvatar(
-                  radius: 23,
-                  backgroundColor: _panel2,
-                  backgroundImage: AssetImage('assets/images/abdo.jpg'),
-                ),
-              ),
             ],
-          ),
-
-          const SizedBox(height: 22),
-
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.045),
-              borderRadius: BorderRadius.circular(17),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-            ),
-            child: const Row(
-              children: [
-                Expanded(
-                  child: AdminStatItem(
-                    label: 'العملاء',
-                    collection: 'clients',
-                    icon: Icons.people_outline_rounded,
-                    color: AppColors.primaryGold,
-                  ),
-                ),
-                SizedBox(
-                  height: 40,
-                  child: VerticalDivider(
-                    color: Colors.white24,
-                    width: 16,
-                    thickness: 1,
-                  ),
-                ),
-                Expanded(
-                  child: AdminStatItem(
-                    label: 'صور المعرض',
-                    collection: 'gallery_images',
-                    icon: Icons.image_outlined,
-                    color: AppColors.lightGold,
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -315,41 +247,50 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   Widget _buildWelcome() {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _panel,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _gold.withValues(alpha: 0.18)),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _gold.withValues(alpha: 0.2)),
       ),
-      child: const Row(
+      child: Row(
         children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(30),
+            child: Image.asset(
+              'assets/images/abdo.jpg',
+              width: 48,
+              height: 48,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => Container(
+                width: 48,
+                height: 48,
+                color: _gold.withValues(alpha: 0.2),
+                child: const Icon(Icons.person, color: _gold),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+              children: const [
                 Text(
-                  'أهلاً، م/ عبدالرحمن 👋',
+                  'أهلاً بك، م/ عبده حمادة',
                   style: TextStyle(
-                    fontFamily: 'Cairo',
-                    color: _white,
-                    fontSize: 16,
+                    fontSize: 15,
                     fontWeight: FontWeight.bold,
+                    color: _white,
                   ),
                 ),
-                SizedBox(height: 5),
+                SizedBox(height: 3),
                 Text(
-                  'كل أدوات إدارة شغلك في مكان واحد',
-                  style: TextStyle(
-                    fontFamily: 'Cairo',
-                    color: _muted,
-                    fontSize: 11,
-                  ),
+                  'كل بيانات المعرض والعملاء والورشة محدثة وجاهزة',
+                  style: TextStyle(fontSize: 11.5, color: _muted),
                 ),
               ],
             ),
           ),
-          Icon(Icons.auto_awesome_rounded, color: _gold, size: 27),
         ],
       ),
     );
@@ -363,42 +304,20 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   ) {
     return Row(
       children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.09),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withValues(alpha: 0.25)),
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: _white,
           ),
-          child: Icon(icon, color: color, size: 21),
         ),
-        const SizedBox(width: 11),
-
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontFamily: 'Cairo',
-                  color: _white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontFamily: 'Cairo',
-                  color: _muted,
-                  fontSize: 10,
-                ),
-              ),
-            ],
-          ),
+        const SizedBox(width: 8),
+        Text(
+          '• $subtitle',
+          style: const TextStyle(fontSize: 11, color: _muted),
         ),
       ],
     );
@@ -411,159 +330,93 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     required Color color,
     required VoidCallback onTap,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 11),
-      child: Material(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
         color: _panel,
-        borderRadius: BorderRadius.circular(17),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(17),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(17),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 45,
-                  height: 45,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.09),
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: Icon(icon, color: color, size: 24),
-                ),
-                const SizedBox(width: 13),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontFamily: 'Cairo',
-                          color: _white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(
-                          fontFamily: 'Cairo',
-                          color: _muted,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: color.withValues(alpha: 0.8),
-                  size: 15,
-                ),
-              ],
-            ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: ListTile(
+        onTap: onTap,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12),
           ),
+          child: Icon(icon, color: color, size: 22),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+            color: _white,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(fontSize: 11, color: _muted),
+        ),
+        trailing: const Icon(
+          Icons.arrow_forward_ios_rounded,
+          size: 14,
+          color: _muted,
         ),
       ),
     );
   }
 
   Widget _buildHomeButton() {
-    return Material(
-      color: _panel,
-      borderRadius: BorderRadius.circular(17),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(17),
-        onTap: () {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const HomeScreen()),
-          );
-        },
-        child: Container(
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(17),
-            border: Border.all(color: _gold.withValues(alpha: 0.25)),
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.home_rounded, color: _gold, size: 25),
-              SizedBox(width: 12),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'العودة لواجهة العميل',
-                      style: TextStyle(
-                        fontFamily: 'Cairo',
-                        color: _white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                    ),
-                    SizedBox(height: 3),
-                    Text(
-                      'الانتقال إلى الواجهة الرئيسية',
-                      style: TextStyle(
-                        fontFamily: 'Cairo',
-                        color: _muted,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ],
-                ),
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (route) => false,
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: _panel2,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _gold.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.home_rounded, color: _gold, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'الرجوع للواجهة الرئيسية للتطبيق',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: _gold,
               ),
-
-              Icon(Icons.arrow_back_ios_new_rounded, color: _muted, size: 15),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
   void _navTo(Widget page) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
   }
 
   void _showSecurityDialog() {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (_) => AlertDialog(
         backgroundColor: _panel,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(22),
-          side: BorderSide(color: _gold.withValues(alpha: 0.25)),
-        ),
-        title: const Row(
-          children: [
-            Icon(Icons.security_rounded, color: _gold),
-            SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'أمان التطبيق',
-                style: TextStyle(
-                  fontFamily: 'Cairo',
-                  color: _white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 17,
-                ),
-              ),
-            ),
-          ],
+        title: const Text(
+          'أمان التطبيق',
+          style: TextStyle(color: _gold, fontFamily: 'Cairo'),
         ),
         content: FutureBuilder<bool>(
           future: SharedPreferences.getInstance().then(
@@ -571,7 +424,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ),
           builder: (context, snapshot) {
             bool isEnabled = snapshot.data ?? false;
-
             return StatefulBuilder(
               builder: (context, setStateDialog) {
                 return SwitchListTile(
@@ -590,7 +442,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       ? null
                       : (value) async {
                           final success = await _toggleBiometrics(value);
-
                           if (success) {
                             setStateDialog(() {
                               isEnabled = value;
@@ -602,60 +453,57 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             );
           },
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'إغلاق',
+              style: TextStyle(color: _gold, fontFamily: 'Cairo'),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Future<bool> _toggleBiometrics(bool value) async {
     final prefs = await SharedPreferences.getInstance();
-
     if (value) {
       try {
         final canCheck = await auth.canCheckBiometrics;
         final isSupported = await auth.isDeviceSupported();
-
         if (!mounted) return false;
-
         if (!canCheck && !isSupported) {
-          _showSnack('البصمة غير متاحة على هذا الجهاز', AppColors.neonRed);
+          _showSnack('البصمة غير متاحة على هذا الجهاز', AppColors.danger);
           return false;
         }
-
         final authenticated = await auth.authenticate(
           localizedReason: 'تأكيد الهوية لتفعيل البصمة',
           options: const AuthenticationOptions(biometricOnly: true),
         );
-
         if (!authenticated) return false;
-
         await prefs.setBool('biometric_enabled', true);
-
         if (mounted) {
           _showSnack('تم تفعيل البصمة بنجاح', _green);
         }
-
         return true;
       } catch (_) {
         if (mounted) {
-          _showSnack('تعذر تفعيل البصمة على هذا الجهاز', AppColors.neonRed);
+          _showSnack('تعذر تفعيل البصمة على هذا الجهاز', AppColors.danger);
         }
-
         return false;
       }
     } else {
       await prefs.setBool('biometric_enabled', false);
-
       if (mounted) {
         _showSnack('تم إلغاء تفعيل البصمة', _gold);
       }
-
       return true;
     }
   }
 
   void _showSnack(String message, Color color) {
     if (!mounted) return;
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
@@ -749,44 +597,35 @@ class _SecondaryAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0xFF191923),
-      borderRadius: BorderRadius.circular(17),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(17),
-        child: Container(
-          padding: const EdgeInsets.all(13),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(17),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, color: color, size: 25),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontFamily: 'Cairo',
-                  color: Color(0xFFF5F5F7),
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontFamily: 'Cairo',
-                  color: Color(0xFFB0B0BE),
-                  fontSize: 10,
-                ),
-              ),
-            ],
-          ),
+    return ListTile(
+      onTap: onTap,
+      tileColor: const Color(0xFF161622),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: color.withValues(alpha: 0.2)),
+      ),
+      leading: Icon(icon, color: color),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontFamily: 'Cairo',
+          color: Colors.white,
+          fontSize: 13,
+          fontWeight: FontWeight.bold,
         ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(
+          fontFamily: 'Cairo',
+          color: Colors.white54,
+          fontSize: 11,
+        ),
+      ),
+      trailing: const Icon(
+        Icons.arrow_forward_ios_rounded,
+        size: 12,
+        color: Colors.white38,
       ),
     );
   }

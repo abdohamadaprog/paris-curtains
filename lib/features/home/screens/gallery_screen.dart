@@ -1,13 +1,13 @@
 import 'dart:async';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/image_url.dart';
+import '../../../core/widgets/paris_footer.dart';
 import '../widgets/app_image_viewer.dart';
 import '../widgets/gallery_widgets.dart';
 import 'accessories_gallery_page.dart';
+import 'full_gallery_page.dart';
 
 class GalleryScreen extends StatefulWidget {
   const GalleryScreen({super.key});
@@ -44,7 +44,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
   };
 
   String _selectedCategory = 'ستائر';
-
   final PageController _bannerController = PageController();
   Timer? _bannerTimer;
   int _bannerIndex = 0;
@@ -66,31 +65,21 @@ class _GalleryScreenState extends State<GalleryScreen> {
               .map((doc) => (doc.data()['url'] ?? '').toString().trim())
               .where((url) => url.isNotEmpty)
               .toList();
-
           if (!mounted) return;
-          setState(() {
-            _bannerImages = urls;
-            if (_bannerIndex >= urls.length) _bannerIndex = 0;
-          });
-          _startBannerTimer();
+          setState(() => _bannerImages = urls);
+          _restartBannerTimer();
         });
   }
 
-  void _startBannerTimer() {
+  void _restartBannerTimer() {
     _bannerTimer?.cancel();
     if (_bannerImages.length <= 1) return;
-
-    _bannerTimer = Timer.periodic(const Duration(seconds: 7), (_) {
-      if (!mounted ||
-          !_bannerController.hasClients ||
-          _bannerImages.length <= 1) {
-        return;
-      }
-
-      final nextIndex = (_bannerIndex + 1) % _bannerImages.length;
+    _bannerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted || !_bannerController.hasClients) return;
+      final next = (_bannerIndex + 1) % _bannerImages.length;
       _bannerController.animateToPage(
-        nextIndex,
-        duration: const Duration(milliseconds: 650),
+        next,
+        duration: const Duration(milliseconds: 500),
         curve: Curves.easeInOut,
       );
     });
@@ -105,8 +94,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> _galleryStream() {
-    // Do not order in Firestore: orderBy excludes legacy documents that lack
-    // sort_order. We sort locally so old images remain visible.
     return FirebaseFirestore.instance.collection('gallery_images').snapshots();
   }
 
@@ -120,15 +107,12 @@ class _GalleryScreenState extends State<GalleryScreen> {
     final bo = bd['sort_order'];
     final aHasOrder = ao is num;
     final bHasOrder = bo is num;
-
     if (aHasOrder && bHasOrder) {
       final order = (ao).compareTo(bo);
       if (order != 0) return order;
     } else if (aHasOrder != bHasOrder) {
-      // Explicitly ordered images come first; legacy images follow by date.
       return aHasOrder ? -1 : 1;
     }
-
     final at = ad['created_at'];
     final bt = bd['created_at'];
     final aMillis = at is Timestamp ? at.millisecondsSinceEpoch : 0;
@@ -140,25 +124,33 @@ class _GalleryScreenState extends State<GalleryScreen> {
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _filterImages(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) {
-    return docs.where((doc) {
+    // 1. استبعاد الإكسسوارات والروابط الفارغة
+    final validDocs = docs.where((doc) {
       final data = doc.data();
       final category = (data['category'] ?? 'عام').toString();
       final url = data['url'];
-
       if (category == 'إكسسوارات') return false;
       if (url is! String || url.trim().isEmpty) return false;
 
-      // تصنيف "ستائر" يعرض جميع صور الستائر.
       if (_selectedCategory == 'ستائر') return true;
-
       if (_selectedCategory == 'حلقات كبس ومواسير') {
         return category == 'حلقات كبس ومواسير' ||
             category == 'حلقات كبس' ||
             category == 'مواسير';
       }
-
       return category == _selectedCategory;
     }).toList();
+
+    // 2. تطبيق فكرة الـ 25 صورة:
+    // إذا كان هناك صور محددة كـ is_featured نعرضها، وإلا نأخذ أول 25 صورة من المعرض
+    final featuredDocs = validDocs
+        .where((d) => d.data()['is_featured'] == true)
+        .toList();
+    if (featuredDocs.isNotEmpty) {
+      return featuredDocs.take(25).toList();
+    }
+
+    return validDocs.take(25).toList();
   }
 
   void _openImage(
@@ -200,7 +192,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
             onRetry: () => setState(() {}),
           );
         }
-
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator(color: _gold));
@@ -209,6 +200,8 @@ class _GalleryScreenState extends State<GalleryScreen> {
         final List<QueryDocumentSnapshot<Map<String, dynamic>>> allDocs = [
           ...(snapshot.data?.docs ?? []),
         ]..sort(_compareGalleryDocs);
+
+        // تصفية أحدث 25 صورة فقط للشاشة الرئيسية
         final images = _filterImages(allDocs);
 
         return LayoutBuilder(
@@ -226,7 +219,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                 parent: BouncingScrollPhysics(),
               ),
               slivers: [
-                // البانر المتحرك
+                // 1. البانر الإعلاني
                 SliverToBoxAdapter(
                   child: PromoBanner(
                     images: _bannerImages,
@@ -236,12 +229,16 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       setState(() => _bannerIndex = index);
                     },
                     onBrowse: () {
-                      setState(() => _selectedCategory = 'ستائر');
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const FullGalleryPage(),
+                        ),
+                      );
                     },
                   ),
                 ),
 
-                // عنوان المجموعات وزر الإكسسوارات
+                // 2. عنوان المجموعات وزر الإكسسوارات
                 SliverToBoxAdapter(
                   child: SectionTitle(
                     title: 'تصفّح مجموعتنا',
@@ -254,7 +251,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                   ),
                 ),
 
-                // تصنيفات الستائر
+                // 3. تصنيفات الستائر الأفقية
                 SliverToBoxAdapter(
                   child: SizedBox(
                     height: 118,
@@ -268,7 +265,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       separatorBuilder: (_, _) => const SizedBox(width: 10),
                       itemBuilder: (context, index) {
                         final category = _categories[index];
-
                         return CategoryTile(
                           label: category == 'ستائر' ? 'كل الستائر' : category,
                           imageUrl: _categoryImages[category]!,
@@ -284,15 +280,16 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
                 const SliverToBoxAdapter(child: SizedBox(height: 18)),
 
-                // عنوان المعرض وعدد الصور
+                // 4. عنوان "أحدث الأعمال" مع زر "استعراض المعرض بالكامل"
                 SliverToBoxAdapter(
                   child: SectionTitle(
                     title: 'أحدث الأعمال',
                     trailing: CountPill(count: images.length),
                   ),
                 ),
+                const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-                // شبكة الصور
+                // 5. شبكة أحدث 25 صورة
                 images.isEmpty
                     ? SliverFillRemaining(
                         hasScrollBody: false,
@@ -317,7 +314,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
                             );
                             final category = (data['category'] ?? 'ستائر')
                                 .toString();
-
                             return GalleryImageCard(
                               imageUrl: url,
                               category: category,
@@ -334,6 +330,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
                               ),
                         ),
                       ),
+
+                // 6. فوتر نهاية الصفحة (باريس للستاير مع الواتساب والاتصال)
+                const SliverToBoxAdapter(child: ParisFooter()),
               ],
             );
           },

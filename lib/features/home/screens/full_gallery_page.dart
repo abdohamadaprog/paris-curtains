@@ -1,0 +1,223 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/image_url.dart';
+
+import '../widgets/app_image_viewer.dart';
+import '../widgets/gallery_widgets.dart';
+import 'accessories_gallery_page.dart';
+
+class FullGalleryPage extends StatefulWidget {
+  const FullGalleryPage({super.key});
+
+  @override
+  State<FullGalleryPage> createState() => _FullGalleryPageState();
+}
+
+class _FullGalleryPageState extends State<FullGalleryPage> {
+  static const Color _gold = AppColors.primaryGold;
+
+  // نفس تصنيفات المعرض الخارجي
+  static const List<String> _categories = [
+    'ستائر',
+    'ويفي',
+    'دابل ويفي',
+    'حلقات كبس ومواسير',
+    'بلتكانة',
+  ];
+
+  static const Map<String, String> _categoryImages = {
+    'ستائر':
+        'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=400&q=65',
+    'ويفي':
+        'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=400&q=65',
+    'دابل ويفي':
+        'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=400&q=65',
+    'حلقات كبس ومواسير':
+        'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=400&q=65',
+    'بلتكانة':
+        'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=400&q=65',
+  };
+
+  String _selectedCategory = 'ستائر';
+
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _filterImages(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    return docs.where((doc) {
+      final data = doc.data();
+      final category = (data['category'] ?? 'عام').toString();
+      final url = data['url'];
+      if (category == 'إكسسوارات') return false;
+      if (url is! String || url.trim().isEmpty) return false;
+
+      if (_selectedCategory == 'ستائر') return true;
+      if (_selectedCategory == 'حلقات كبس ومواسير') {
+        return category == 'حلقات كبس ومواسير' ||
+            category == 'حلقات كبس' ||
+            category == 'مواسير';
+      }
+      return category == _selectedCategory;
+    }).toList();
+  }
+
+  void _openImage(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> images,
+    int index,
+  ) {
+    AppImageViewerPage.open(
+      context,
+      imageUrls: images
+          .map((doc) => (doc.data()['url'] ?? '').toString())
+          .toList(),
+      titles: images
+          .map((doc) => (doc.data()['category'] ?? 'باريس للستائر').toString())
+          .toList(),
+      initialIndex: index,
+    );
+  }
+
+  void _openAccessories() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const AccessoriesGalleryPage()));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.bgDark : AppColors.background,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_forward_ios_rounded, color: _gold),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text(
+          'معرض باريس للستائر',
+          style: TextStyle(
+            fontFamily: 'Aref Ruqaa',
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: _gold,
+          ),
+        ),
+      ),
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('gallery_images')
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              !snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator(color: _gold));
+          }
+
+          final allDocs = snapshot.data?.docs ?? [];
+          // عرض كامل الصور للتصنيف المحدد بدون حد الـ 25
+          final images = _filterImages(allDocs);
+
+          return CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            slivers: [
+              // 1. نفس عنوان المجموعات وزر الإكسسوارات مثل الهوم
+              SliverToBoxAdapter(
+                child: SectionTitle(
+                  title: 'تصفّح مجموعتنا',
+                  trailing: GoldPillButton(
+                    label: 'الإكسسوارات',
+                    icon: Icons.auto_awesome,
+                    compact: true,
+                    onTap: _openAccessories,
+                  ),
+                ),
+              ),
+
+              // 2. نفس شريط التصنيفات الدائرية الأنيق
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 118,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
+                    ),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _categories.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 10),
+                    itemBuilder: (context, index) {
+                      final category = _categories[index];
+                      return CategoryTile(
+                        label: category == 'ستائر' ? 'كل الستائر' : category,
+                        imageUrl: _categoryImages[category]!,
+                        selected: category == _selectedCategory,
+                        onTap: () {
+                          setState(() => _selectedCategory = category);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 18)),
+
+              // 3. عنوان المعرض الكلي مع عدد الصور الإجمالي
+              SliverToBoxAdapter(
+                child: SectionTitle(
+                  title: _selectedCategory == 'ستائر'
+                      ? 'كافة الستائر'
+                      : 'موديلات $_selectedCategory',
+                  trailing: CountPill(count: images.length),
+                ),
+              ),
+
+              // 4. شبكة جميع الصور بالكامل
+              images.isEmpty
+                  ? SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: GalleryMessageView(
+                        icon: Icons.photo_library_outlined,
+                        title: 'لا توجد صور في هذا التصنيف',
+                        subtitle: 'سيتم إضافة صور جديدة قريباً.',
+                      ),
+                    )
+                  : SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
+                      sliver: SliverGrid(
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          final data = images[index].data();
+                          final url = ImageUrl.thumbnail(
+                            data['url'].toString(),
+                          );
+                          final category = (data['category'] ?? 'ستائر')
+                              .toString();
+                          return GalleryImageCard(
+                            imageUrl: url,
+                            category: category,
+                            isDark: isDark,
+                            onTap: () => _openImage(images, index),
+                          );
+                        }, childCount: images.length),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 14,
+                              mainAxisSpacing: 14,
+                              childAspectRatio: 0.78,
+                            ),
+                      ),
+                    ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}

@@ -187,7 +187,7 @@ class _SplashScreenState extends State<SplashScreen>
                           child: SlideTransition(
                             position: _titleSlide,
                             child: Text(
-                              'باريس',
+                              'باريس للستائر',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontFamily: 'Aref Ruqaa',
@@ -233,7 +233,7 @@ class _SplashScreenState extends State<SplashScreen>
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'لمسة من الفخامة',
+                                'فخامة التصميم وأناقة التفصيل الملكي',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontFamily: 'Tajawal',

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../auth/screens/login_page.dart';
-import 'gallery_widgets.dart';
 
 class HomeAppBar extends StatelessWidget {
   final bool isDarkMode;
@@ -94,24 +93,32 @@ class HomeAppBar extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    GoldText(
-                      'باريس',
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        height: 1.1,
+                    // العنوان الرئيسي بخط الرقعة ومذهب
+                    const Text(
+                      'باريس للستائر',
+                      style: TextStyle(
+                        fontFamily: 'Aref Ruqaa',
+                        fontSize: 25,
+                        fontWeight: FontWeight.bold,
+                        height: 1,
+                        color: gold,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
+                    // السلوجن الأنيق مع الفاصل المذهب
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(width: 18, height: 1.5, color: gold),
+                        Container(width: 14, height: 1.5, color: gold),
                         const SizedBox(width: 6),
                         Text(
-                          'لمسة من الفخامة',
+                          'فخامة التصميم وأناقة التفصيل الملكي',
                           style: theme.textTheme.bodySmall?.copyWith(
+                            fontFamily: 'Cairo',
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w600,
                             color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.6,
+                              alpha: 0.75,
                             ),
                           ),
                         ),
@@ -120,7 +127,6 @@ class HomeAppBar extends StatelessWidget {
                   ],
                 ),
               ),
-
               _HeaderIconButton(
                 tooltip: 'البحث',
                 icon: Icons.search_rounded,
