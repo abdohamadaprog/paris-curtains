@@ -5,7 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/theme_manger.dart';
 import 'paris_client_measurements_page.dart';
 
-/// صفحة إدارة العملاء الخاصة بلوحة تحكم باريس للستاير.
+/// صفحة إدارة العملاء الخاصة بلوحة تحكم باريس للستائر.
 /// تستخدم مجموعة Firestore الحالية: clients
 class ClientsListPage extends StatefulWidget {
   const ClientsListPage({super.key});

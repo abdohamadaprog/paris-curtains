@@ -222,7 +222,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
                     Text(
-                      'لوحة تحكم باريس للستاير',
+                      'لوحة تحكم باريس للستائر',
                       style: TextStyle(
                         fontFamily: 'Aref Ruqaa',
                         fontSize: 20,

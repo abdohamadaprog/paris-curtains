@@ -159,7 +159,7 @@ class _AppImageViewerPageState extends State<AppImageViewerPage> {
   Widget build(BuildContext context) {
     final title = (widget.titles != null && _index < widget.titles!.length)
         ? widget.titles![_index]
-        : 'باريس للستاير';
+        : 'باريس للستائر';
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,

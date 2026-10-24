@@ -18,6 +18,9 @@ dependencies:
   # Images and networking
   image_picker: ^1.2.3
   cached_network_image: ^3.4.1
+
+  # أنيميشن تكبير الكارت داخل نفس الصفحة (مثبّتة على إصدار محدد لأن المكتبة جديدة وبتتغير بسرعة)
+  hero_here: 2.3.5
   http: ^1.6.0
   easy_localization: ^3.0.7
 

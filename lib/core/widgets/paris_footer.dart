@@ -13,11 +13,18 @@ class ParisFooter extends StatelessWidget {
   final String phone;
   final String locationText;
 
+  // الرقم بصيغة دولية (مصر) مشتق من `phone` عشان يبقى مصدر واحد للرقم
+  String get _intlPhone {
+    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.startsWith('20')) return digits;
+    return '20${digits.startsWith('0') ? digits.substring(1) : digits}';
+  }
+
   // 💬 فتح الواتساب مباشرة برقمك
   Future<void> _launchWhatsApp(BuildContext context) async {
-    final cleanPhone = '201027867463';
+    final cleanPhone = _intlPhone;
     final text =
-        'السلام عليكم م/ عبده حمادة، استفسار بخصوص ستائر منزلي مع باريس للستاير';
+        'السلام عليكم م/ عبده حمادة، استفسار بخصوص ستائر منزلي مع باريس للستائر';
     final encodedText = Uri.encodeComponent(text);
 
     // الرابط المباشر لتطبيق الواتساب ورابط الويب البديل
@@ -54,7 +61,7 @@ class ParisFooter extends StatelessWidget {
 
   // 📞 فتح شاشة الاتصال الهاتفي مباشرة
   Future<void> _launchCall(BuildContext context) async {
-    final uri = Uri(scheme: 'tel', path: '01027867463');
+    final uri = Uri(scheme: 'tel', path: phone);
     try {
       // إطلاق مباشر دون انتظار canLaunchUrl
       final launched = await launchUrl(uri);
@@ -136,7 +143,7 @@ class ParisFooter extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'باريس للستاير — Paris Curtains',
+                        'باريس للستائر — Paris Curtains',
                         style: TextStyle(
                           fontFamily: 'Aref Ruqaa',
                           fontSize: 19,

@@ -163,7 +163,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
           .map((doc) => (doc.data()['url'] ?? '').toString())
           .toList(),
       titles: images
-          .map((doc) => (doc.data()['category'] ?? 'باريس للستاير').toString())
+          .map((doc) => (doc.data()['category'] ?? 'باريس للستائر').toString())
           .toList(),
       initialIndex: index,
     );
@@ -331,7 +331,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                         ),
                       ),
 
-                // 6. فوتر نهاية الصفحة (باريس للستاير مع الواتساب والاتصال)
+                // 6. فوتر نهاية الصفحة (باريس للستائر مع الواتساب والاتصال)
                 const SliverToBoxAdapter(child: ParisFooter()),
               ],
             );

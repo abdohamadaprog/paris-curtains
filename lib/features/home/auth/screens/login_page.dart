@@ -480,7 +480,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         const SizedBox(height: 24),
                         Text(
-                          'باريس للستاير',
+                          'باريس للستائر',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: isDark ? Colors.white54 : Colors.black54,

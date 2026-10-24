@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:hero_here/hero_here.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/constants/app_colors.dart';
+
+part 'measurement_models.dart';
 
 /// ============================================================================
 /// شاشة مقاسات العميل الفاخرة لتطبيق ستائر باريس — Paris Curtains
@@ -66,11 +69,6 @@ class _ParisClientMeasurementsPageState
   // مؤقت الحفظ التلقائي (Debounce Auto-Save)
   Timer? _autoSaveTimer;
 
-  // تتبع النقرات المتتالية (Triple-Tap) لتكرار الكارت
-  int _tapCount = 0;
-  int _lastTappedCardId = -1;
-  DateTime? _lastTapTime;
-
   @override
   void initState() {
     super.initState();
@@ -91,33 +89,6 @@ class _ParisClientMeasurementsPageState
     }
     super.dispose();
   }
-
-  // ============================================================================
-  // دوال تحويل الأرقام إلى العربية وتنسيق الفواصل
-  // ============================================================================
-  String _toArabic(dynamic value) {
-    if (value == null) return '';
-    final str = value.toString();
-    const english = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-    const arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-    var result = str;
-    for (int i = 0; i < 10; i++) {
-      result = result.replaceAll(english[i], arabic[i]);
-    }
-    return result;
-  }
-
-  String _fmt(double val) {
-    if (val == val.roundToDouble()) {
-      return val.toInt().toString();
-    }
-    return val
-        .toStringAsFixed(2)
-        .replaceAll(RegExp(r'0+$'), '')
-        .replaceAll(RegExp(r'\.$'), '');
-  }
-
-  String _fmtAr(double val) => _toArabic(_fmt(val));
 
   String _date(DateTime? value) => value == null
       ? 'حدد موعد التركيب'
@@ -178,9 +149,9 @@ class _ParisClientMeasurementsPageState
         );
         m.velvetSides = (raw['velvet_sides'] as num?)?.toInt() ?? 2;
         m.lightLayers = (raw['light_layers'] as num?)?.toInt() ?? 1;
+        m.lightSides = (raw['light_sides'] as num?)?.toInt() ?? 2;
         m.wheels.text = (raw['wheels'] ?? '').toString();
         m.enabled = raw['enabled'] != false;
-        m.expanded = false;
         loadedMeasurements.add(m);
       }
 
@@ -267,6 +238,7 @@ class _ParisClientMeasurementsPageState
           'ceiling': m.ceiling.name,
           'velvet_sides': m.velvetSides,
           'light_layers': m.lightLayers,
+          'light_sides': m.lightSides,
           'wheels': m.wheels.text.trim(),
           'heavy_meters': c.heavyMeters,
           'light_meters': c.lightMeters,
@@ -359,25 +331,6 @@ class _ParisClientMeasurementsPageState
     _triggerAutoSave();
   }
 
-  // التحقق من النقرات الثلاثية المتتالية (Triple-Tap) لتكرار الكارت
-  void _handleCardTap(_Measurement item) {
-    final now = DateTime.now();
-    if (_lastTappedCardId == item.id &&
-        _lastTapTime != null &&
-        now.difference(_lastTapTime!) < const Duration(milliseconds: 480)) {
-      _tapCount++;
-      if (_tapCount >= 3) {
-        _tapCount = 0;
-        _duplicateMeasurement(item);
-        return;
-      }
-    } else {
-      _tapCount = 1;
-      _lastTappedCardId = item.id;
-    }
-    _lastTapTime = now;
-  }
-
   void _duplicateMeasurement(_Measurement item) {
     setState(() {
       final copy = _Measurement();
@@ -388,13 +341,14 @@ class _ParisClientMeasurementsPageState
       copy.ceiling = item.ceiling;
       copy.velvetSides = item.velvetSides;
       copy.lightLayers = item.lightLayers;
+      copy.lightSides = item.lightSides;
       copy.wheels.text = item.wheels.text;
       copy.enabled = item.enabled;
       _measurements.add(copy);
     });
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('تم تكرار المقاس بنجاح (٣ نقرات) 📋'),
+        content: Text('تم تكرار المقاس'),
         duration: Duration(seconds: 1),
       ),
     );
@@ -463,145 +417,159 @@ class _ParisClientMeasurementsPageState
       totalWheels += (c.heavyWheels + c.lightWheels);
     }
 
-    return Scaffold(
-      backgroundColor: _bg,
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        backgroundColor: _panel,
-        elevation: 0,
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                'مقاسات: ${widget.clientName}',
-                style: const TextStyle(
-                  color: _gold,
-                  fontFamily: 'Aref Ruqaa',
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+    return PopScope(
+      canPop: _expandedId == null,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _closeCard();
+      },
+      child: Scaffold(
+        backgroundColor: _bg,
+        resizeToAvoidBottomInset: true,
+        appBar: AppBar(
+          backgroundColor: _panel,
+          elevation: 0,
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'مقاسات: ${widget.clientName}',
+                  style: const TextStyle(
+                    color: _gold,
+                    fontFamily: 'Aref Ruqaa',
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            // مؤشر الحفظ التلقائي
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: _isAutoSaving
-                    ? Colors.amber.withValues(alpha: 0.15)
-                    : (_savedSuccess
-                          ? Colors.green.withValues(alpha: 0.15)
-                          : Colors.transparent),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
+              // مؤشر الحفظ التلقائي
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
                   color: _isAutoSaving
-                      ? Colors.amber
-                      : (_savedSuccess ? Colors.green : Colors.transparent),
-                  width: 0.8,
+                      ? Colors.amber.withValues(alpha: 0.15)
+                      : (_savedSuccess
+                            ? Colors.green.withValues(alpha: 0.15)
+                            : Colors.transparent),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _isAutoSaving
+                        ? Colors.amber
+                        : (_savedSuccess ? Colors.green : Colors.transparent),
+                    width: 0.8,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_isAutoSaving) ...[
+                      const SizedBox(
+                        width: 10,
+                        height: 10,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.5,
+                          color: Colors.amber,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'جاري الحفظ...',
+                        style: TextStyle(color: Colors.amber, fontSize: 10),
+                      ),
+                    ] else if (_savedSuccess) ...[
+                      const Icon(
+                        Icons.check,
+                        color: Colors.greenAccent,
+                        size: 12,
+                      ),
+                      const SizedBox(width: 3),
+                      const Text(
+                        'محفوظ تلقائياً',
+                        style: TextStyle(
+                          color: Colors.greenAccent,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_isAutoSaving) ...[
-                    const SizedBox(
-                      width: 10,
-                      height: 10,
+            ],
+          ),
+          actions: [
+            IconButton(
+              tooltip: 'حفظ يدوي',
+              icon: _saving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
                       child: CircularProgressIndicator(
-                        strokeWidth: 1.5,
-                        color: Colors.amber,
+                        strokeWidth: 2,
+                        color: _gold,
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Text(
-                      'جاري الحفظ...',
-                      style: TextStyle(color: Colors.amber, fontSize: 10),
-                    ),
-                  ] else if (_savedSuccess) ...[
-                    const Icon(
-                      Icons.check,
-                      color: Colors.greenAccent,
-                      size: 12,
-                    ),
-                    const SizedBox(width: 3),
-                    const Text(
-                      'محفوظ تلقائياً',
-                      style: TextStyle(color: Colors.greenAccent, fontSize: 10),
-                    ),
-                  ],
-                ],
-              ),
+                    )
+                  : const Icon(Icons.save_rounded, color: _gold),
+              onPressed: () => _performSave(isAuto: false),
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            tooltip: 'توسيع / طي الكل',
-            icon: const Icon(Icons.unfold_more_rounded, color: _gold),
-            onPressed: () {
-              final anyCollapsed = _measurements.any((m) => !m.expanded);
-              setState(() {
-                for (final m in _measurements) {
-                  m.expanded = anyCollapsed;
-                }
-              });
-            },
-          ),
-          IconButton(
-            tooltip: 'حفظ يدوي',
-            icon: _saving
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: _gold,
+        body: SafeArea(
+          child: HeroHereSwitcher(
+            switchKey: _expandedId,
+            child: Stack(
+              children: [
+                Column(
+                  children: [
+                    _clientInfoBar(),
+                    _sectionHeaderBar(),
+                    if (_showTrash) _trashPanel(),
+                    Expanded(
+                      child: ReorderableListView.builder(
+                        padding: const EdgeInsets.fromLTRB(10, 2, 10, 16),
+                        itemCount: _measurements.length + _balconies.length,
+                        onReorder: (oldIndex, newIndex) {
+                          if (oldIndex >= _measurements.length ||
+                              newIndex > _measurements.length) {
+                            return;
+                          }
+                          setState(() {
+                            if (newIndex > oldIndex) newIndex--;
+                            if (newIndex < 0 ||
+                                newIndex >= _measurements.length)
+                              return;
+                            final item = _measurements.removeAt(oldIndex);
+                            _measurements.insert(newIndex, item);
+                          });
+                          _triggerAutoSave();
+                        },
+                        itemBuilder: (context, index) {
+                          if (index < _measurements.length) {
+                            return _measurementCard(
+                              _measurements[index],
+                              index,
+                            );
+                          }
+                          final bIndex = index - _measurements.length;
+                          return _balconyCard(
+                            _balconies[bIndex],
+                            bIndex,
+                            key: ValueKey('balcony-${_balconies[bIndex].id}'),
+                          );
+                        },
+                      ),
                     ),
-                  )
-                : const Icon(Icons.save_rounded, color: _gold),
-            onPressed: () => _performSave(isAuto: false),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _clientInfoBar(),
-            _sectionHeaderBar(),
-            if (_showTrash) _trashPanel(),
-            Expanded(
-              child: ReorderableListView.builder(
-                padding: const EdgeInsets.fromLTRB(10, 2, 10, 16),
-                itemCount: _measurements.length + _balconies.length,
-                onReorder: (oldIndex, newIndex) {
-                  if (oldIndex >= _measurements.length ||
-                      newIndex > _measurements.length) {
-                    return;
-                  }
-                  setState(() {
-                    if (newIndex > oldIndex) newIndex--;
-                    if (newIndex < 0 || newIndex >= _measurements.length)
-                      return;
-                    final item = _measurements.removeAt(oldIndex);
-                    _measurements.insert(newIndex, item);
-                  });
-                  _triggerAutoSave();
-                },
-                itemBuilder: (context, index) {
-                  if (index < _measurements.length) {
-                    return _measurementCard(_measurements[index], index);
-                  }
-                  final bIndex = index - _measurements.length;
-                  return _balconyCard(
-                    _balconies[bIndex],
-                    bIndex,
-                    key: ValueKey('balcony-${_balconies[bIndex].id}'),
-                  );
-                },
-              ),
+                    _totalsBottomBar(
+                      totalHeavy,
+                      totalLight,
+                      totalWheels,
+                      activeCount,
+                    ),
+                  ],
+                ),
+                if (_expandedId != null) _expandedOverlay(),
+              ],
             ),
-            _totalsBottomBar(totalHeavy, totalLight, totalWheels, activeCount),
-          ],
+          ),
         ),
       ),
     );
@@ -735,9 +703,634 @@ class _ParisClientMeasurementsPageState
   }
 
   // ============================================================================
-  // الكارت المطور فائق الدقة والكثافة (التطوير المباشر وفق التعديلات الفنية)
+  // كارت المقاس: مصغّر في القائمة، وبلمسة واحدة نفس الكارت يكبر (Pop-up)
+  // ويظهر معاه التعديل، ولما تقفله بيصغر ويرجع مكانه.
   // ============================================================================
+  static const double _compactZoom = 0.76;
+  int? _expandedId; // الكارت المكبّر حاليًا
+  bool _closing = false;
+
+  String _heroTag(_Measurement item) => 'measurement-${item.id}';
+
+  // نفس الكارت في مكانين (مصغّر في القايمة / مكبّر فوقها) بنفس الـ tag،
+  // و hero_here بيطيّره من مكان للتاني على نفس الصفحة بدون Navigator.
+  Widget _hero(_Measurement item, {required bool open, required Widget child}) {
+    return HeroHere(
+      key: ValueKey('${open ? 'open' : 'closed'}-${item.id}'),
+      tag: _heroTag(item),
+      flightAnimationDuration: const Duration(milliseconds: 520),
+      flightAnimationFactory: (controller) =>
+          CurvedAnimation(parent: controller, curve: Curves.easeOutBack),
+      flightShuttleBuilder: HeroHereShuttles.scale(),
+      child: child,
+    );
+  }
+
   Widget _measurementCard(_Measurement item, int index) {
+    return Padding(
+      key: ValueKey('measurement-${item.id}'),
+      padding: const EdgeInsets.only(bottom: 4),
+      child: _hero(
+        item,
+        open: false,
+        child: _cardShell(
+          item,
+          index,
+          zoom: _compactZoom,
+          reveal: 0,
+          popup: false,
+        ),
+      ),
+    );
+  }
+
+  void _openCard(_Measurement item) {
+    if (_expandedId != null) return;
+    setState(() {
+      _expandedId = item.id;
+      _closing = false;
+    });
+  }
+
+  // بنخفي اللوحة والتعتيم الأول، وبعدين الكارت يرجع يطير لمكانه في القايمة
+  void _closeCard() {
+    if (_expandedId == null || _closing) return;
+    setState(() => _closing = true);
+    Future.delayed(const Duration(milliseconds: 170), () {
+      if (!mounted) return;
+      setState(() {
+        _expandedId = null;
+        _closing = false;
+      });
+    });
+  }
+
+  // التنقل بين الكروت وهي مفتوحة: الكارت الحالي يرجع مكانه والتاني يطلع (سحب أو أزرار)
+  void _goToNeighbor(int delta) {
+    if (_closing) return;
+    final i = _measurements.indexWhere((m) => m.id == _expandedId);
+    if (i < 0) return;
+    final next = i + delta;
+    if (next < 0 || next >= _measurements.length) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _expandedId = _measurements[next].id);
+  }
+
+  Widget _navRow(int index) {
+    final hasPrev = index > 0;
+    final hasNext = index < _measurements.length - 1;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: hasPrev ? () => _goToNeighbor(-1) : null,
+              icon: const Icon(Icons.chevron_right_rounded),
+              label: const Text('السابق'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _gold,
+                side: BorderSide(color: _gold.withValues(alpha: 0.5)),
+                minimumSize: const Size(0, 42),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              '${_toArabic(index + 1)} / ${_toArabic(_measurements.length)}',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: hasNext ? () => _goToNeighbor(1) : null,
+              icon: const Icon(Icons.chevron_left_rounded),
+              label: const Text('التالي'),
+              iconAlignment: IconAlignment.end,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _gold,
+                side: BorderSide(color: _gold.withValues(alpha: 0.5)),
+                minimumSize: const Size(0, 42),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _expandedOverlay() {
+    final index = _measurements.indexWhere((m) => m.id == _expandedId);
+    if (index < 0) return const SizedBox.shrink();
+    final item = _measurements[index];
+    return Positioned.fill(
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _closeCard,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: 0, end: _closing ? 0 : 0.68),
+                duration: const Duration(milliseconds: 260),
+                builder: (context, v, _) =>
+                    ColoredBox(color: Colors.black.withValues(alpha: v)),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+            child: Center(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // سحب الكارت يمين أو شمال ينقلك للكارت اللي جنبه
+                    GestureDetector(
+                      onHorizontalDragEnd: (d) {
+                        final v = d.primaryVelocity ?? 0;
+                        if (v < -250) _goToNeighbor(1);
+                        if (v > 250) _goToNeighbor(-1);
+                      },
+                      child: _hero(
+                        item,
+                        open: true,
+                        child: _cardShell(
+                          item,
+                          index,
+                          zoom: 1,
+                          reveal: 1,
+                          popup: true,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    _PanelReveal(
+                      visible: !_closing,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [_editPanel(item), _navRow(index)],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // لوحة التعديل: بتنزل تحت الكارت المكبّر
+  Widget _editPanel(_Measurement item) {
+    final calc = item.calculation;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF07080D),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: _gold.withValues(alpha: 0.35),
+              width: 1.15,
+            ),
+          ),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Column(
+              children: [
+                // الصف الأول: اسم الغرفة والعرض والارتفاع
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: TextField(
+                        controller: item.name,
+                        onChanged: (_) {
+                          setState(() {});
+                          _triggerAutoSave();
+                        },
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          color: _gold,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 6,
+                          ),
+                          border: OutlineInputBorder(),
+                          labelText: 'اسم الغرفة',
+                          labelStyle: TextStyle(
+                            fontSize: 11,
+                            color: Colors.white60,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: item.width,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        onChanged: (_) {
+                          setState(() {});
+                          _triggerAutoSave();
+                        },
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 6,
+                          ),
+                          border: OutlineInputBorder(),
+                          labelText: 'العرض (م)',
+                          labelStyle: TextStyle(
+                            fontSize: 11,
+                            color: Colors.white60,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: item.height,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        onChanged: (_) {
+                          setState(() {});
+                          _triggerAutoSave();
+                        },
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 6,
+                          ),
+                          border: OutlineInputBorder(),
+                          labelText: 'الارتفاع (م)',
+                          labelStyle: TextStyle(
+                            fontSize: 11,
+                            color: Colors.white60,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // الصف الثاني: طراز الشغل ونوع السقف بشكل مريح
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<_WorkMethod>(
+                        initialValue: item.method,
+                        isDense: true,
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 6,
+                          ),
+                          border: OutlineInputBorder(),
+                          labelText: 'طراز الشغل',
+                          labelStyle: TextStyle(
+                            fontSize: 11,
+                            color: Colors.white60,
+                          ),
+                        ),
+                        dropdownColor: _panel,
+                        items: _WorkMethod.values
+                            .map(
+                              (v) => DropdownMenuItem(
+                                value: v,
+                                child: Text(
+                                  v.label,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => item.method = val);
+                            _triggerAutoSave();
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: DropdownButtonFormField<_CeilingType>(
+                        initialValue: item.ceiling,
+                        isDense: true,
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 6,
+                          ),
+                          border: OutlineInputBorder(),
+                          labelText: 'نوع السقف',
+                          labelStyle: TextStyle(
+                            fontSize: 11,
+                            color: Colors.white60,
+                          ),
+                        ),
+                        dropdownColor: _panel,
+                        items: _CeilingType.values
+                            .map(
+                              (v) => DropdownMenuItem(
+                                value: v,
+                                child: Text(
+                                  v.label,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => item.ceiling = val);
+                            _triggerAutoSave();
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // عدد العجل: تلقائي من جدول المقاس، أو يدوي لو كتبت رقم
+                if (item.method != _WorkMethod.press) ...[
+                  TextField(
+                    controller: item.wheels,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      labelText: 'عدد العجل (فاضي = حساب تلقائي)',
+                      hintText: 'تلقائي: ${calc.heavyWheelsLabel}',
+                      labelStyle: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.white60,
+                      ),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: item.wheels.text.trim().isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'رجوع للحساب التلقائي',
+                              icon: const Icon(Icons.refresh, size: 18),
+                              onPressed: () {
+                                item.wheels.clear();
+                                setState(() {});
+                                _triggerAutoSave();
+                              },
+                            ),
+                    ),
+                    onChanged: (_) {
+                      setState(() {});
+                      _triggerAutoSave();
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                ],
+
+                // الصف الثالث: تحديد الأجناب والستارة الخفيفة بدون أي اختناق أو تجاوز بكسلات
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.04),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.white12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'أجناب قطيفة:',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.white70,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          ChoiceChip(
+                            label: const Text(
+                              '١ جنب',
+                              style: TextStyle(fontSize: 10.5),
+                            ),
+                            selected: item.velvetSides == 1,
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            onSelected: (_) {
+                              setState(() => item.velvetSides = 1);
+                              _triggerAutoSave();
+                            },
+                          ),
+                          const SizedBox(width: 4),
+                          ChoiceChip(
+                            label: const Text(
+                              '٢ جنب',
+                              style: TextStyle(fontSize: 10.5),
+                            ),
+                            selected: item.velvetSides == 2,
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            onSelected: (_) {
+                              setState(() => item.velvetSides = 2);
+                              _triggerAutoSave();
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    InkWell(
+                      onTap: () {
+                        setState(
+                          () => item.lightLayers = item.lightLayers > 0 ? 0 : 1,
+                        );
+                        _triggerAutoSave();
+                      },
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: item.lightLayers > 0
+                              ? const Color(0x228AE9C1)
+                              : Colors.white.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: item.lightLayers > 0
+                                ? const Color(0xFF8AE9C1)
+                                : Colors.white12,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              item.lightLayers > 0
+                                  ? Icons.check_box_rounded
+                                  : Icons.check_box_outline_blank_rounded,
+                              size: 16,
+                              color: item.lightLayers > 0
+                                  ? const Color(0xFF8AE9C1)
+                                  : Colors.white38,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              'ستارة خفيفة (كتان)',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: item.lightLayers > 0
+                                    ? const Color(0xFF8AE9C1)
+                                    : Colors.white60,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (item.lightLayers > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.white12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'أجناب الخفيف:',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.white70,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            for (final n in const [1, 2]) ...[
+                              ChoiceChip(
+                                label: Text(
+                                  '${_toArabic(n)} جنب',
+                                  style: const TextStyle(fontSize: 10.5),
+                                ),
+                                selected: item.lightSides == n,
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                onSelected: (_) {
+                                  setState(() => item.lightSides = n);
+                                  _triggerAutoSave();
+                                },
+                              ),
+                              if (n == 1) const SizedBox(width: 4),
+                            ],
+                          ],
+                        ),
+                      ),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        _closeCard();
+                        Future.delayed(const Duration(milliseconds: 900), () {
+                          if (mounted) _duplicateMeasurement(item);
+                        });
+                      },
+                      icon: const Icon(Icons.copy_rounded, size: 16),
+                      label: const Text(
+                        'تكرار الكارت',
+                        style: TextStyle(fontSize: 11),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _neon,
+                        side: const BorderSide(color: Colors.white24),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _cardShell(
+    _Measurement item,
+    int index, {
+    required double zoom,
+    required double reveal,
+    required bool popup,
+    bool bare = false,
+  }) {
+    final k = ((zoom - _compactZoom) / (1 - _compactZoom)).clamp(0.0, 1.0);
+    final double gap = 0.5 + 3 * k;
+    final double pv = 2.5 + 4.5 * k;
+    final double pb = 2.5 * k;
+    final double btnH = 22 + 6 * k;
+
     final calc = item.calculation;
     final disabled = !item.enabled;
     final wVal = _Measurement.toDouble(item.width.text);
@@ -749,788 +1342,495 @@ class _ParisClientMeasurementsPageState
         ? Colors.redAccent.withValues(alpha: 0.8)
         : null;
 
-    return Container(
-      key: ValueKey('measurement-${item.id}'),
-      margin: const EdgeInsets.only(bottom: 7),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0C0E14),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: disabled ? Colors.white24 : _gold.withValues(alpha: 0.4),
-          width: 1.15,
-        ),
-        boxShadow: disabled
-            ? const []
-            : [
-                BoxShadow(
-                  color: _gold.withValues(alpha: 0.09),
-                  blurRadius: 7,
-                  spreadRadius: 0.3,
-                ),
-              ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // النقر المتكرر (3 نقرات) يكرر الكارت، والنقر الفردي يفتح التعديل
-          InkWell(
-            onTap: () {
-              _handleCardTap(item);
-              if (_tapCount == 1) {
-                setState(() => item.expanded = !item.expanded);
-              }
-            },
-            borderRadius: BorderRadius.circular(10),
-            child: Opacity(
-              opacity: disabled ? 0.45 : 1.0,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 7,
-                ),
-                child: Directionality(
-                  textDirection: TextDirection.rtl,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // ========================================================
-                      // السطر 1: [صح] [اسم المقاس في مكانه المميز] [أدوات]
-                      // ========================================================
-                      Row(
-                        children: [
-                          // زر التفعيل / التعطيل السريع (يشطب كامل الكلام)
-                          InkWell(
-                            onTap: () {
-                              setState(() => item.enabled = !item.enabled);
-                              _triggerAutoSave();
-                            },
-                            child: Icon(
-                              item.enabled
-                                  ? Icons.check_circle_rounded
-                                  : Icons.radio_button_unchecked,
-                              color: item.enabled ? _gold : Colors.white30,
-                              size: 21,
-                            ),
+    return MediaQuery(
+      data: MediaQuery.of(
+        context,
+      ).copyWith(textScaler: TextScaler.linear(zoom)),
+      child: DefaultTextStyle.merge(
+        style: TextStyle(height: 1.05 + 0.3 * k),
+        child: Container(
+          decoration: bare
+              ? null
+              : BoxDecoration(
+                  color: const Color(0xFF0C0E14),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: disabled
+                        ? Colors.white24
+                        : _gold.withValues(alpha: 0.4),
+                    width: 1.15,
+                  ),
+                  boxShadow: disabled
+                      ? const []
+                      : [
+                          BoxShadow(
+                            color: _gold.withValues(alpha: 0.09),
+                            blurRadius: 7,
+                            spreadRadius: 0.3,
                           ),
-                          const SizedBox(width: 8),
-
-                          // اسم المقاس في مكانه المميز مع أيقونات باريس
-                          Expanded(
-                            child: Row(
-                              children: [
-                                const Text(
-                                  '🌟',
-                                  style: TextStyle(fontSize: 12),
+                        ],
+                ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // النقر المتكرر (3 نقرات) يكرر الكارت، والنقر الفردي يفتح التعديل
+              InkWell(
+                onTap: () => popup ? _closeCard() : _openCard(item),
+                borderRadius: BorderRadius.circular(10),
+                child: Opacity(
+                  opacity: disabled ? 0.45 : 1.0,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: pv),
+                    child: Directionality(
+                      textDirection: TextDirection.rtl,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // ========================================================
+                          // السطر 1: [صح] [اسم المقاس في مكانه المميز] [أدوات]
+                          // ========================================================
+                          Row(
+                            children: [
+                              // زر التفعيل / التعطيل السريع (يشطب كامل الكلام)
+                              InkWell(
+                                onTap: () {
+                                  setState(() => item.enabled = !item.enabled);
+                                  _triggerAutoSave();
+                                },
+                                child: Icon(
+                                  item.enabled
+                                      ? Icons.check_circle_rounded
+                                      : Icons.radio_button_unchecked,
+                                  color: item.enabled ? _gold : Colors.white30,
+                                  size: 21,
                                 ),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    item.name.text.isEmpty
-                                        ? 'مقاس بدون اسم'
-                                        : item.name.text,
-                                    style: TextStyle(
-                                      color: disabled ? Colors.white54 : _gold,
-                                      fontSize: 16.5,
-                                      fontWeight: FontWeight.w900,
-                                      decoration: cardDecoration,
-                                      decorationColor: cardDecorColor,
-                                      decorationThickness: 2,
+                              ),
+                              const SizedBox(width: 8),
+
+                              // اسم المقاس في مكانه المميز مع أيقونات باريس
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    const Text(
+                                      '🌟',
+                                      style: TextStyle(fontSize: 12),
                                     ),
-                                    overflow: TextOverflow.ellipsis,
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        item.name.text.isEmpty
+                                            ? 'مقاس بدون اسم'
+                                            : item.name.text,
+                                        style: TextStyle(
+                                          color: disabled
+                                              ? Colors.white54
+                                              : _gold,
+                                          fontSize: 16.5,
+                                          fontWeight: FontWeight.w900,
+                                          decoration: cardDecoration,
+                                          decorationColor: cardDecorColor,
+                                          decorationThickness: 2,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Text(
+                                      '🌟 🪟',
+                                      style: TextStyle(fontSize: 13),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              // أدوات سريعة
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                constraints: BoxConstraints.tightFor(
+                                  width: 28,
+                                  height: btnH,
+                                ),
+                                padding: EdgeInsets.zero,
+                                tooltip: popup ? 'طي التعديل' : 'تعديل تفصيلي',
+                                icon: Icon(
+                                  popup
+                                      ? Icons.keyboard_arrow_up
+                                      : Icons.edit_note_rounded,
+                                  color: _neon,
+                                  size: 21,
+                                ),
+                                onPressed: () =>
+                                    popup ? _closeCard() : _openCard(item),
+                              ),
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                constraints: BoxConstraints.tightFor(
+                                  width: 26,
+                                  height: btnH,
+                                ),
+                                padding: EdgeInsets.zero,
+                                tooltip: 'حذف المقاس',
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.redAccent,
+                                  size: 18,
+                                ),
+                                onPressed: () {
+                                  if (popup) {
+                                    final i = _measurements.indexOf(item);
+                                    setState(() {
+                                      _expandedId = null;
+                                      _closing = false;
+                                    });
+                                    if (i >= 0) _deleteMeasurement(i);
+                                  } else {
+                                    _deleteMeasurement(index);
+                                  }
+                                },
+                              ),
+                              popup
+                                  ? const SizedBox(width: 22)
+                                  : ReorderableDragStartListener(
+                                      index: index,
+                                      child: const Padding(
+                                        padding: EdgeInsets.only(right: 2),
+                                        child: Icon(
+                                          Icons.drag_indicator,
+                                          color: Colors.white38,
+                                          size: 20,
+                                        ),
+                                      ),
+                                    ),
+                            ],
+                          ),
+
+                          SizedBox(height: gap),
+
+                          // ========================================================
+                          // السطر 2: [بند المقاس يمين] ⬅️⬅️ [٦ متر ثقيل + ٤ متر خفيف]
+                          // ========================================================
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // بند المقاس على اليمين في بادج بارز
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: pb,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _gold.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: _gold.withValues(alpha: 0.4),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text(
+                                        '📌',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        _toArabic(
+                                          item.width.text.trim().isNotEmpty
+                                              ? item.width.text.trim()
+                                              : _fmt(wVal),
+                                        ),
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 15.5,
+                                          decoration: cardDecoration,
+                                          decorationColor: cardDecorColor,
+                                        ),
+                                      ),
+                                      const Text(
+                                        ' م',
+                                        style: TextStyle(
+                                          color: _neon,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Text(
+                                        '📌',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(width: 4),
+
+                                const SizedBox(width: 6),
+
+                                // إيموشن السهم مرتين يوضح اتجاه الكلام
                                 const Text(
-                                  '🌟 🪟',
+                                  '⬅️⬅️',
                                   style: TextStyle(fontSize: 13),
+                                ),
+
+                                const SizedBox(width: 6),
+
+                                // كتابة (٦ متر ثقيل + ٤ متر خفيف) بالخط الواضح الصريح
+                                Text(
+                                  '${_fmtAr(calc.heavyMeters)} متر ثقيل',
+                                  style: TextStyle(
+                                    color: const Color(0xFFFFD45A),
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 14,
+                                    decoration: cardDecoration,
+                                    decorationColor: cardDecorColor,
+                                  ),
+                                ),
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 5),
+                                  child: Text(
+                                    '+',
+                                    style: TextStyle(
+                                      color: Colors.white54,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  '${_fmtAr(calc.lightMeters)} متر خفيف',
+                                  style: TextStyle(
+                                    color: const Color(0xFF70D6FF),
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 14,
+                                    decoration: cardDecoration,
+                                    decorationColor: cardDecorColor,
+                                  ),
                                 ),
                               ],
                             ),
                           ),
 
-                          // أدوات سريعة
-                          IconButton(
-                            visualDensity: VisualDensity.compact,
-                            constraints: const BoxConstraints.tightFor(
-                              width: 28,
-                              height: 28,
+                          SizedBox(height: gap),
+
+                          // ========================================================
+                          // السطر 3: [الارتفاع كذا م] + [اختيار الويفي بسهولة] + [اختيار كابولي بسهولة]
+                          // ========================================================
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // نص الارتفاع بترتيب عربي صحيح (الكلمة أولاً ثم الرقم)
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: pb,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black45,
+                                    borderRadius: BorderRadius.circular(5),
+                                    border: Border.all(color: Colors.white12),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text(
+                                        '📩 ',
+                                        style: TextStyle(fontSize: 11),
+                                      ),
+                                      Text(
+                                        'الارتفاع ${_toArabic(item.height.text.trim().isNotEmpty ? item.height.text.trim() : _fmt(hVal))} م',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                          decoration: cardDecoration,
+                                          decorationColor: cardDecorColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                const SizedBox(width: 6),
+
+                                // اختيار طراز الويفي / كبس / دابل ويفي بلمسة واحدة سهلة
+                                _quickSelectMenu<_WorkMethod>(
+                                  label: item.method.label,
+                                  icon: '🪟',
+                                  items: _WorkMethod.values,
+                                  itemLabel: (v) => v.label,
+                                  onSelected: (val) {
+                                    setState(() => item.method = val);
+                                    _triggerAutoSave();
+                                  },
+                                  cardDecoration: cardDecoration,
+                                  cardDecorColor: cardDecorColor,
+                                ),
+
+                                const SizedBox(width: 6),
+
+                                // اختيار نوع السقف (كابولي / بيت ستارة) بلمسة واحدة سهلة
+                                _quickSelectMenu<_CeilingType>(
+                                  label: item.ceiling.label,
+                                  icon: '🏠',
+                                  items: _CeilingType.values,
+                                  itemLabel: (v) => v.label,
+                                  onSelected: (val) {
+                                    setState(() => item.ceiling = val);
+                                    _triggerAutoSave();
+                                  },
+                                  cardDecoration: cardDecoration,
+                                  cardDecorColor: cardDecorColor,
+                                ),
+                              ],
                             ),
-                            padding: EdgeInsets.zero,
-                            tooltip: item.expanded
-                                ? 'طي التعديل'
-                                : 'تعديل تفصيلي',
-                            icon: Icon(
-                              item.expanded
-                                  ? Icons.keyboard_arrow_up
-                                  : Icons.edit_note_rounded,
-                              color: _neon,
-                              size: 21,
-                            ),
-                            onPressed: () =>
-                                setState(() => item.expanded = !item.expanded),
                           ),
-                          IconButton(
-                            visualDensity: VisualDensity.compact,
-                            constraints: const BoxConstraints.tightFor(
-                              width: 26,
-                              height: 28,
+
+                          SizedBox(height: gap),
+
+                          // ========================================================
+                          // السطر 4: خياطة ثقيل كذا م • خياطة خفيف كذا م (بالتفصيل والتنسيق العربي السليم)
+                          // ========================================================
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: pb,
                             ),
-                            padding: EdgeInsets.zero,
-                            tooltip: 'حذف المقاس',
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.redAccent,
-                              size: 18,
+                            decoration: BoxDecoration(
+                              color: _gold.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(5),
+                              border: Border.all(
+                                color: _gold.withValues(alpha: 0.2),
+                              ),
                             ),
-                            onPressed: () => _deleteMeasurement(index),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerRight,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text(
+                                    '🪡',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'خياطة ثقيل ${_fmtAr(calc.heavyHeight)} م',
+                                    style: TextStyle(
+                                      color: const Color(0xFFFFE082),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      decoration: cardDecoration,
+                                      decorationColor: cardDecorColor,
+                                    ),
+                                  ),
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    child: Text(
+                                      '•',
+                                      style: TextStyle(
+                                        color: _gold,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                  const Text(
+                                    '🪡',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'خياطة خفيف ${_fmtAr(calc.lightHeight)} م',
+                                    style: TextStyle(
+                                      color: const Color(0xFF8AE9C1),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      decoration: cardDecoration,
+                                      decorationColor: cardDecorColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                          ReorderableDragStartListener(
-                            index: index,
-                            child: const Padding(
-                              padding: EdgeInsets.only(right: 2),
-                              child: Icon(
-                                Icons.drag_indicator,
-                                color: Colors.white38,
-                                size: 20,
+
+                          SizedBox(height: gap),
+
+                          // ========================================================
+                          // السطر 5: نظام الخياطة (الأجناب) والعجل والشريط مدمجين في سطر واحد
+                          // ========================================================
+                          Container(
+                            padding: EdgeInsets.symmetric(vertical: pb),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerRight,
+                              child: Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 6,
+                                runSpacing: 0,
+                                children: [
+                                  // نظام الخياطة والأجناب
+                                  Text(
+                                    '${_toArabic(item.velvetSides)} ج قطيفة "${item.method.label}" + ${item.lightLayers > 0 ? '${_toArabic(item.lightSides)} ج كتان خفيف' : "بدون خفيف"}',
+                                    style: TextStyle(
+                                      color: const Color(0xFFF1E6D2),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      decoration: cardDecoration,
+                                      decorationColor: cardDecorColor,
+                                    ),
+                                  ),
+
+                                  if (item.method != _WorkMethod.press) ...[
+                                    const Text(
+                                      '•',
+                                      style: TextStyle(
+                                        color: Colors.white54,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+
+                                    // العجل والشريط
+                                    Text(
+                                      '${calc.heavyWheelsLabel} + ${_toArabic(calc.lightWheels)} عجلة = ${_fmtAr(calc.heavyTapeMeters)} م + ${_fmtAr(calc.lightTapeMeters)} م',
+                                      style: TextStyle(
+                                        color: const Color(0xFFFFD45A),
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 13,
+                                        decoration: cardDecoration,
+                                        decorationColor: cardDecorColor,
+                                      ),
+                                    ),
+                                  ],
+                                  const Text(
+                                    '✅ 📌',
+                                    style: TextStyle(fontSize: 11),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
                         ],
                       ),
-
-                      const SizedBox(height: 4),
-
-                      // ========================================================
-                      // السطر 2: [بند المقاس يمين] ⬅️⬅️ [٦ متر ثقيل + ٤ متر خفيف]
-                      // ========================================================
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerRight,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // بند المقاس على اليمين في بادج بارز
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 2.5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _gold.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: _gold.withValues(alpha: 0.4),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Text(
-                                    '📌',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    _toArabic(
-                                      item.width.text.trim().isNotEmpty
-                                          ? item.width.text.trim()
-                                          : _fmt(wVal),
-                                    ),
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 15.5,
-                                      decoration: cardDecoration,
-                                      decorationColor: cardDecorColor,
-                                    ),
-                                  ),
-                                  const Text(
-                                    ' م',
-                                    style: TextStyle(
-                                      color: _neon,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  const Text(
-                                    '📌',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            const SizedBox(width: 6),
-
-                            // إيموشن السهم مرتين يوضح اتجاه الكلام
-                            const Text('⬅️⬅️', style: TextStyle(fontSize: 13)),
-
-                            const SizedBox(width: 6),
-
-                            // كتابة (٦ متر ثقيل + ٤ متر خفيف) بالخط الواضح الصريح
-                            Text(
-                              '${_fmtAr(calc.heavyMeters)} متر ثقيل',
-                              style: TextStyle(
-                                color: const Color(0xFFFFD45A),
-                                fontWeight: FontWeight.w900,
-                                fontSize: 14,
-                                decoration: cardDecoration,
-                                decorationColor: cardDecorColor,
-                              ),
-                            ),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 5),
-                              child: Text(
-                                '+',
-                                style: TextStyle(
-                                  color: Colors.white54,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              '${_fmtAr(calc.lightMeters)} متر خفيف',
-                              style: TextStyle(
-                                color: const Color(0xFF70D6FF),
-                                fontWeight: FontWeight.w900,
-                                fontSize: 14,
-                                decoration: cardDecoration,
-                                decorationColor: cardDecorColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      // ========================================================
-                      // السطر 3: [الارتفاع كذا م] + [اختيار الويفي بسهولة] + [اختيار كابولي بسهولة]
-                      // ========================================================
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerRight,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // نص الارتفاع بترتيب عربي صحيح (الكلمة أولاً ثم الرقم)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2.5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.black45,
-                                borderRadius: BorderRadius.circular(5),
-                                border: Border.all(color: Colors.white12),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Text(
-                                    '📩 ',
-                                    style: TextStyle(fontSize: 11),
-                                  ),
-                                  Text(
-                                    'الارتفاع ${_toArabic(item.height.text.trim().isNotEmpty ? item.height.text.trim() : _fmt(hVal))} م',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                      decoration: cardDecoration,
-                                      decorationColor: cardDecorColor,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            const SizedBox(width: 6),
-
-                            // اختيار طراز الويفي / كبس / دابل ويفي بلمسة واحدة سهلة
-                            _quickSelectMenu<_WorkMethod>(
-                              label: item.method.label,
-                              icon: '🪟',
-                              items: _WorkMethod.values,
-                              itemLabel: (v) => v.label,
-                              onSelected: (val) {
-                                setState(() => item.method = val);
-                                _triggerAutoSave();
-                              },
-                              cardDecoration: cardDecoration,
-                              cardDecorColor: cardDecorColor,
-                            ),
-
-                            const SizedBox(width: 6),
-
-                            // اختيار نوع السقف (كابولي / بيت ستارة) بلمسة واحدة سهلة
-                            _quickSelectMenu<_CeilingType>(
-                              label: item.ceiling.label,
-                              icon: '🏠',
-                              items: _CeilingType.values,
-                              itemLabel: (v) => v.label,
-                              onSelected: (val) {
-                                setState(() => item.ceiling = val);
-                                _triggerAutoSave();
-                              },
-                              cardDecoration: cardDecoration,
-                              cardDecorColor: cardDecorColor,
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      // ========================================================
-                      // السطر 4: خياطة ثقيل كذا م • خياطة خفيف كذا م (بالتفصيل والتنسيق العربي السليم)
-                      // ========================================================
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _gold.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(5),
-                          border: Border.all(
-                            color: _gold.withValues(alpha: 0.2),
-                          ),
-                        ),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerRight,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('🪡', style: TextStyle(fontSize: 12)),
-                              const SizedBox(width: 4),
-                              Text(
-                                'خياطة ثقيل ${_fmtAr(calc.heavyHeight)} م',
-                                style: TextStyle(
-                                  color: const Color(0xFFFFE082),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  decoration: cardDecoration,
-                                  decorationColor: cardDecorColor,
-                                ),
-                              ),
-                              const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 8),
-                                child: Text(
-                                  '•',
-                                  style: TextStyle(
-                                    color: _gold,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                              const Text('🪡', style: TextStyle(fontSize: 12)),
-                              const SizedBox(width: 4),
-                              Text(
-                                'خياطة خفيف ${_fmtAr(calc.lightHeight)} م',
-                                style: TextStyle(
-                                  color: const Color(0xFF8AE9C1),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  decoration: cardDecoration,
-                                  decorationColor: cardDecorColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      // ========================================================
-                      // السطر 5: نظام الخياطة (الأجناب) والعجل والشريط مدمجين في سطر واحد
-                      // ========================================================
-                      Container(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: Wrap(
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 6,
-                          runSpacing: 4,
-                          children: [
-                            // نظام الخياطة والأجناب
-                            Text(
-                              '${_toArabic(item.velvetSides)} ج قطيفة "${item.method.label}" + ${item.lightLayers > 0 ? "كتان خفيف" : "بدون خفيف"}',
-                              style: TextStyle(
-                                color: const Color(0xFFF1E6D2),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                decoration: cardDecoration,
-                                decorationColor: cardDecorColor,
-                              ),
-                            ),
-
-                            const Text(
-                              '•',
-                              style: TextStyle(
-                                color: Colors.white54,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-
-                            // العجل والشريط
-                            Text(
-                              '${_toArabic(calc.heavyWheels)} + ${_toArabic(calc.lightWheels)} عجلة = ${_fmtAr(calc.heavyTapeMeters)} م + ${_fmtAr(calc.lightTapeMeters)} م',
-                              style: TextStyle(
-                                color: const Color(0xFFFFD45A),
-                                fontWeight: FontWeight.w800,
-                                fontSize: 13,
-                                decoration: cardDecoration,
-                                decorationColor: cardDecorColor,
-                              ),
-                            ),
-
-                            const Text('✅ 📌', style: TextStyle(fontSize: 11)),
-                          ],
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ),
+
+              // ====================================================================
+              // لوحة التعديل التفصيلي المنسدلة (تفتح اختيارياً عند الرغبة في تعديل المقاسات يدوياً)
+              // ====================================================================
+            ],
           ),
-
-          // ====================================================================
-          // لوحة التعديل التفصيلي المنسدلة (تفتح اختيارياً عند الرغبة في تعديل المقاسات يدوياً)
-          // ====================================================================
-          if (item.expanded) ...[
-            const Divider(color: Color(0x33C7A064), height: 1),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: const BoxDecoration(
-                color: Color(0xFF07080D),
-                borderRadius: BorderRadius.vertical(
-                  bottom: Radius.circular(10),
-                ),
-              ),
-              child: Directionality(
-                textDirection: TextDirection.rtl,
-                child: Column(
-                  children: [
-                    // الصف الأول: اسم الغرفة والعرض والارتفاع
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: TextField(
-                            controller: item.name,
-                            onChanged: (_) {
-                              setState(() {});
-                              _triggerAutoSave();
-                            },
-                            textAlign: TextAlign.right,
-                            style: const TextStyle(
-                              color: _gold,
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 6,
-                              ),
-                              border: OutlineInputBorder(),
-                              labelText: 'اسم الغرفة',
-                              labelStyle: TextStyle(
-                                fontSize: 11,
-                                color: Colors.white60,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          flex: 2,
-                          child: TextField(
-                            controller: item.width,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            onChanged: (_) {
-                              setState(() {});
-                              _triggerAutoSave();
-                            },
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 6,
-                              ),
-                              border: OutlineInputBorder(),
-                              labelText: 'العرض (م)',
-                              labelStyle: TextStyle(
-                                fontSize: 11,
-                                color: Colors.white60,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          flex: 2,
-                          child: TextField(
-                            controller: item.height,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            onChanged: (_) {
-                              setState(() {});
-                              _triggerAutoSave();
-                            },
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 6,
-                              ),
-                              border: OutlineInputBorder(),
-                              labelText: 'الارتفاع (م)',
-                              labelStyle: TextStyle(
-                                fontSize: 11,
-                                color: Colors.white60,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-
-                    // الصف الثاني: طراز الشغل ونوع السقف بشكل مريح
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<_WorkMethod>(
-                            initialValue: item.method,
-                            isDense: true,
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 6,
-                              ),
-                              border: OutlineInputBorder(),
-                              labelText: 'طراز الشغل',
-                              labelStyle: TextStyle(
-                                fontSize: 11,
-                                color: Colors.white60,
-                              ),
-                            ),
-                            dropdownColor: _panel,
-                            items: _WorkMethod.values
-                                .map(
-                                  (v) => DropdownMenuItem(
-                                    value: v,
-                                    child: Text(
-                                      v.label,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                setState(() => item.method = val);
-                                _triggerAutoSave();
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: DropdownButtonFormField<_CeilingType>(
-                            initialValue: item.ceiling,
-                            isDense: true,
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 6,
-                              ),
-                              border: OutlineInputBorder(),
-                              labelText: 'نوع السقف',
-                              labelStyle: TextStyle(
-                                fontSize: 11,
-                                color: Colors.white60,
-                              ),
-                            ),
-                            dropdownColor: _panel,
-                            items: _CeilingType.values
-                                .map(
-                                  (v) => DropdownMenuItem(
-                                    value: v,
-                                    child: Text(
-                                      v.label,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                setState(() => item.ceiling = val);
-                                _triggerAutoSave();
-                              }
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-
-                    // الصف الثالث: تحديد الأجناب والستارة الخفيفة بدون أي اختناق أو تجاوز بكسلات
-                    Wrap(
-                      alignment: WrapAlignment.spaceBetween,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.04),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: Colors.white12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text(
-                                'أجناب قطيفة:',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.white70,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              ChoiceChip(
-                                label: const Text(
-                                  '١ جنب',
-                                  style: TextStyle(fontSize: 10.5),
-                                ),
-                                selected: item.velvetSides == 1,
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                ),
-                                onSelected: (_) {
-                                  setState(() => item.velvetSides = 1);
-                                  _triggerAutoSave();
-                                },
-                              ),
-                              const SizedBox(width: 4),
-                              ChoiceChip(
-                                label: const Text(
-                                  '٢ جنب',
-                                  style: TextStyle(fontSize: 10.5),
-                                ),
-                                selected: item.velvetSides == 2,
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                ),
-                                onSelected: (_) {
-                                  setState(() => item.velvetSides = 2);
-                                  _triggerAutoSave();
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        InkWell(
-                          onTap: () {
-                            setState(
-                              () => item.lightLayers = item.lightLayers > 0
-                                  ? 0
-                                  : 1,
-                            );
-                            _triggerAutoSave();
-                          },
-                          borderRadius: BorderRadius.circular(6),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 9,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: item.lightLayers > 0
-                                  ? const Color(0x228AE9C1)
-                                  : Colors.white.withValues(alpha: 0.04),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: item.lightLayers > 0
-                                    ? const Color(0xFF8AE9C1)
-                                    : Colors.white12,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  item.lightLayers > 0
-                                      ? Icons.check_box_rounded
-                                      : Icons.check_box_outline_blank_rounded,
-                                  size: 16,
-                                  color: item.lightLayers > 0
-                                      ? const Color(0xFF8AE9C1)
-                                      : Colors.white38,
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  'ستارة خفيفة (كتان)',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: item.lightLayers > 0
-                                        ? const Color(0xFF8AE9C1)
-                                        : Colors.white60,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -1918,277 +2218,32 @@ class _ParisClientMeasurementsPageState
   }
 }
 
-// ============================================================================
-// نماذج البيانات والحسابات الهندسية الدقيقة
-// ============================================================================
-class _Measurement {
-  static int _counter = 0;
-  final int id = ++_counter;
-  final TextEditingController name = TextEditingController(text: 'شباك');
-  final TextEditingController width = TextEditingController(text: '3.00');
-  final TextEditingController height = TextEditingController(text: '2.95');
-  final TextEditingController wheels = TextEditingController();
+// لوحة التعديل بتنزل بالتدريج بعد ما الكارت يوصل، وتختفي بسرعة قبل ما يرجع
+class _PanelReveal extends StatelessWidget {
+  const _PanelReveal({required this.visible, required this.child});
 
-  _WorkMethod method = _WorkMethod.wave;
-  _CeilingType ceiling = _CeilingType.kaboli;
-  int velvetSides = 2;
-  int lightLayers = 1;
-  bool enabled = true;
-  bool expanded = false;
+  final bool visible;
+  final Widget child;
 
-  _Calculation get calculation {
-    final w = toDouble(width.text);
-    final h = toDouble(height.text);
-
-    // مضاعفات القماش بناءً على الطراز
-    final heavyMultiplier = method == _WorkMethod.press ? 2.5 : 3.0;
-    final lightMultiplier = method == _WorkMethod.doubleWave ? 3.0 : 2.0;
-
-    // خصومات الارتفاع بالسنتيمتر بناءً على السقف ونوع التعليق
-    double heavyOffset = 0;
-    double lightOffset = 0;
-
-    if (method == _WorkMethod.press) {
-      heavyOffset = .03;
-      lightOffset = .02;
-    } else if (method == _WorkMethod.wave && ceiling == _CeilingType.kaboli) {
-      heavyOffset = -.01;
-      lightOffset = -.04;
-    } else if (method == _WorkMethod.wave &&
-        ceiling == _CeilingType.curtainBox) {
-      heavyOffset = 0;
-      lightOffset = -.04;
-    } else if (method == _WorkMethod.doubleWave &&
-        ceiling == _CeilingType.kaboli) {
-      heavyOffset = -.01;
-      lightOffset = -.02;
-    } else if (method == _WorkMethod.doubleWave &&
-        ceiling == _CeilingType.curtainBox) {
-      heavyOffset = .01;
-      lightOffset = 0;
-    }
-
-    // حساب العجل ومتر الشريط التلقائي
-    final heavyWheels = w > 0 ? (w * 9.52).round() : 0;
-    final lightWheels = (lightLayers > 0 && w > 0) ? heavyWheels : 0;
-    final heavyTape = w > 0 ? (w * 1.33) : 0.0;
-    final lightTape = (lightLayers > 0 && w > 0) ? heavyTape : 0.0;
-
-    return _Calculation(
-      heavyMeters: w > 0 ? (w * heavyMultiplier) : 0,
-      lightMeters: (lightLayers > 0 && w > 0) ? (w * lightMultiplier) : 0,
-      heavyHeight: h > 0 ? (h + heavyOffset) : 0,
-      lightHeight: (lightLayers > 0 && h > 0) ? (h + lightOffset) : 0,
-      heavyWheels: heavyWheels,
-      lightWheels: lightWheels,
-      heavyTapeMeters: heavyTape,
-      lightTapeMeters: lightTape,
-    );
-  }
-
-  static double toDouble(String val) {
-    var clean = val
-        .replaceAll('٠', '0')
-        .replaceAll('١', '1')
-        .replaceAll('٢', '2')
-        .replaceAll('٣', '3')
-        .replaceAll('٤', '4')
-        .replaceAll('٥', '5')
-        .replaceAll('٦', '6')
-        .replaceAll('٧', '7')
-        .replaceAll('٨', '8')
-        .replaceAll('٩', '9')
-        .replaceAll('،', '.')
-        .replaceAll('٫', '.')
-        .replaceAll(',', '.')
-        .trim();
-    return double.tryParse(clean) ?? 0.0;
-  }
-
-  void dispose() {
-    name.dispose();
-    width.dispose();
-    height.dispose();
-    wheels.dispose();
-  }
-}
-
-class _Balcony {
-  static int _counter = 0;
-  final int id = ++_counter;
-  final TextEditingController name = TextEditingController(text: 'بلكونة');
-  final TextEditingController parts = TextEditingController(text: '3');
-  bool enabled = true;
-
-  double get totalWidth {
-    final clean = parts.text
-        .replaceAll('٠', '0')
-        .replaceAll('١', '1')
-        .replaceAll('٢', '2')
-        .replaceAll('٣', '3')
-        .replaceAll('٤', '4')
-        .replaceAll('٥', '5')
-        .replaceAll('٦', '6')
-        .replaceAll('٧', '7')
-        .replaceAll('٨', '8')
-        .replaceAll('٩', '9')
-        .replaceAll('،', '.')
-        .replaceAll('٫', '.')
-        .replaceAll(',', '.');
-
-    return clean
-        .split('+')
-        .fold<double>(
-          0.0,
-          (sum, part) => sum + (double.tryParse(part.trim()) ?? 0.0),
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: visible ? 1 : 0),
+      duration: Duration(milliseconds: visible ? 560 : 150),
+      curve: visible
+          ? const Interval(0.4, 1.0, curve: Curves.easeOutCubic)
+          : Curves.easeIn,
+      builder: (context, v, child) {
+        final f = v.clamp(0.0, 1.0);
+        return ClipRect(
+          child: Align(
+            alignment: Alignment.topCenter,
+            heightFactor: f,
+            child: Opacity(opacity: f, child: child),
+          ),
         );
-  }
-
-  void dispose() {
-    name.dispose();
-    parts.dispose();
-  }
-}
-
-class _Calculation {
-  const _Calculation({
-    required this.heavyMeters,
-    required this.lightMeters,
-    required this.heavyHeight,
-    required this.lightHeight,
-    required this.heavyWheels,
-    required this.lightWheels,
-    required this.heavyTapeMeters,
-    required this.lightTapeMeters,
-  });
-
-  final double heavyMeters;
-  final double lightMeters;
-  final double heavyHeight;
-  final double lightHeight;
-  final int heavyWheels;
-  final int lightWheels;
-  final double heavyTapeMeters;
-  final double lightTapeMeters;
-}
-
-class _DeletedCard {
-  _DeletedCard({
-    required this.isBalcony,
-    required this.name,
-    this.width = '3.00',
-    this.height = '2.95',
-    this.method = 'wave',
-    this.ceiling = 'kaboli',
-    this.velvetSides = 2,
-    this.lightLayers = 1,
-    this.wheels = '',
-    this.parts = '',
-    this.enabled = true,
-  });
-
-  factory _DeletedCard.measurement(_Measurement m) => _DeletedCard(
-    isBalcony: false,
-    name: m.name.text,
-    width: m.width.text,
-    height: m.height.text,
-    method: m.method.name,
-    ceiling: m.ceiling.name,
-    velvetSides: m.velvetSides,
-    lightLayers: m.lightLayers,
-    wheels: m.wheels.text,
-    enabled: m.enabled,
-  );
-
-  factory _DeletedCard.balcony(_Balcony b) => _DeletedCard(
-    isBalcony: true,
-    name: b.name.text,
-    parts: b.parts.text,
-    enabled: b.enabled,
-  );
-
-  factory _DeletedCard.fromMap(Map<String, dynamic> map) => _DeletedCard(
-    isBalcony: map['is_balcony'] == true || map['type'] == 'balcony',
-    name: (map['name'] ?? '').toString(),
-    width: (map['width'] ?? '3.00').toString(),
-    height: (map['height'] ?? '2.95').toString(),
-    method: (map['method'] ?? 'wave').toString(),
-    ceiling: (map['ceiling'] ?? 'kaboli').toString(),
-    velvetSides: (map['velvet_sides'] as num?)?.toInt() ?? 2,
-    lightLayers: (map['light_layers'] as num?)?.toInt() ?? 1,
-    wheels: (map['wheels'] ?? '').toString(),
-    parts: (map['parts'] ?? '').toString(),
-    enabled: map['enabled'] != false,
-  );
-
-  final bool isBalcony;
-  final String name;
-  final String width;
-  final String height;
-  final String method;
-  final String ceiling;
-  final int velvetSides;
-  final int lightLayers;
-  final String wheels;
-  final String parts;
-  final bool enabled;
-
-  Map<String, dynamic> toMap() => {
-    'is_balcony': isBalcony,
-    'name': name,
-    'width': width,
-    'height': height,
-    'method': method,
-    'ceiling': ceiling,
-    'velvet_sides': velvetSides,
-    'light_layers': lightLayers,
-    'wheels': wheels,
-    'parts': parts,
-    'enabled': enabled,
-  };
-
-  _Measurement toMeasurement() {
-    final m = _Measurement();
-    m.name.text = name;
-    m.width.text = width;
-    m.height.text = height;
-    m.method = _WorkMethod.values.firstWhere(
-      (v) => v.name == method,
-      orElse: () => _WorkMethod.wave,
+      },
+      child: child,
     );
-    m.ceiling = _CeilingType.values.firstWhere(
-      (v) => v.name == ceiling,
-      orElse: () => _CeilingType.kaboli,
-    );
-    m.velvetSides = velvetSides;
-    m.lightLayers = lightLayers;
-    m.wheels.text = wheels;
-    m.enabled = enabled;
-    return m;
   }
-
-  _Balcony toBalcony() {
-    final b = _Balcony();
-    b.name.text = name;
-    b.parts.text = parts;
-    b.enabled = enabled;
-    return b;
-  }
-}
-
-enum _WorkMethod {
-  wave('ويفي'),
-  press('حلقات كبس'),
-  doubleWave('دابل ويفي');
-
-  const _WorkMethod(this.label);
-  final String label;
-}
-
-enum _CeilingType {
-  kaboli('كابولي'),
-  curtainBox('بيت ستارة');
-
-  const _CeilingType(this.label);
-  final String label;
 }

@@ -15,7 +15,7 @@ class ParisCurtainsApp extends StatelessWidget {
       builder: (context, child) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
-          title: 'باريس للستاير',
+          title: 'باريس للستائر',
           localizationsDelegates: context.localizationDelegates,
           supportedLocales: context.supportedLocales,
           locale: context.locale,
