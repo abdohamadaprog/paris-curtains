@@ -1,4 +1,4 @@
-part of 'paris_client_measurements_page.dart';
+part of '../paris_client_measurements_page.dart';
 
 // ============================================================================
 // دوال تحويل الأرقام إلى العربية وتنسيق الفواصل (مشتركة بين الصفحة والكروت)
@@ -97,7 +97,8 @@ class _Measurement {
           heavyWheels = auto;
         }
       }
-      heavyMeters = heavyWheels * _fabricPerWheel;
+      // القماش الأساسي = 3 أضعاف العرض (ويفي)، وحسبة العجل للإرشاد بس في سطر العجل
+      heavyMeters = w > 0 ? (w * heavyMultiplier) : 0;
     } else {
       heavyWheels = 0; // الحلقات (كبس) مفيهاش عجل
       heavyMeters = w > 0 ? (w * heavyMultiplier) : 0;
@@ -114,12 +115,13 @@ class _Measurement {
       heavyWheels: heavyWheels,
       lightWheels: lightWheels,
       heavySides: heavySides,
+      wheelsFabricMeters: heavyWheels * _fabricPerWheel,
       heavyTapeMeters: heavyTape,
       lightTapeMeters: lightTape,
     );
   }
 
-  // متر القماش لكل عجلة
+  // متر القماش لكل عجلة (سر المهنة: بيظهر في سطر العجل بس)
   static const double _fabricPerWheel = 0.148;
 
   // العدد اليدوي للعجل (لو الحقل فاضي أو غلط بيرجع null ويشتغل الحساب التلقائي)
@@ -225,6 +227,7 @@ class _Calculation {
     required this.heavyWheels,
     required this.lightWheels,
     required this.heavySides,
+    required this.wheelsFabricMeters,
     required this.heavyTapeMeters,
     required this.lightTapeMeters,
   });
@@ -236,6 +239,9 @@ class _Calculation {
   final int heavyWheels;
   final int lightWheels;
   final int heavySides;
+
+  // قماش العجل (عدد العجل × 0.148): معلومة للشغل بتتكتب تحت الكارت
+  final double wheelsFabricMeters;
 
   // 18 + 18 لو جنبين، أو الرقم الواحد لو جنب واحد
   String get heavyWheelsLabel {

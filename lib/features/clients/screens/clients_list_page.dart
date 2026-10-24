@@ -1,9 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/theme_manger.dart';
 import 'paris_client_measurements_page.dart';
+
+part 'clients_list/client_card.dart';
+part 'clients_list/client_dialog.dart';
+part 'clients_list/client_helpers.dart';
+part 'clients_list/client_theme.dart';
 
 /// صفحة إدارة العملاء الخاصة بلوحة تحكم باريس للستائر.
 /// تستخدم مجموعة Firestore الحالية: clients
@@ -20,22 +27,13 @@ class _ClientsListPageState extends State<ClientsListPage>
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String _search = '';
-  static const Color _gold = AppColors.primaryGold;
+  int _sortMode = 0; // 0 موعد التركيب • 1 الأحدث تسجيلاً • 2 الأقدم تسجيلاً • 3 الاسم
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _allDocs = const [];
 
-  bool _isDark(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark;
 
-  Color _surfaceColor(BuildContext context) =>
-      _isDark(context) ? AppColors.surfaceDark : Colors.white;
 
-  Color _dialogColor(BuildContext context) =>
-      _isDark(context) ? AppColors.surfaceDark2 : AppColors.background;
 
-  Color _primaryText(BuildContext context) =>
-      Theme.of(context).colorScheme.onSurface;
 
-  Color _mutedText(BuildContext context) =>
-      Theme.of(context).colorScheme.onSurface.withValues(alpha: .68);
 
   @override
   void initState() {
@@ -51,240 +49,25 @@ class _ClientsListPageState extends State<ClientsListPage>
     super.dispose();
   }
 
-  Future<void> _addClient() async {
-    final nameController = TextEditingController();
-    final phoneController = TextEditingController();
-    final addressController = TextEditingController();
-    final notesController = TextEditingController();
-    DateTime? installationDate;
-    final formKey = GlobalKey<FormState>();
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: _dialogColor(context),
-          title: Text(
-            'عميل جديد',
-            style: TextStyle(color: _primaryText(context)),
-          ),
-          content: SingleChildScrollView(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: nameController,
-                    autofocus: true,
-                    style: TextStyle(color: _primaryText(context)),
-                    decoration: _inputDecoration('اسم العميل'),
-                    validator: (v) => v == null || v.trim().isEmpty
-                        ? 'اكتب اسم العميل'
-                        : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: phoneController,
-                    keyboardType: TextInputType.phone,
-                    style: TextStyle(color: _primaryText(context)),
-                    decoration: _inputDecoration('رقم الهاتف'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: addressController,
-                    style: TextStyle(color: _primaryText(context)),
-                    decoration: _inputDecoration('العنوان'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: notesController,
-                    style: TextStyle(color: _primaryText(context)),
-                    decoration: _inputDecoration('ملاحظات'),
-                    maxLines: 2,
-                  ),
-                  const SizedBox(height: 12),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.calendar_month, color: _gold),
-                    title: const Text(
-                      'تاريخ التركيب',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    subtitle: Text(
-                      installationDate == null
-                          ? 'اختياري'
-                          : DateFormat('yyyy-MM-dd').format(installationDate!),
-                      style: const TextStyle(color: _gold),
-                    ),
-                    onTap: () async {
-                      final now = DateTime.now();
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: installationDate ?? now,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime(2100),
-                      );
-                      if (picked != null) {
-                        setDialogState(() => installationDate = picked);
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('إلغاء'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _gold,
-                foregroundColor: Colors.black,
-              ),
-              onPressed: () {
-                if (formKey.currentState!.validate()) {
-                  Navigator.pop(dialogContext, true);
-                }
-              },
-              child: const Text('حفظ'),
-            ),
-          ],
-        ),
-      ),
-    );
 
-    if (result == true) {
-      try {
-        await FirebaseFirestore.instance.collection('clients').add({
-          'name': nameController.text.trim(),
-          'phone': phoneController.text.trim(),
-          'address': addressController.text.trim(),
-          'notes': notesController.text.trim(),
-          'created_at': FieldValue.serverTimestamp(),
-          'installation_date': installationDate == null
-              ? null
-              : Timestamp.fromDate(installationDate!),
-          'installation_done': false,
-        });
-        if (mounted) _message('تم إضافة العميل بنجاح');
-      } catch (e) {
-        if (mounted) _message('تعذر حفظ العميل: $e');
-      }
-    }
-    nameController.dispose();
-    phoneController.dispose();
-    addressController.dispose();
-    notesController.dispose();
-  }
 
-  Future<void> _editClient(String id, String currentName) async {
-    final controller = TextEditingController(text: currentName);
-    final key = GlobalKey<FormState>();
-    final save = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: _dialogColor(context),
-        title: Text(
-          'تعديل اسم العميل',
-          style: TextStyle(color: _primaryText(context)),
-        ),
-        content: Form(
-          key: key,
-          child: TextFormField(
-            controller: controller,
-            style: TextStyle(color: _primaryText(context)),
-            decoration: _inputDecoration('اسم العميل'),
-            validator: (v) =>
-                v == null || v.trim().isEmpty ? 'اكتب اسم العميل' : null,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _gold,
-              foregroundColor: Colors.black,
-            ),
-            onPressed: () {
-              if (key.currentState!.validate()) Navigator.pop(ctx, true);
-            },
-            child: const Text('حفظ التعديل'),
-          ),
-        ],
-      ),
-    );
-    if (save == true) {
-      try {
-        await FirebaseFirestore.instance.collection('clients').doc(id).update({
-          'name': controller.text.trim(),
-        });
-        if (mounted) _message('تم تعديل اسم العميل');
-      } catch (e) {
-        if (mounted) _message('تعذر تعديل العميل: $e');
-      }
-    }
-    controller.dispose();
-  }
 
-  Future<void> _deleteClient(String id, String name) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: _dialogColor(context),
-        title: Text(
-          'حذف العميل؟',
-          style: TextStyle(color: _primaryText(context)),
-        ),
-        content: Text(
-          'هل تريد حذف "$name"؟',
-          style: TextStyle(color: _mutedText(context)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('إلغاء'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('حذف', style: TextStyle(color: Colors.redAccent)),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    try {
-      await FirebaseFirestore.instance.collection('clients').doc(id).delete();
-      if (mounted) _message('تم حذف العميل');
-    } catch (e) {
-      if (mounted) _message('تعذر حذف العميل: $e');
-    }
-  }
 
-  InputDecoration _inputDecoration(String hint) => InputDecoration(
-    hintText: hint,
-    hintStyle: TextStyle(color: _mutedText(context)),
-    filled: true,
-    fillColor: _isDark(context) ? AppColors.glassWhite : AppColors.bgCreamy,
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide.none,
-    ),
-  );
 
-  void _message(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-  }
 
-  DateTime? _dateFrom(dynamic value) {
-    if (value is Timestamp) return value.toDate();
-    if (value is DateTime) return value;
-    return null;
-  }
+
+
+
+
+
+
+
+
+
+
+
+  // بتتنادى من ملفات الـ extensions بدل setState مباشرة
+  void _rebuild(VoidCallback fn) => setState(fn);
 
   @override
   Widget build(BuildContext context) {
@@ -402,7 +185,10 @@ class _ClientsListPageState extends State<ClientsListPage>
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: TextField(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
                 focusNode: _searchFocusNode,
                 controller: _searchController,
                 onChanged: (value) =>
@@ -430,6 +216,38 @@ class _ClientsListPageState extends State<ClientsListPage>
                               },
                             ),
                     ),
+                    ),
+                  ),
+                  PopupMenuButton<int>(
+                    tooltip: 'ترتيب العملاء',
+                    icon: const Icon(Icons.sort_rounded, color: _gold),
+                    color: _dialogColor(context),
+                    initialValue: _sortMode,
+                    onSelected: (v) => setState(() => _sortMode = v),
+                    itemBuilder: (_) => [
+                      for (final entry in const {
+                        0: 'حسب موعد التركيب',
+                        1: 'الأحدث تسجيلاً',
+                        2: 'الأقدم تسجيلاً',
+                        3: 'الاسم (أ - ي)',
+                      }.entries)
+                        PopupMenuItem(
+                          value: entry.key,
+                          child: Text(
+                            entry.value,
+                            style: TextStyle(
+                              color: entry.key == _sortMode
+                                  ? _gold
+                                  : _primaryText(context),
+                              fontWeight: entry.key == _sortMode
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ),
             ),
             Expanded(
@@ -439,10 +257,40 @@ class _ClientsListPageState extends State<ClientsListPage>
                     .snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
+                    final err = snapshot.error;
+                    final denied =
+                        err is FirebaseException &&
+                        err.code == 'permission-denied';
+                    final user = FirebaseAuth.instance.currentUser;
                     return Center(
-                      child: Text(
-                        'حصل خطأ أثناء تحميل العملاء',
-                        style: TextStyle(color: theme.colorScheme.error),
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              denied
+                                  ? 'الصلاحيات رفضت قراءة العملاء'
+                                  : 'حصل خطأ أثناء تحميل العملاء',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: theme.colorScheme.error,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            SelectableText(
+                              'السبب: $err\n'
+                              'الحساب: ${user?.email ?? 'غير مسجّل دخول'}\n'
+                              'الإيميل متحقق منه: ${user?.emailVerified}',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: _mutedText(context),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   }
@@ -452,6 +300,7 @@ class _ClientsListPageState extends State<ClientsListPage>
                     );
                   }
                   final docs = snapshot.data?.docs ?? [];
+                  _allDocs = docs;
                   final clients = docs.where((doc) {
                     final data = doc.data();
                     final name = (data['name'] ?? '').toString();
@@ -516,282 +365,5 @@ class _ClientsListPageState extends State<ClientsListPage>
     );
   }
 
-  Widget _clientList(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> clients,
-    bool archived,
-  ) {
-    if (clients.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              archived ? Icons.archive_outlined : Icons.people_outline,
-              color: _mutedText(context).withValues(alpha: .45),
-              size: 44,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              archived ? 'الأرشيف فارغ' : 'لا يوجد شغل حالي',
-              style: TextStyle(color: _mutedText(context), fontSize: 16),
-            ),
-          ],
-        ),
-      );
-    }
 
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 90),
-      itemCount: clients.length,
-      itemBuilder: (context, index) {
-        final doc = clients[index];
-        final data = doc.data();
-        final name = (data['name'] ?? 'بدون اسم').toString().trim();
-        final phone = (data['phone'] ?? '').toString().trim();
-        final address = (data['address'] ?? '').toString().trim();
-        final notes = (data['notes'] ?? '').toString().trim();
-        final date = _dateFrom(data['installation_date']);
-        final registrationDate = _dateFrom(data['created_at']);
-        final done = data['installation_done'] == true;
-
-        return Card(
-          color: _surfaceColor(context),
-          margin: const EdgeInsets.symmetric(vertical: 6),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(
-              color: done
-                  ? const Color(0xFF72C69A).withValues(alpha: .45)
-                  : _gold.withValues(alpha: .20),
-            ),
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => ParisClientMeasurementsPage(
-                    clientId: doc.id,
-                    clientName: name,
-                    phone: phone.isEmpty ? null : phone,
-                    address: address.isEmpty ? null : address,
-                    registrationDate: registrationDate,
-                    installationDate: date,
-                  ),
-                ),
-              );
-            },
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CircleAvatar(
-                    radius: 23,
-                    backgroundColor: _gold.withValues(alpha: .15),
-                    child: Text(
-                      name.isNotEmpty ? name.characters.first : '?',
-                      style: const TextStyle(
-                        color: _gold,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name.isEmpty ? 'بدون اسم' : name,
-                          style: TextStyle(
-                            color: _primaryText(context),
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        if (phone.isNotEmpty) ...[
-                          const SizedBox(height: 7),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.phone_outlined,
-                                color: _gold,
-                                size: 15,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  phone,
-                                  textAlign: TextAlign.right,
-                                  style: TextStyle(
-                                    color: _mutedText(context),
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                        if (address.isNotEmpty) ...[
-                          const SizedBox(height: 5),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(
-                                Icons.location_on_outlined,
-                                color: _gold,
-                                size: 15,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  address,
-                                  style: TextStyle(
-                                    color: _mutedText(context),
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                        const SizedBox(height: 9),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            _clientInfoChip(
-                              icon: Icons.calendar_month_outlined,
-                              label: date == null
-                                  ? 'موعد التركيب غير محدد'
-                                  : DateFormat('yyyy/MM/dd').format(date),
-                              color: _gold,
-                            ),
-                            if (registrationDate != null)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 2,
-                                  vertical: 5,
-                                ),
-                                child: Text(
-                                  'تسجيل: ${DateFormat('yyyy/MM/dd').format(registrationDate)}',
-                                  style: TextStyle(
-                                    color: _mutedText(context),
-                                    fontSize: 10,
-                                  ),
-                                ),
-                              ),
-                            _clientInfoChip(
-                              icon: done
-                                  ? Icons.check_circle_outline
-                                  : Icons.pending_outlined,
-                              label: done ? 'تم تنفيذ الشغل' : 'لم يتم التنفيذ',
-                              color: done
-                                  ? const Color(0xFF72C69A)
-                                  : _mutedText(context),
-                            ),
-                          ],
-                        ),
-                        if (notes.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            'ملاحظات: $notes',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: _mutedText(context).withValues(alpha: .8),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  PopupMenuButton<String>(
-                    tooltip: 'إجراءات العميل',
-                    iconColor: _mutedText(context),
-                    color: _dialogColor(context),
-                    onSelected: (value) async {
-                      if (value == 'edit') {
-                        await _editClient(doc.id, name);
-                      } else if (value == 'delete') {
-                        await _deleteClient(doc.id, name);
-                      } else if (value == 'done') {
-                        try {
-                          await doc.reference.update({
-                            'installation_done': !done,
-                            'installation_done_at': !done
-                                ? FieldValue.serverTimestamp()
-                                : null,
-                          });
-                          if (mounted) {
-                            _message(
-                              !done
-                                  ? 'تم تسجيل تنفيذ الشغل'
-                                  : 'تم إلغاء حالة التنفيذ',
-                            );
-                          }
-                        } catch (e) {
-                          if (mounted) _message('تعذر تحديث حالة التنفيذ: $e');
-                        }
-                      }
-                    },
-                    itemBuilder: (_) => [
-                      PopupMenuItem(
-                        value: 'edit',
-                        child: Text(
-                          'تعديل الاسم',
-                          style: TextStyle(color: _primaryText(context)),
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'done',
-                        child: Text(
-                          done ? 'إلغاء تنفيذ الشغل' : 'تسجيل إن الشغل اتعمل',
-                          style: TextStyle(color: _primaryText(context)),
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Text(
-                          'حذف العميل',
-                          style: TextStyle(color: Colors.redAccent),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _clientInfoChip({
-    required IconData icon,
-    required String label,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: .10),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: .25)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: color),
-          const SizedBox(width: 5),
-          Text(label, style: TextStyle(color: color, fontSize: 11)),
-        ],
-      ),
-    );
-  }
 }
