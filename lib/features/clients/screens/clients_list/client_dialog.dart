@@ -92,7 +92,10 @@ extension _ClientDialog on _ClientsListPageState {
                   const SizedBox(height: 6),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.event_note_outlined, color: _gold),
+                    leading: const Icon(
+                      Icons.event_note_outlined,
+                      color: _gold,
+                    ),
                     title: Text(
                       'تاريخ التسجيل',
                       style: TextStyle(color: _primaryText(context)),
@@ -270,7 +273,7 @@ extension _ClientDialog on _ClientsListPageState {
         if (registrationDate != null) {
           fields['created_at'] = Timestamp.fromDate(registrationDate!);
         }
-        await doc!.reference.update(fields);
+        await doc.reference.update(fields);
         if (mounted) _message('تم تعديل بيانات العميل');
       } else {
         fields['created_at'] = registrationDate == null

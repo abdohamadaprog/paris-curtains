@@ -38,6 +38,7 @@ class PriceDef {
   final String label;
   final String unit;
   final double value;
+
   const PriceDef(this.key, this.label, this.unit, this.value);
 }
 
@@ -88,6 +89,7 @@ class WindowSpec {
   final double width;
   final String method; // wave | doubleWave | press
   final bool hasLight;
+
   const WindowSpec(this.width, this.method, this.hasLight);
 
   static WindowSpec? fromMap(Map<dynamic, dynamic> m) {
@@ -101,6 +103,7 @@ class WindowSpec {
 
 class BalconySpec {
   final List<double> parts;
+
   const BalconySpec(this.parts);
 
   static BalconySpec? fromMap(Map<dynamic, dynamic> m) {
@@ -128,6 +131,7 @@ class AutoLine {
 
   /// بند بيتكتب يدوي (كوبشة، نقل، تركيب بلكونة): ما بيتعتبرش ناقص لو كميته 1
   final bool manual;
+
   const AutoLine({
     required this.key,
     required this.name,
@@ -144,6 +148,7 @@ class InvoiceAuto {
   final List<AutoLine> accessories;
   final double totalWidth;
   final int windows;
+
   const InvoiceAuto(
     this.fabric,
     this.accessories,
@@ -164,6 +169,7 @@ InvoiceAuto calcApartment(List<WindowSpec> windows, Map<String, double> p) {
     final x = w.width;
     totalWidth += x;
     final layers = w.hasLight ? 2 : 1;
+
     if (w.method == 'press') {
       heavy += 2.5 * x;
       final l = w.hasLight ? 2 * x : 0.0;
@@ -175,6 +181,7 @@ InvoiceAuto calcApartment(List<WindowSpec> windows, Map<String, double> p) {
     } else {
       heavy += 3 * x;
       trackM += x * layers;
+
       if (w.method == 'doubleWave') {
         final l = w.hasLight ? 3 * x : 0.0;
         light += l;
@@ -377,6 +384,7 @@ InvoiceAuto calcBalcony(
       note: 'المقاسات × 1.5',
     ),
   ];
+
   final acc = <AutoLine>[
     AutoLine(
       key: 'balc_pipe',
@@ -434,5 +442,6 @@ InvoiceAuto calcBalcony(
       priceKey: 'balc_sew',
     ),
   ];
+
   return InvoiceAuto(fabric, acc, total, balconies.length);
 }

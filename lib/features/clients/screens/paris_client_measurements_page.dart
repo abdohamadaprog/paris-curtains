@@ -1,9 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:hero_here/hero_here.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/constants/app_colors.dart';
-import 'invoice/invoice_page.dart';
+import 'package:paris_curtian_app/features/clients/screens/invoice/invoice_page.dart';
 
 part 'measurements/balcony_card.dart';
 part 'measurements/measurement_card_hero.dart';
@@ -20,15 +19,7 @@ part 'measurements/trash_panel.dart';
 /// التصميم المطور النهائي الخالي من أي أخطاء والمتوافق مع جميع إصدارات فلاتر:
 /// - متوافق مع كافة إصدارات Flutter (استخدام withOpacity بدلاً من withValues)
 /// - كروت مدمجة عالية الكثافة تتسع لـ ٥ مقاسات على شاشة الهاتف
-/// - السطر 1: [صح] [ 🌟 اسم الغرفة 🌟 🪟 ] [ أدوات / سحب وإعادة ترتيب ]
-/// - السطر 2: [ 📌 ٤.٢٠ م 📌 ] ⬅️⬅️ [ ٦ متر ثقيل + ٤ متر خفيف ]
-/// - السطر 3: [ 📩 الارتفاع ٢.٩٥ م ] [ ✅ 🪟 ويفي ▾ ] [ ✅ 🏠 كابولي ▾ ] بقوائم منبثقة سريعة بلمسة واحدة
-/// - السطر 4: 🪡 خياطة ثقيل ٢.٩٤ م • 🪡 خياطة خفيف ٢.٩١ م (بالتفصيل والتنسيق العربي السليم)
-/// - السطر 5: نظام الخياطة (الأجناب) والعجل والشريط مدمجين في سطر واحد
-/// - تكبير الخطوط لتكون واضحة ومقروءة تحت إضاءة الورشة
-/// - تكرار ونسخ الكارت بـ ٣ نقرات متتالية (Triple-Tap)
-/// - شطب جميع النصوص بالكامل عند تعطيل الكارت (Strike-through)
-/// - حفظ تلقائي فوري وسلس (Auto-Save) في Firestore بمجرد إدخال أو تعديل أي بيان
+/// - تكبير بانبثاق مرن (Spring Pop Zoom) بلمسة واحدة
 /// ============================================================================
 class ParisClientMeasurementsPage extends StatefulWidget {
   const ParisClientMeasurementsPage({
@@ -114,7 +105,6 @@ class _ParisClientMeasurementsPageState
           clientName: typed.isEmpty ? widget.clientName : typed,
           phone: widget.phone,
           address: widget.address,
-          startOnBalcony: balcony,
         ),
       ),
     );
@@ -138,10 +128,13 @@ class _ParisClientMeasurementsPageState
       totalWheels += (c.heavyWheels + c.lightWheels);
     }
 
-    return PopScope(
-      canPop: _expandedId == null,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) _closeCard();
+    return WillPopScope(
+      onWillPop: () async {
+        if (_expandedId != null) {
+          _closeCard();
+          return false;
+        }
+        return true;
       },
       child: Scaffold(
         backgroundColor: _bg,
@@ -245,61 +238,56 @@ class _ParisClientMeasurementsPageState
           ],
         ),
         body: SafeArea(
-          child: HeroHereSwitcher(
-            switchKey: _expandedId,
-            child: Stack(
-              children: [
-                Column(
-                  children: [
-                    _clientInfoBar(),
-                    _sectionHeaderBar(),
-                    if (_showTrash) _trashPanel(),
-                    Expanded(
-                      child: ReorderableListView.builder(
-                        padding: const EdgeInsets.fromLTRB(10, 2, 10, 16),
-                        itemCount: _measurements.length + _balconies.length,
-                        onReorder: (oldIndex, newIndex) {
-                          if (oldIndex >= _measurements.length ||
-                              newIndex > _measurements.length) {
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  _clientInfoBar(),
+                  _sectionHeaderBar(),
+                  if (_showTrash) _trashPanel(),
+                  Expanded(
+                    child: ReorderableListView.builder(
+                      padding: const EdgeInsets.fromLTRB(10, 2, 10, 16),
+                      itemCount: _measurements.length + _balconies.length,
+                      onReorder: (oldIndex, newIndex) {
+                        if (oldIndex >= _measurements.length ||
+                            newIndex > _measurements.length) {
+                          return;
+                        }
+                        setState(() {
+                          if (newIndex > oldIndex) newIndex--;
+                          if (newIndex < 0 ||
+                              newIndex >= _measurements.length) {
                             return;
                           }
-                          setState(() {
-                            if (newIndex > oldIndex) newIndex--;
-                            if (newIndex < 0 ||
-                                newIndex >= _measurements.length)
-                              return;
-                            final item = _measurements.removeAt(oldIndex);
-                            _measurements.insert(newIndex, item);
-                          });
-                          _triggerAutoSave();
-                        },
-                        itemBuilder: (context, index) {
-                          if (index < _measurements.length) {
-                            return _measurementCard(
-                              _measurements[index],
-                              index,
-                            );
-                          }
-                          final bIndex = index - _measurements.length;
-                          return _balconyCard(
-                            _balconies[bIndex],
-                            bIndex,
-                            key: ValueKey('balcony-${_balconies[bIndex].id}'),
-                          );
-                        },
-                      ),
+                          final item = _measurements.removeAt(oldIndex);
+                          _measurements.insert(newIndex, item);
+                        });
+                        _triggerAutoSave();
+                      },
+                      itemBuilder: (context, index) {
+                        if (index < _measurements.length) {
+                          return _measurementCard(_measurements[index], index);
+                        }
+                        final bIndex = index - _measurements.length;
+                        return _balconyCard(
+                          _balconies[bIndex],
+                          bIndex,
+                          key: ValueKey('balcony-${_balconies[bIndex].id}'),
+                        );
+                      },
                     ),
-                    _totalsBottomBar(
-                      totalHeavy,
-                      totalLight,
-                      totalWheels,
-                      activeCount,
-                    ),
-                  ],
-                ),
-                if (_expandedId != null) _expandedOverlay(),
-              ],
-            ),
+                  ),
+                  _totalsBottomBar(
+                    totalHeavy,
+                    totalLight,
+                    totalWheels,
+                    activeCount,
+                  ),
+                ],
+              ),
+              if (_expandedId != null) _expandedOverlay(),
+            ],
           ),
         ),
       ),

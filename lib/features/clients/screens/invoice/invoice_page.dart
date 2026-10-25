@@ -1,30 +1,31 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/app_colors.dart';
 import 'invoice_calculator.dart';
 
-// تصميم الفاتورة: ورق كريمي + عناوين سودا + ذهبي (زي نسخة الفاتورة المعتمدة)
+// ألوان وهوية ستائر باريس الملكية الفاخرة (Dark & Gold)
 const Color _gold = AppColors.primaryGold;
+const Color _goldLight = AppColors.lightGold;
 const Color _goldDeep = AppColors.goldDeep;
-const Color _ink = Color(0xFF0C0C0C);
-const Color _paper = Color(0xFFF6F0E4);
-const Color _paper2 = Color(0xFFFBF7EE);
-const Color _rule = Color(0xFFE2D6BC);
-const Color _danger = Color(0xFFB3261E);
+const Color _bgDark = Color(0xFF0C0E14);
+const Color _cardDark = Color(0xFF161622);
+const Color _cardDark2 = Color(0xFF1E2030);
+const Color _borderGold = Color(0x55C7A064);
+const Color _success = Color(0xFF4ADE80);
+const Color _danger = Color(0xFFFF5252);
 
-/// بنود أسعار بتتكتب يدوي وبتتخزن مع الفاتورة (مش ليها سعر افتراضي)
+/// بنود أسعار تتطلب إدخال يدوي إذا لزم
 const List<PriceDef> _manualPriceDefs = [
   PriceDef('kobsha', 'كوبشة', 'قطعة', 0),
   PriceDef('transport', 'موصلات ونقل', 'مرة', 0),
   PriceDef('balc_install', 'تركيب بلكونة', 'بلكونة', 0),
 ];
 
-String _ar(String s) => s.replaceAllMapped(
-  RegExp(r'[0-9]'),
-  (m) => '٠١٢٣٤٥٦٧٨٩'[int.parse(m[0]!)],
-);
+/// تحويل الأرقام إلى أرقام عربية مشرقية (٠١٢٣٤٥٦٧٨٩)
+String _ar(String s) =>
+    s.replaceAllMapped(RegExp(r'[0-9]'), (m) => '٠١٢٣٤٥٦٧٨٩'[int.parse(m[0]!)]);
 
 String _money(double v) {
   final r = roundMoney(v);
@@ -35,11 +36,15 @@ String _money(double v) {
 String _qtyText(double v) {
   final s = v == v.roundToDouble()
       ? v.toInt().toString()
-      : v.toStringAsFixed(2).replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
+      : v
+            .toStringAsFixed(2)
+            .replaceAll(RegExp(r'0+$'), '')
+            .replaceAll(RegExp(r'\.$'), '');
   return _ar(s);
 }
 
-double _toDouble(dynamic v) => v is num ? v.toDouble() : parseNumber('${v ?? ''}');
+double _toDouble(dynamic v) =>
+    v is num ? v.toDouble() : parseNumber('${v ?? ''}');
 
 class _Custom {
   static int _next = 0;
@@ -90,6 +95,11 @@ class _InvoicePageState extends State<InvoicePage> {
   bool _dirty = false;
   bool _saving = false;
 
+  // خيارات الفاتورة المعتمدة
+  bool _includeFabric = false; // القماش اختياري - الاستندر مصنعية وإكسسوار
+  bool _includeBalcony = false; // إضافة البلكونة للفاتورة
+  double _depositPaid = 0.0; // العربون المدفوع (مقدم)
+
   Map<String, double> _globalDefaults = defaultPrices();
   Map<String, double> _prices = defaultPrices();
   final Map<String, double> _qtyOverride = {};
@@ -98,6 +108,8 @@ class _InvoicePageState extends State<InvoicePage> {
   List<WindowSpec> _windows = [];
   List<BalconySpec> _balconies = [];
 
+  final TextEditingController _depositController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -105,43 +117,59 @@ class _InvoicePageState extends State<InvoicePage> {
     _load();
   }
 
-  // ============================ التحميل والحفظ ============================
+  @override
+  void dispose() {
+    _depositController.dispose();
+    super.dispose();
+  }
 
+  // ============================ جلب البيانات ============================
   Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
     try {
-      final db = FirebaseFirestore.instance;
+      final docGlobal = await FirebaseFirestore.instance
+          .collection('settings')
+          .doc('invoice_prices')
+          .get();
+      if (docGlobal.exists && docGlobal.data() != null) {
+        final m = docGlobal.data()!;
+        _globalDefaults = {
+          for (final d in kPriceDefs) d.key: _toDouble(m[d.key] ?? d.value),
+        };
+      }
 
-      // الأسعار الافتراضية العامة (لو القواعد ما بتسمحش بتفضل الأسعار المدمجة)
-      try {
-        final s = await db.collection('settings').doc('prices').get();
-        if (s.exists) {
-          final saved = s.data() ?? {};
-          _globalDefaults = {
-            ...defaultPrices(),
-            for (final e in saved.entries) e.key: _toDouble(e.value),
-          };
-        }
-      } catch (_) {}
-
-      final doc = await db.collection('clients').doc(widget.clientId).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('clients')
+          .doc(widget.clientId)
+          .get();
       final data = doc.data() ?? {};
 
+      final rawWindows = (data['measurements'] as List<dynamic>?) ?? [];
       _windows = [
-        for (final m in (data['measurements'] as List? ?? const []))
-          if (m is Map) ...[
-            if (WindowSpec.fromMap(m) != null) WindowSpec.fromMap(m)!,
-          ],
+        for (final m in rawWindows)
+          if (m is Map && WindowSpec.fromMap(m) != null) WindowSpec.fromMap(m)!,
       ];
+
+      final rawBalc = (data['balconies'] as List<dynamic>?) ?? [];
       _balconies = [
-        for (final m in (data['balconies'] as List? ?? const []))
-          if (m is Map) ...[
-            if (BalconySpec.fromMap(m) != null) BalconySpec.fromMap(m)!,
-          ],
+        for (final m in rawBalc)
+          if (m is Map && BalconySpec.fromMap(m) != null)
+            BalconySpec.fromMap(m)!,
       ];
 
       _prices = {..._globalDefaults};
+
       final inv = data['invoice'];
       if (inv is Map) {
+        _includeFabric = inv['include_fabric'] == true;
+        _includeBalcony = inv['include_balcony'] == true;
+        _depositPaid = _toDouble(inv['deposit_paid']);
+        _depositController.text = _depositPaid > 0 ? '$_depositPaid' : '';
+
         final p = inv['prices'];
         if (p is Map) {
           for (final e in p.entries) {
@@ -154,41 +182,53 @@ class _InvoicePageState extends State<InvoicePage> {
             _qtyOverride['${e.key}'] = _toDouble(e.value);
           }
         }
-        final c = inv['custom'];
-        if (c is List) {
-          for (final raw in c) {
-            if (raw is Map) {
+        final bf = inv['balcony_fabric'];
+        if (bf is String && kBalconyFabrics.containsKey(bf)) {
+          _balconyFabric = bf;
+        }
+        final cust = inv['custom'];
+        if (cust is List) {
+          _custom.clear();
+          for (final c in cust) {
+            if (c is Map) {
               _custom.add(
                 _Custom(
-                  name: '${raw['name'] ?? ''}',
-                  qty: _toDouble(raw['qty']),
-                  price: _toDouble(raw['price']),
-                  balcony: raw['balcony'] == true,
+                  name: '${c['name'] ?? ''}',
+                  qty: _toDouble(c['qty']),
+                  price: _toDouble(c['price']),
+                  balcony: c['balcony'] == true,
                 ),
               );
             }
           }
         }
-        final bf = inv['balcony_fabric'];
-        if (bf is String && kBalconyFabrics.containsKey(bf)) _balconyFabric = bf;
       }
-      if (!mounted) return;
+
       setState(() => _loading = false);
     } catch (e) {
-      if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = '$e';
+        _error = 'حدث خطأ أثناء تحميل الفاتورة: $e';
       });
     }
   }
 
+  // ============================ حفظ الفاتورة ============================
   Future<bool> _save() async {
-    if (_saving) return false;
     setState(() => _saving = true);
     try {
-      final apt = _totalsFor(false);
-      final bal = _totalsFor(true);
+      final aptTotals = _totalsFor(false);
+      final balTotals = _totalsFor(true);
+
+      final double totalBill =
+          (aptTotals.acc +
+                  (_includeFabric ? aptTotals.fabric : 0) +
+                  (_includeBalcony ? (balTotals.acc + balTotals.fabric) : 0))
+              .toDouble();
+      final double remaining = (totalBill - _depositPaid) > 0
+          ? (totalBill - _depositPaid)
+          : 0.0;
+
       await FirebaseFirestore.instance
           .collection('clients')
           .doc(widget.clientId)
@@ -198,48 +238,59 @@ class _InvoicePageState extends State<InvoicePage> {
               'qty_overrides': _qtyOverride,
               'custom': [for (final c in _custom) c.toMap()],
               'balcony_fabric': _balconyFabric,
-              'apartment_fabric_total': apt.fabric,
-              'apartment_accessories_total': apt.acc,
-              'apartment_total': roundMoney(apt.fabric + apt.acc),
-              'balcony_fabric_total': bal.fabric,
-              'balcony_accessories_total': bal.acc,
-              'balcony_total': roundMoney(bal.fabric + bal.acc),
+              'include_fabric': _includeFabric,
+              'include_balcony': _includeBalcony,
+              'deposit_paid': _depositPaid,
+              'apartment_fabric_total': aptTotals.fabric,
+              'apartment_accessories_total': aptTotals.acc,
+              'balcony_fabric_total': balTotals.fabric,
+              'balcony_accessories_total': balTotals.acc,
+              'grand_total': roundMoney(totalBill),
+              'remaining_balance': roundMoney(remaining),
               'updated_at': FieldValue.serverTimestamp(),
             },
+            'totalCost': roundMoney(totalBill),
+            'depositPaid': roundMoney(_depositPaid),
+            'remainingBalance': roundMoney(remaining),
           });
-      if (!mounted) return true;
+
       setState(() {
-        _saving = false;
         _dirty = false;
+        _saving = false;
       });
-      _snack('تم حفظ الفاتورة');
+      _snack('تم حفظ الفاتورة بنجاح');
       return true;
     } catch (e) {
-      if (mounted) {
-        setState(() => _saving = false);
-        _snack('تعذر حفظ الفاتورة: $e');
-      }
+      setState(() => _saving = false);
+      _snack('تعذر الحفظ: $e');
       return false;
     }
   }
 
-  void _snack(String t) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(t)));
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: _cardDark2,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   // ============================ الحسابات ============================
-
   InvoiceAuto _autoFor(bool balcony) => balcony
       ? calcBalcony(_balconies, _balconyFabric, _prices)
       : calcApartment(_windows, _prices);
 
   double _qtyOf(AutoLine l) => _qtyOverride[l.key] ?? l.qty;
-  double _priceOf(AutoLine l) => _prices[l.priceKey] ?? 0;
-  bool _visible(AutoLine l) =>
-      l.manual || l.qty > 0 || _qtyOverride.containsKey(l.key);
+  double _priceOf(AutoLine l) => _prices[l.priceKey] ?? 0.0;
   double _lineTotal(AutoLine l) => roundMoney(_qtyOf(l) * _priceOf(l));
+
+  bool _visible(AutoLine l) {
+    if (l.manual) return true;
+    return _qtyOf(l) > 0;
+  }
 
   ({double fabric, double acc}) _totalsFor(bool balcony) {
     final auto = _autoFor(balcony);
@@ -273,318 +324,484 @@ class _InvoicePageState extends State<InvoicePage> {
 
   void _setPrice(String key, double v) => _touch(() => _prices[key] = v);
 
-  // ============================ الواجهة ============================
+  // ============================ إرسال الفاتورة عبر واتساب ============================
+  Future<void> _shareOnWhatsApp() async {
+    final aptTotals = _totalsFor(false);
+    final balTotals = _totalsFor(true);
+    final autoApt = _autoFor(false);
 
+    final double totalBill =
+        aptTotals.acc +
+        (_includeFabric ? aptTotals.fabric : 0) +
+        (_includeBalcony ? (balTotals.acc + balTotals.fabric) : 0);
+    final double remaining = (totalBill - _depositPaid) > 0
+        ? (totalBill - _depositPaid)
+        : 0.0;
+
+    final buffer = StringBuffer();
+    buffer.writeln('✨ *فاتورة حساب معتمدة — باريس للستاير* ✨');
+    buffer.writeln('م/ عبدالرحمن حمادة · هاتف: 01012345678');
+    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━');
+    buffer.writeln('👤 *العميل:* ${widget.clientName}');
+    if ((widget.phone ?? '').isNotEmpty) {
+      buffer.writeln('📱 *الهاتف:* ${widget.phone}');
+    }
+    if ((widget.address ?? '').isNotEmpty) {
+      buffer.writeln('📍 *العنوان:* ${widget.address}');
+    }
+    buffer.writeln(
+      '🪟 *عدد الشبابيك:* ${_ar('${autoApt.windows}')} شبابيك (إجمالي عرض: ${_ar('${autoApt.totalWidth}')} م)',
+    );
+    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━');
+    buffer.writeln('🛠️ *المصنعيات والتركيب الداخلي:*');
+    buffer.writeln(
+      '• تركيب داخلي للشقة (ثابت ١٠٠ج للشباك): ${_money((autoApt.windows * 100).toDouble())} ج.م',
+    );
+    buffer.writeln('• إجمالي المصنعيات والتجهيز: ${_money(aptTotals.acc)} ج.م');
+
+    if (_includeFabric) {
+      buffer.writeln('━━━━━━━━━━━━━━━━━━━━━');
+      buffer.writeln('🧵 *أقمشة الستائر (مشمولة بالفاتورة):*');
+      buffer.writeln('• إجمالي الأقمشة: ${_money(aptTotals.fabric)} ج.م');
+    } else {
+      buffer.writeln(
+        '*(ملاحظة: القماش توريد العميل وغير مضاف في هذه الفاتورة)*',
+      );
+    }
+
+    if (_includeBalcony && balTotals.acc > 0) {
+      buffer.writeln('━━━━━━━━━━━━━━━━━━━━━');
+      buffer.writeln(
+        '🏖️ *حساب البلكونات:* ${_money(balTotals.acc + balTotals.fabric)} ج.م',
+      );
+    }
+
+    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━');
+    buffer.writeln('💰 *إجمالي الحساب:* ${_money(totalBill)} ج.م');
+    if (_depositPaid > 0) {
+      buffer.writeln('✅ *تم دفع عربون:* ${_money(_depositPaid)} ج.م');
+    }
+    buffer.writeln(
+      '🔥 *المتبقي عند الاستلام والتركيب:* ${_money(remaining)} ج.م',
+    );
+    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━');
+    buffer.writeln(
+      '📜 *الضمان:* ضمان شامل 3 سنوات على التراكات والإكسسوارات الصامتة.',
+    );
+
+    final phoneClean = (widget.phone ?? '').replaceAll(RegExp(r'\D'), '');
+    final uri = Uri.parse(
+      'https://wa.me/2$phoneClean?text=${Uri.encodeComponent(buffer.toString())}',
+    );
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      _snack('تعذر فتح تطبيق واتساب');
+    }
+  }
+
+  // ============================ الواجهة ============================
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: !_dirty,
-      onPopInvokedWithResult: (didPop, _) async {
-        if (didPop) return;
-        final choice = await showDialog<String>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('تعديلات لم تُحفظ'),
-            content: const Text('تحب تحفظ الفاتورة قبل ما تخرج؟'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, 'cancel'),
-                child: const Text('رجوع'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, 'discard'),
-                child: const Text('خروج بدون حفظ'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _gold,
-                  foregroundColor: Colors.black,
-                ),
-                onPressed: () => Navigator.pop(ctx, 'save'),
-                child: const Text('حفظ وخروج'),
-              ),
-            ],
+    return Scaffold(
+      backgroundColor: _bgDark,
+      appBar: AppBar(
+        backgroundColor: _cardDark,
+        elevation: 0,
+        title: Text(
+          'فاتورة: ${widget.clientName}',
+          style: const TextStyle(
+            color: _gold,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
           ),
-        );
-        if (!mounted) return;
-        if (choice == 'save') {
-          if (await _save() && mounted) Navigator.of(context).pop();
-        } else if (choice == 'discard') {
-          setState(() => _dirty = false);
-          Navigator.of(context).pop();
-        }
-      },
-      child: Scaffold(
-        backgroundColor: _paper,
-        appBar: AppBar(
-          backgroundColor: _ink,
-          foregroundColor: _gold,
-          title: Text(
-            'فاتورة / عرض سعر',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'إعدادات الأسعار الافتراضية',
+            icon: const Icon(Icons.tune_rounded, color: _gold),
+            onPressed: _openPrices,
           ),
-          actions: [
-            IconButton(
-              tooltip: 'إعدادات الأسعار',
-              icon: const Icon(Icons.tune_rounded),
-              onPressed: _loading ? null : _openPrices,
-            ),
-            _saving
-                ? const Padding(
-                    padding: EdgeInsets.all(14),
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: _gold),
+          IconButton(
+            tooltip: 'مشاركة عبر واتساب',
+            icon: const Icon(Icons.share_rounded, color: _success),
+            onPressed: _shareOnWhatsApp,
+          ),
+          IconButton(
+            tooltip: 'حفظ',
+            icon: _saving
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: _gold,
                     ),
                   )
-                : IconButton(
-                    tooltip: 'حفظ الفاتورة',
-                    icon: Icon(
-                      Icons.save_rounded,
-                      color: _dirty ? _gold : Colors.white54,
-                    ),
-                    onPressed: _loading ? null : _save,
+                : Icon(
+                    _dirty ? Icons.save_rounded : Icons.check_circle_outline,
+                    color: _dirty ? _goldLight : Colors.white38,
                   ),
-          ],
-        ),
-        body: _loading
-            ? const Center(child: CircularProgressIndicator(color: _gold))
-            : _error != null
-            ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: SelectableText(
-                    'تعذر تحميل بيانات العميل\n$_error',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: _danger),
-                  ),
-                ),
-              )
-            : _content(),
+            onPressed: _saving ? null : _save,
+          ),
+        ],
       ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: _gold))
+          : (_error != null)
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: _danger),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            )
+          : _content(),
     );
   }
 
   Widget _content() {
     final auto = _autoFor(_balconyTab);
     final t = _totalsFor(_balconyTab);
+    final aptTotals = _totalsFor(false);
+    final balTotals = _totalsFor(true);
+
+    final double grandTotal =
+        aptTotals.acc +
+        (_includeFabric ? aptTotals.fabric : 0) +
+        (_includeBalcony ? (balTotals.acc + balTotals.fabric) : 0);
+
+    final double remaining = (grandTotal - _depositPaid) > 0
+        ? (grandTotal - _depositPaid)
+        : 0.0;
+
     final accessories = auto.accessories.where(_visible).toList();
     final customHere = _custom.where((c) => c.balcony == _balconyTab).toList();
-    final unpriced = <String>[
-      for (final l in [...auto.fabric, ...accessories])
-        if (_priceOf(l) == 0 && _qtyOf(l) > 0 && l.key != 'transport') l.name,
-    ];
-    final empty = auto.totalWidth <= 0;
 
     return Column(
       children: [
         _tabs(),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+            padding: const EdgeInsets.fromLTRB(14, 4, 14, 16),
             children: [
               _clientCard(auto),
-              if (empty)
-                _notice(
-                  _balconyTab
-                      ? 'مفيش بلكونات مسجلة للعميل ده. سجّل مقاسات البلكونة الأول.'
-                      : 'مفيش مقاسات مسجلة للعميل ده. سجّل المقاسات الأول.',
-                ),
-              if (unpriced.isNotEmpty)
-                _notice('بنود لسه ما اتسعرتش: ${unpriced.join('، ')}', warn: true),
-              _sectionBar('أولاً : الأقمشة'),
-              if (_balconyTab) _fabricChoice(),
-              _tableHeader(),
-              for (final l in auto.fabric) _lineRow(l),
-              _subtotal('إجمالي تكلفة الأقمشة', t.fabric),
+              _configBar(aptTotals, balTotals),
               const SizedBox(height: 12),
-              _sectionBar('ثانياً : الإكسسوارات والمصنعية'),
+
+              _sectionBar(
+                'أولاً : أقمشة الستائر (${_includeFabric ? "مشمولة بالحساب" : "توريد الزبون - استرشادي"})',
+                total: t.fabric,
+                isFabric: true,
+              ),
+              _tableHeader(),
+              if (_balconyTab) _fabricChoice(),
+              for (final l in auto.fabric) _lineRow(l),
+              _subtotal('إجمالي الأقمشة', t.fabric, isSubdued: !_includeFabric),
+
+              const SizedBox(height: 16),
+
+              _sectionBar(
+                'ثانياً : المصنعيات والإكسسوار والتركيب',
+                total: t.acc,
+                isFabric: false,
+              ),
               _tableHeader(),
               for (final l in accessories) _lineRow(l),
               for (final c in customHere) _customRow(c),
               _addCustomButton(),
-              _subtotal('إجمالي تكلفة الإكسسوارات والمصنعية', t.acc),
-              const SizedBox(height: 12),
-              _notes(),
+              _subtotal('إجمالي المصنعية والإكسسوار', t.acc),
+
+              const SizedBox(height: 20),
+
+              // كرت الملخص المالي وتسوية الحساب (إجمالي، عربون، متبقي)
+              _financialSettlementCard(grandTotal, remaining),
+              const SizedBox(height: 80),
             ],
           ),
         ),
-        _grandTotal(t.fabric + t.acc),
+        _bottomActionBar(grandTotal, remaining),
       ],
     );
   }
 
   Widget _tabs() {
-    Widget tab(String label, bool balcony) {
-      final active = _balconyTab == balcony;
-      return Expanded(
-        child: GestureDetector(
-          onTap: () => setState(() => _balconyTab = balcony),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              color: active ? _ink : Colors.transparent,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Center(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: active ? _gold : Colors.black54,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13.5,
+    return Container(
+      color: _cardDark,
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: () => setState(() => _balconyTab = false),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: !_balconyTab ? _gold : Colors.transparent,
+                      width: 2.5,
+                    ),
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    'فاتورة ستائر الشقة (${_windows.length})',
+                    style: TextStyle(
+                      color: !_balconyTab ? _gold : Colors.white60,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      );
-    }
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: _paper2,
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: _rule),
+          Expanded(
+            child: InkWell(
+              onTap: () => setState(() => _balconyTab = true),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: _balconyTab ? _gold : Colors.transparent,
+                      width: 2.5,
+                    ),
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    'فاتورة البلكونات (${_balconies.length})',
+                    style: TextStyle(
+                      color: _balconyTab ? _gold : Colors.white60,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
-      child: Row(children: [tab('ستائر الشقة', false), tab('فاتورة بلكونة', true)]),
     );
   }
 
   Widget _clientCard(InvoiceAuto auto) {
-    Widget cell(String label, String value) => Expanded(
-      child: Column(
-        children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: Colors.black54)),
-          const SizedBox(height: 2),
-          Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-
-    final phone = (widget.phone ?? '').trim();
-    final address = (widget.address ?? '').trim();
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _paper2,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _gold.withValues(alpha: .6)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            widget.clientName,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
-          ),
-          if (phone.isNotEmpty || address.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                [if (phone.isNotEmpty) phone, if (address.isNotEmpty) address].join('  •  '),
-                style: const TextStyle(fontSize: 12, color: Colors.black54),
-              ),
-            ),
-          const Divider(height: 18, color: _rule),
-          Row(
-            children: [
-              cell(
-                _balconyTab ? 'إجمالي المقاسات' : 'إجمالي أطوال الشبابيك',
-                '${_qtyText(roundMoney(auto.totalWidth))} م',
-              ),
-              cell(
-                _balconyTab ? 'عدد البلكونات' : 'عدد الشبابيك',
-                _qtyText(auto.windows.toDouble()),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _notice(String text, {bool warn = false}) {
-    final color = warn ? _danger : _goldDeep;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: .08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: .4)),
+        color: _cardDark,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _borderGold),
       ),
       child: Row(
         children: [
-          Icon(warn ? Icons.warning_amber_rounded : Icons.info_outline, size: 18, color: color),
-          const SizedBox(width: 8),
           Expanded(
-            child: Text(text, style: TextStyle(fontSize: 12.5, color: color, fontWeight: FontWeight.w600)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.clientName,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _goldLight,
+                  ),
+                ),
+                if ((widget.phone ?? '').isNotEmpty)
+                  Text(
+                    widget.phone!,
+                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                  ),
+              ],
+            ),
+          ),
+          _statBox('الشبابيك', '${auto.windows}'),
+          const SizedBox(width: 8),
+          _statBox('إجمالي العرض', '${auto.totalWidth} م'),
+        ],
+      ),
+    );
+  }
+
+  Widget _statBox(String title, String val) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black26,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontSize: 10, color: Colors.white54),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            _ar(val),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: _gold,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _sectionBar(String title) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-    decoration: const BoxDecoration(
-      color: _ink,
-      borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-    ),
-    child: Text(
-      title,
-      style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-    ),
-  );
-
-  Widget _tableHeader() {
-    Widget h(String t, int flex) => Expanded(
-      flex: flex,
-      child: Text(
-        t,
-        textAlign: TextAlign.center,
-        style: const TextStyle(color: _gold, fontSize: 11.5, fontWeight: FontWeight.bold),
+  Widget _configBar(
+    ({double fabric, double acc}) apt,
+    ({double fabric, double acc}) bal,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: _cardDark2,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: const Text(
+                'إضافة القماش للحساب',
+                style: TextStyle(fontSize: 12, color: Colors.white),
+              ),
+              value: _includeFabric,
+              activeColor: _gold,
+              onChanged: (v) => _touch(() => _includeFabric = v ?? false),
+            ),
+          ),
+          Expanded(
+            child: CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: const Text(
+                'ضم البلكونة للفاتورة',
+                style: TextStyle(fontSize: 12, color: Colors.white),
+              ),
+              value: _includeBalcony,
+              activeColor: _gold,
+              onChanged: (v) => _touch(() => _includeBalcony = v ?? false),
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  Widget _sectionBar(
+    String title, {
+    required double total,
+    required bool isFabric,
+  }) {
     return Container(
-      color: const Color(0xFF1B1B1B),
-      padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 6),
-      child: Row(children: [h('البند', 5), h('الكمية', 2), h('السعر', 2), h('الإجمالي', 2)]),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E2030),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _gold.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: _goldLight,
+            ),
+          ),
+          Text(
+            '${_money(total)} ج.م',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: isFabric && !_includeFabric ? Colors.white38 : _gold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tableHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+      color: Colors.black38,
+      child: const Row(
+        children: [
+          Expanded(
+            flex: 5,
+            child: Text(
+              'البند والمواصفات',
+              style: TextStyle(fontSize: 11, color: Colors.white60),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              'الكمية',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11, color: Colors.white60),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              'السعر',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11, color: Colors.white60),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(
+              'الإجمالي',
+              textAlign: TextAlign.end,
+              style: TextStyle(fontSize: 11, color: Colors.white60),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _fabricChoice() => Container(
-    width: double.infinity,
-    color: _paper2,
-    padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-    child: Wrap(
-      spacing: 8,
-      runSpacing: 4,
+    padding: const EdgeInsets.all(8),
+    color: _cardDark,
+    child: Row(
       children: [
-        for (final e in kBalconyFabrics.entries)
-          ChoiceChip(
-            label: Text(
-              '${e.value} • ${_money(_prices[e.key] ?? 0)}',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: _balconyFabric == e.key ? Colors.black : Colors.black54,
-              ),
-            ),
-            selected: _balconyFabric == e.key,
-            showCheckmark: false,
-            selectedColor: _gold,
-            backgroundColor: Colors.white,
-            side: BorderSide(color: _balconyFabric == e.key ? _goldDeep : _rule),
-            onSelected: (_) => _touch(() => _balconyFabric = e.key),
-          ),
+        const Text(
+          'نوع قماش البلكونة:',
+          style: TextStyle(fontSize: 12, color: Colors.white70),
+        ),
+        const SizedBox(width: 8),
+        DropdownButton<String>(
+          value: _balconyFabric,
+          dropdownColor: _cardDark2,
+          style: const TextStyle(color: _gold, fontSize: 13),
+          underline: const SizedBox(),
+          items: [
+            for (final e in kBalconyFabrics.entries)
+              DropdownMenuItem(value: e.key, child: Text(e.value)),
+          ],
+          onChanged: (v) {
+            if (v != null) _touch(() => _balconyFabric = v);
+          },
+        ),
       ],
     ),
   );
@@ -592,134 +809,105 @@ class _InvoicePageState extends State<InvoicePage> {
   Widget _lineRow(AutoLine l) {
     final qty = _qtyOf(l);
     final price = _priceOf(l);
-    final overridden = _qtyOverride.containsKey(l.key);
-    final flagged = price == 0 && qty > 0 && l.key != 'transport';
-    final quick = l.key == 'kobsha' || l.key == 'balc_install';
     final total = _lineTotal(l);
-    final mode = _balconyTab ? 'b' : 'a';
+    final bool isFixedInstall = l.key == 'install';
 
     return Container(
       decoration: const BoxDecoration(
-        color: _paper2,
-        border: Border(bottom: BorderSide(color: _rule)),
+        color: Color(0xFF161622),
+        border: Border(bottom: BorderSide(color: Color(0x1FFFFFFF))),
       ),
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
-      child: Column(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+      child: Row(
         children: [
-          Row(
-            children: [
-              Expanded(
-                flex: 5,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(l.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                    Text(
-                      l.note.isEmpty ? l.unit : '${l.unit} • ${l.note}',
-                      style: const TextStyle(fontSize: 10.5, color: Colors.black54),
-                    ),
-                    if (overridden)
-                      InkWell(
-                        onTap: () => _touch(() => _qtyOverride.remove(l.key)),
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 2),
-                          child: Text(
-                            '↺ رجوع للكمية التلقائية',
-                            style: TextStyle(fontSize: 10.5, color: _goldDeep, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                  ],
+          Expanded(
+            flex: 5,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l.name,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
-              ),
-              Expanded(
-                flex: 2,
-                child: _NumField(
-                  key: ValueKey('q-$mode-${l.key}'),
-                  value: qty,
-                  highlight: overridden,
-                  onChanged: (v) => _setQty(l, v),
-                ),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                flex: 2,
-                child: _NumField(
-                  key: ValueKey('p-$mode-${l.priceKey}'),
-                  value: price,
-                  blankZero: true,
-                  flagged: flagged,
-                  onChanged: (v) => _setPrice(l.priceKey, v),
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(
-                  total > 0 ? _money(total) : '—',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
-                ),
-              ),
-            ],
+                if (l.note.isNotEmpty)
+                  Text(
+                    l.note,
+                    style: const TextStyle(fontSize: 10, color: Colors.white54),
+                  ),
+              ],
+            ),
           ),
-          if (quick)
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: Wrap(
-                spacing: 6,
-                children: [
-                  for (final v in const [100.0, 200.0, 300.0])
-                    ActionChip(
-                      visualDensity: VisualDensity.compact,
-                      label: Text(_ar('${v.toInt()}'), style: const TextStyle(fontSize: 11)),
-                      backgroundColor: price == v ? _gold : Colors.white,
-                      side: const BorderSide(color: _rule),
-                      onPressed: () => _setPriceAndRefresh(l.priceKey, v),
+          Expanded(
+            flex: 2,
+            child: _NumBox(value: qty, onChanged: (v) => _setQty(l, v)),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            flex: 2,
+            child: isFixedInstall
+                ? Center(
+                    child: Text(
+                      _ar('${price.toInt()}'),
+                      style: const TextStyle(color: _gold, fontSize: 13),
                     ),
-                ],
+                  )
+                : _NumBox(
+                    value: price,
+                    highlight: true,
+                    onChanged: (v) => _setPrice(l.priceKey, v),
+                  ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(
+              '${_money(total)} ج',
+              textAlign: TextAlign.end,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: _goldLight,
               ),
             ),
+          ),
         ],
       ),
     );
   }
 
-  // الشيبس لازم تحدّث خانة السعر المفتوحة كمان
-  void _setPriceAndRefresh(String key, double v) {
-    FocusManager.instance.primaryFocus?.unfocus();
-    _touch(() => _prices[key] = v);
-  }
-
   Widget _customRow(_Custom c) {
     return Container(
-      decoration: const BoxDecoration(
-        color: _paper2,
-        border: Border(bottom: BorderSide(color: _rule)),
-      ),
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+      color: const Color(0xFF1A1D2B),
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
       child: Row(
         children: [
           Expanded(
             flex: 5,
             child: Row(
               children: [
-                InkWell(
-                  onTap: () => _touch(() => _custom.remove(c)),
-                  child: const Padding(
-                    padding: EdgeInsets.all(4),
-                    child: Icon(Icons.delete_outline, size: 18, color: _danger),
+                IconButton(
+                  icon: const Icon(
+                    Icons.remove_circle,
+                    color: _danger,
+                    size: 16,
                   ),
+                  onPressed: () => _touch(() => _custom.remove(c)),
                 ),
                 Expanded(
-                  child: Text(c.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    c.name,
+                    style: const TextStyle(fontSize: 12, color: Colors.white),
+                  ),
                 ),
               ],
             ),
           ),
           Expanded(
             flex: 2,
-            child: _NumField(
-              key: ValueKey('cq-${c.id}'),
+            child: _NumBox(
               value: c.qty,
               onChanged: (v) => _touch(() => c.qty = v),
             ),
@@ -727,19 +915,18 @@ class _InvoicePageState extends State<InvoicePage> {
           const SizedBox(width: 4),
           Expanded(
             flex: 2,
-            child: _NumField(
-              key: ValueKey('cp-${c.id}'),
+            child: _NumBox(
               value: c.price,
-              blankZero: true,
+              highlight: true,
               onChanged: (v) => _touch(() => c.price = v),
             ),
           ),
           Expanded(
-            flex: 2,
+            flex: 3,
             child: Text(
-              roundMoney(c.qty * c.price) > 0 ? _money(c.qty * c.price) : '—',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+              '${_money(c.qty * c.price)} ج',
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontSize: 12, color: _goldLight),
             ),
           ),
         ],
@@ -747,294 +934,542 @@ class _InvoicePageState extends State<InvoicePage> {
     );
   }
 
-  Widget _addCustomButton() => Container(
-    width: double.infinity,
-    color: _paper2,
-    padding: const EdgeInsets.symmetric(vertical: 4),
-    child: TextButton.icon(
-      onPressed: _addCustom,
-      icon: const Icon(Icons.add_circle_outline, color: _goldDeep),
-      label: const Text('إضافة بند جديد', style: TextStyle(color: _goldDeep, fontWeight: FontWeight.bold)),
+  Widget _addCustomButton() => TextButton.icon(
+    icon: const Icon(Icons.add, color: _gold, size: 16),
+    label: const Text(
+      'إضافة بند يدوي مخصص',
+      style: TextStyle(color: _gold, fontSize: 12),
     ),
+    onPressed: _addCustom,
   );
 
-  Widget _subtotal(String label, double value) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    decoration: const BoxDecoration(
-      color: _ink,
-      borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
-    ),
-    child: Row(
-      children: [
-        Expanded(
-          child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.bold)),
-        ),
-        Text(
-          '${_money(value)} ج.م',
-          style: const TextStyle(color: _gold, fontSize: 18, fontWeight: FontWeight.w900),
-        ),
-      ],
-    ),
-  );
-
-  Widget _grandTotal(double value) => Container(
-    padding: EdgeInsets.fromLTRB(16, 10, 16, 10 + MediaQuery.of(context).padding.bottom),
-    decoration: const BoxDecoration(
-      color: _ink,
-      border: Border(top: BorderSide(color: _gold, width: 1.5)),
-    ),
-    child: Row(
-      children: [
-        const Expanded(
-          child: Text(
-            'الإجمالي النهائي',
-            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-        ),
-        Text(
-          '${_money(value)} ج.م',
-          style: const TextStyle(color: _gold, fontSize: 24, fontWeight: FontWeight.w900),
-        ),
-      ],
-    ),
-  );
-
-  Widget _notes() => Container(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: _paper2,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: _rule),
-    ),
-    child: const Text(
-      'ملاحظات:\n'
-      '• الأسعار قابلة للتغيير في حال تعديل المقاسات أو الخامات.\n'
-      '• مدة التنفيذ تختلف حسب حجم الشغل.\n'
-      '• السعر يشمل الخامات والمصنعية طبقًا للبيانات المذكورة.',
-      style: TextStyle(fontSize: 12, height: 1.6, color: Colors.black54),
-    ),
-  );
-
-  // ============================ النوافذ ============================
-
-  Future<void> _addCustom() async {
-    final name = TextEditingController();
-    final qty = TextEditingController(text: '1');
-    final price = TextEditingController();
-    InputDecoration deco(String t) =>
-        InputDecoration(labelText: t, isDense: true, border: const OutlineInputBorder());
-
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('إضافة بند جديد'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: name, autofocus: true, decoration: deco('اسم البند')),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: qty,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: deco('الكمية'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextField(
-                    controller: price,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: deco('سعر الوحدة'),
-                  ),
-                ),
-              ],
+  Widget _subtotal(String label, double value, {bool isSubdued = false}) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      color: Colors.black26,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: isSubdued ? Colors.white38 : Colors.white70,
             ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: _gold, foregroundColor: Colors.black),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('إضافة'),
+          ),
+          Text(
+            '${_money(value)} ج.م',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: isSubdued ? Colors.white38 : _gold,
+            ),
           ),
         ],
       ),
     );
-    final n = name.text.trim();
-    final q = parseNumber(qty.text);
-    final p = parseNumber(price.text);
-    name.dispose();
-    qty.dispose();
-    price.dispose();
-    if (ok == true && n.isNotEmpty && mounted) {
-      _touch(() => _custom.add(_Custom(name: n, qty: q, price: p, balcony: _balconyTab)));
-    }
   }
 
-  Future<void> _openPrices() async {
-    final tmp = Map<String, double>.from(_prices);
-    var version = 0;
-    final defs = [...kPriceDefs, ..._manualPriceDefs];
+  // ============================ كرت الملخص المالي وتسوية الحساب ============================
+  // المعادلة المعتمدة: حسابنا 10 آلاف - دفع 5 آلاف = فاضل 5 آلاف
+  Widget _financialSettlementCard(double grandTotal, double remaining) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1E2030), Color(0xFF141522)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _gold, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'الملخص المالي وتسوية الحساب',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: _goldLight,
+                ),
+              ),
+              Text(
+                'بالجنيه المصري (EGP)',
+                style: TextStyle(fontSize: 10, color: Colors.white54),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              // 1. الإجمالي المطلوب
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.black45,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'إجمالي الحساب',
+                        style: TextStyle(fontSize: 10, color: Colors.white54),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${_money(grandTotal)} ج',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _includeFabric ? 'شامل القماش' : 'مصنعية وإكسسوار',
+                        style: const TextStyle(fontSize: 9, color: _gold),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
 
-    final action = await showDialog<String>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setD) => AlertDialog(
-          title: const Text('إعدادات الأسعار'),
-          contentPadding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView(
-              shrinkWrap: true,
-              children: [
-                for (final d in defs)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3),
-                    child: Row(
+              // 2. العربون المدفوع
+              Expanded(
+                child: InkWell(
+                  onTap: _editDepositDialog,
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: _success.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _success.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          flex: 5,
-                          child: Text(
-                            '${d.label}\n${d.unit}',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        const Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'تم دفع عربون',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: _success,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Icon(Icons.edit, size: 12, color: _success),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _depositPaid > 0
+                              ? '${_money(_depositPaid)} ج'
+                              : '٠ ج',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: _success,
                           ),
                         ),
-                        Expanded(
-                          flex: 2,
-                          child: _NumField(
-                            key: ValueKey('set-${d.key}-$version'),
-                            value: tmp[d.key] ?? 0,
-                            blankZero: true,
-                            onChanged: (v) => tmp[d.key] = v,
+                        const SizedBox(height: 2),
+                        Text(
+                          _depositPaid > 0
+                              ? 'مخصوم من الإجمالي'
+                              : 'اضغط لتعديل',
+                          style: const TextStyle(
+                            fontSize: 9,
+                            color: Colors.white70,
                           ),
                         ),
                       ],
                     ),
                   ),
-              ],
-            ),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // 3. المتبقي عند الاستلام
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF3B1017),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: _danger, width: 1.5),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'المتبقي للاستلام',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Color(0xFFFF9E9E),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${_money(remaining)} ج',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFFFF5252),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'يدفع عند التركيب',
+                        style: TextStyle(fontSize: 9, color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-          actionsOverflowButtonSpacing: 4,
-          actions: [
-            TextButton(
-              onPressed: () => setD(() {
-                tmp
-                  ..clear()
-                  ..addAll(_globalDefaults);
-                version++;
-              }),
-              child: const Text('رجوع للافتراضي'),
+          if (_depositPaid > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                '💡 معادلة الحساب: (حسابنا ${_money(grandTotal)} ج - دفع ${_money(_depositPaid)} ج = فاضل ${_money(remaining)} ج)',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, 'apply'),
-              child: const Text('على الفاتورة دي'),
+        ],
+      ),
+    );
+  }
+
+  Widget _bottomActionBar(double grandTotal, double remaining) {
+    return Container(
+      color: _cardDark,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'المتبقي: ${_money(remaining)} ج.م',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: _danger,
+                    ),
+                  ),
+                  Text(
+                    'الإجمالي ${_money(grandTotal)} ج • مدفوع ${_money(_depositPaid)} ج',
+                    style: const TextStyle(fontSize: 11, color: Colors.white54),
+                  ),
+                ],
+              ),
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: _gold, foregroundColor: Colors.black),
-              onPressed: () => Navigator.pop(ctx, 'default'),
-              child: const Text('حفظ كافتراضي'),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _gold,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+              ),
+              icon: const Icon(Icons.share, size: 16),
+              label: const Text(
+                'واتساب',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              onPressed: _shareOnWhatsApp,
             ),
           ],
         ),
       ),
     );
+  }
 
-    if (action == null || !mounted) return;
-    _touch(() => _prices = Map<String, double>.from(tmp));
-    if (action == 'default') {
-      try {
-        await FirebaseFirestore.instance.collection('settings').doc('prices').set(tmp);
-        _globalDefaults = {...defaultPrices(), ...tmp};
-        _snack('تم حفظ الأسعار كإعدادات افتراضية للفواتير الجديدة');
-      } catch (e) {
-        _snack('اتطبقت على الفاتورة دي بس. تعذر حفظها كافتراضي (راجع قواعد Firestore): $e');
-      }
+  // ============================ النوافذ ============================
+  Future<void> _editDepositDialog() async {
+    final ctrl = TextEditingController(
+      text: _depositPaid > 0 ? _depositPaid.toStringAsFixed(0) : '',
+    );
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2030),
+        title: const Text(
+          'تسجيل العربون المدفوع (مقدم)',
+          style: TextStyle(color: _goldLight, fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'المبلغ اللي العميل دفعه عربون ليتم خصمه من الإجمالي:',
+              style: TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              style: const TextStyle(
+                color: _success,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+              decoration: InputDecoration(
+                suffixText: 'ج.م',
+                suffixStyle: const TextStyle(color: _gold),
+                filled: true,
+                fillColor: Colors.black38,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: _gold),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('إلغاء', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: _gold),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'تأكيد وحفظ',
+              style: TextStyle(color: Colors.black),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (ok == true) {
+      final v = double.tryParse(normalizeDigits(ctrl.text)) ?? 0.0;
+      _touch(() => _depositPaid = v);
+      await _save();
     }
+  }
+
+  Future<void> _addCustom() async {
+    final nCtrl = TextEditingController();
+    final qCtrl = TextEditingController(text: '1');
+    final pCtrl = TextEditingController();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2030),
+        title: const Text('إضافة بند يدوي', style: TextStyle(color: _gold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nCtrl,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(labelText: 'اسم البند'),
+            ),
+            TextField(
+              controller: qCtrl,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(labelText: 'الكمية'),
+            ),
+            TextField(
+              controller: pCtrl,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(labelText: 'سعر الوحدة'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: _gold),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('إضافة', style: TextStyle(color: Colors.black)),
+          ),
+        ],
+      ),
+    );
+
+    if (ok == true && nCtrl.text.trim().isNotEmpty) {
+      _touch(() {
+        _custom.add(
+          _Custom(
+            name: nCtrl.text.trim(),
+            qty: double.tryParse(normalizeDigits(qCtrl.text)) ?? 1.0,
+            price: double.tryParse(normalizeDigits(pCtrl.text)) ?? 0.0,
+            balcony: _balconyTab,
+          ),
+        );
+      });
+    }
+  }
+
+  Future<void> _openPrices() async {
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: _cardDark2,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setMState) => DraggableScrollableSheet(
+          initialChildSize: 0.8,
+          builder: (_, sc) => ListView(
+            controller: sc,
+            padding: const EdgeInsets.all(16),
+            children: [
+              const Text(
+                'إعدادات الأسعار الافتراضية',
+                style: TextStyle(
+                  color: _gold,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final d in kPriceDefs)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          d.label,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 80,
+                        child: _NumBox(
+                          value: _prices[d.key] ?? d.value,
+                          highlight: true,
+                          onChanged: (v) {
+                            _setPrice(d.key, v);
+                            setMState(() {});
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
-// ============================ خانة رقم قابلة للتعديل ============================
-
-class _NumField extends StatefulWidget {
-  const _NumField({
+class _NumBox extends StatefulWidget {
+  const _NumBox({
     super.key,
     required this.value,
     required this.onChanged,
     this.highlight = false,
-    this.flagged = false,
-    this.blankZero = false,
   });
 
   final double value;
   final ValueChanged<double> onChanged;
   final bool highlight;
-  final bool flagged;
-  final bool blankZero;
 
   @override
-  State<_NumField> createState() => _NumFieldState();
+  State<_NumBox> createState() => _NumBoxState();
 }
 
-class _NumFieldState extends State<_NumField> {
-  late final TextEditingController _c = TextEditingController(text: _text(widget.value));
-  final FocusNode _f = FocusNode();
+class _NumBoxState extends State<_NumBox> {
+  late final TextEditingController _ctrl;
 
-  String _text(double v) {
-    if (widget.blankZero && v == 0) return '';
-    if (v == v.roundToDouble()) return v.toInt().toString();
-    return v.toStringAsFixed(2).replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: _format(widget.value));
   }
 
   @override
-  void didUpdateWidget(covariant _NumField old) {
+  void didUpdateWidget(covariant _NumBox old) {
     super.didUpdateWidget(old);
-    if (!_f.hasFocus && old.value != widget.value) _c.text = _text(widget.value);
+    if ((old.value - widget.value).abs() > 1e-9) {
+      _ctrl.text = _format(widget.value);
+    }
   }
 
   @override
   void dispose() {
-    _c.dispose();
-    _f.dispose();
+    _ctrl.dispose();
     super.dispose();
   }
 
+  String _format(double v) => v == 0
+      ? ''
+      : (v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1));
+
   @override
   Widget build(BuildContext context) {
-    final border = widget.flagged
-        ? _danger
-        : widget.highlight
-        ? _goldDeep
-        : _rule;
-    return SizedBox(
-      height: 34,
+    return Container(
+      height: 32,
+      decoration: BoxDecoration(
+        color: Colors.black45,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: widget.highlight
+              ? _gold.withValues(alpha: 0.5)
+              : Colors.white12,
+        ),
+      ),
       child: TextField(
-        controller: _c,
-        focusNode: _f,
+        controller: _ctrl,
         textAlign: TextAlign.center,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-        onChanged: (s) => widget.onChanged(parseNumber(s)),
-        decoration: InputDecoration(
-          isDense: true,
-          hintText: widget.flagged ? 'سعر؟' : '—',
-          hintStyle: TextStyle(fontSize: 11, color: widget.flagged ? _danger : Colors.black38),
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: border, width: widget.flagged || widget.highlight ? 1.5 : 1),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: _gold, width: 2),
-          ),
+        style: TextStyle(
+          color: widget.highlight ? _goldLight : Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
         ),
+        decoration: const InputDecoration(
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.zero,
+          isDense: true,
+        ),
+        onSubmitted: (t) {
+          final v = double.tryParse(normalizeDigits(t)) ?? 0.0;
+          widget.onChanged(v);
+        },
       ),
     );
   }

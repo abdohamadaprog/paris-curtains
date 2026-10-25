@@ -1,36 +1,16 @@
 part of '../paris_client_measurements_page.dart';
 
 extension _MeasurementCardHero on _ParisClientMeasurementsPageState {
-  String _heroTag(_Measurement item) => 'measurement-${item.id}';
-
-  // نفس الكارت في مكانين (مصغّر في القايمة / مكبّر فوقها) بنفس الـ tag،
-  // و hero_here بيطيّره من مكان للتاني على نفس الصفحة بدون Navigator.
-  Widget _hero(_Measurement item, {required bool open, required Widget child}) {
-    return HeroHere(
-      key: ValueKey('${open ? 'open' : 'closed'}-${item.id}'),
-      tag: _heroTag(item),
-      flightAnimationDuration: const Duration(milliseconds: 520),
-      flightAnimationFactory: (controller) =>
-          CurvedAnimation(parent: controller, curve: Curves.easeOutBack),
-      flightShuttleBuilder: HeroHereShuttles.scale(),
-      child: child,
-    );
-  }
-
   Widget _measurementCard(_Measurement item, int index) {
     return Padding(
       key: ValueKey('measurement-${item.id}'),
-      padding: const EdgeInsets.only(bottom: 4),
-      child: _hero(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: _cardShell(
         item,
-        open: false,
-        child: _cardShell(
-          item,
-          index,
-          zoom: _compactZoom,
-          reveal: 0,
-          popup: false,
-        ),
+        index,
+        zoom: _compactZoom,
+        reveal: 0,
+        popup: false,
       ),
     );
   }
@@ -43,11 +23,10 @@ extension _MeasurementCardHero on _ParisClientMeasurementsPageState {
     });
   }
 
-  // بنخفي اللوحة والتعتيم الأول، وبعدين الكارت يرجع يطير لمكانه في القايمة
   void _closeCard() {
     if (_expandedId == null || _closing) return;
     _rebuild(() => _closing = true);
-    Future.delayed(const Duration(milliseconds: 170), () {
+    Future.delayed(const Duration(milliseconds: 200), () {
       if (!mounted) return;
       _rebuild(() {
         _expandedId = null;
@@ -56,7 +35,6 @@ extension _MeasurementCardHero on _ParisClientMeasurementsPageState {
     });
   }
 
-  // التنقل بين الكروت وهي مفتوحة: الكارت الحالي يرجع مكانه والتاني يطلع (سحب أو أزرار)
   void _goToNeighbor(int delta) {
     if (_closing) return;
     final i = _measurements.indexWhere((m) => m.id == _expandedId);
@@ -97,15 +75,21 @@ extension _MeasurementCardHero on _ParisClientMeasurementsPageState {
             ),
           ),
           Expanded(
-            child: OutlinedButton.icon(
+            child: OutlinedButton(
               onPressed: hasNext ? () => _goToNeighbor(1) : null,
-              icon: const Icon(Icons.chevron_left_rounded),
-              label: const Text('التالي'),
-              iconAlignment: IconAlignment.end,
               style: OutlinedButton.styleFrom(
                 foregroundColor: _gold,
                 side: BorderSide(color: _gold.withValues(alpha: 0.5)),
                 minimumSize: const Size(0, 42),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('التالي'),
+                  SizedBox(width: 4),
+                  Icon(Icons.chevron_left_rounded),
+                ],
               ),
             ),
           ),
@@ -121,53 +105,74 @@ extension _MeasurementCardHero on _ParisClientMeasurementsPageState {
     return Positioned.fill(
       child: Stack(
         children: [
+          // خلفية معتمة تضغط عليها تقفل
           Positioned.fill(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: _closeCard,
               child: TweenAnimationBuilder<double>(
-                tween: Tween<double>(begin: 0, end: _closing ? 0 : 0.68),
-                duration: const Duration(milliseconds: 260),
+                tween: Tween<double>(begin: 0, end: _closing ? 0 : 0.72),
+                duration: const Duration(milliseconds: 240),
                 builder: (context, v, _) =>
                     ColoredBox(color: Colors.black.withValues(alpha: v)),
               ),
             ),
           ),
+          // كارت منبثق بأنيميشن تكبير مرن (Spring Pop Zoom)
           Padding(
             padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
             child: Center(
               child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // سحب الكارت يمين أو شمال ينقلك للكارت اللي جنبه
-                    GestureDetector(
-                      onHorizontalDragEnd: (d) {
-                        final v = d.primaryVelocity ?? 0;
-                        if (v < -250) _goToNeighbor(1);
-                        if (v > 250) _goToNeighbor(-1);
-                      },
-                      child: _hero(
-                        item,
-                        open: true,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(
+                    begin: _closing ? 1.0 : 0.76,
+                    end: _closing ? 0.76 : 1.0,
+                  ),
+                  duration: Duration(milliseconds: _closing ? 180 : 320),
+                  curve: _closing ? Curves.easeInCubic : Curves.easeOutBack,
+                  builder: (context, scale, childWidget) {
+                    return Transform.scale(scale: scale, child: childWidget);
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // زر إغلاق علوي سريع
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white70,
+                          ),
+                          tooltip: 'إغلاق',
+                          onPressed: _closeCard,
+                        ),
+                      ),
+                      // سحب الكارت يمين أو شمال ينقلك للكارت اللي جنبه
+                      GestureDetector(
+                        onHorizontalDragEnd: (d) {
+                          final v = d.primaryVelocity ?? 0;
+                          if (v < -250) _goToNeighbor(1);
+                          if (v > 250) _goToNeighbor(-1);
+                        },
                         child: _cardShell(
                           item,
                           index,
-                          zoom: 1,
-                          reveal: 1,
+                          zoom: 1.0,
+                          reveal: 1.0,
                           popup: true,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    _PanelReveal(
-                      visible: !_closing,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [_editPanel(item), _navRow(index)],
+                      const SizedBox(height: 6),
+                      _PanelReveal(
+                        visible: !_closing,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [_editPanel(item), _navRow(index)],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -178,10 +183,9 @@ extension _MeasurementCardHero on _ParisClientMeasurementsPageState {
   }
 }
 
-// لوحة التعديل بتنزل بالتدريج بعد ما الكارت يوصل، وتختفي بسرعة قبل ما يرجع
+// لوحة التعديل بتنزل بالتدريج بسلاسة
 class _PanelReveal extends StatelessWidget {
   const _PanelReveal({required this.visible, required this.child});
-
   final bool visible;
   final Widget child;
 
@@ -189,17 +193,17 @@ class _PanelReveal extends StatelessWidget {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: visible ? 1 : 0),
-      duration: Duration(milliseconds: visible ? 560 : 150),
+      duration: Duration(milliseconds: visible ? 380 : 150),
       curve: visible
-          ? const Interval(0.4, 1.0, curve: Curves.easeOutCubic)
+          ? const Interval(0.2, 1.0, curve: Curves.easeOutCubic)
           : Curves.easeIn,
-      builder: (context, v, child) {
+      builder: (context, v, childWidget) {
         final f = v.clamp(0.0, 1.0);
         return ClipRect(
           child: Align(
             alignment: Alignment.topCenter,
             heightFactor: f,
-            child: Opacity(opacity: f, child: child),
+            child: Opacity(opacity: f, child: childWidget),
           ),
         );
       },
