@@ -14,7 +14,10 @@ int ceilMeters(double v) => ((v * 100).round() / 100).ceil();
 double roundMoney(double v) => (v * 100).round() / 100;
 
 /// تحويل الأرقام العربي والفاصلة العربية لنص يقدر double.tryParse يقراه
-String normalizeDigits(String s) {
+/// تقبل dynamic بأمان تام لتفادي أي Type Cast Exception لو القيمة null أو double
+String normalizeDigits(dynamic val) {
+  if (val == null) return '0';
+  final s = val.toString();
   const arabic = '٠١٢٣٤٥٦٧٨٩';
   final b = StringBuffer();
   for (final ch in s.split('')) {
@@ -29,7 +32,12 @@ String normalizeDigits(String s) {
       .trim();
 }
 
-double parseNumber(String s) => double.tryParse(normalizeDigits(s)) ?? 0;
+/// قراءة الأرقام بأمان من أي نوع (double, int, String, null)
+double parseNumber(dynamic val) {
+  if (val == null) return 0.0;
+  if (val is num) return val.toDouble();
+  return double.tryParse(normalizeDigits(val)) ?? 0.0;
+}
 
 // ============================ الأسعار ============================
 
@@ -86,362 +94,485 @@ const Map<String, String> kBalconyFabrics = {
 // ============================ المدخلات ============================
 
 class WindowSpec {
+  final String title;
   final double width;
-  final String method; // wave | doubleWave | press
+  final double height;
+  final String curtainType; // 'wave' | 'double_wave' | 'press'
+  final bool hasHeavy;
   final bool hasLight;
+  final bool enabled;
 
-  const WindowSpec(this.width, this.method, this.hasLight);
+  const WindowSpec({
+    required this.title,
+    required this.width,
+    required this.height,
+    required this.curtainType,
+    required this.hasHeavy,
+    required this.hasLight,
+    this.enabled = true,
+  });
 
-  static WindowSpec? fromMap(Map<dynamic, dynamic> m) {
-    if (m['enabled'] == false) return null;
-    final w = (m['width'] as num?)?.toDouble() ?? 0;
-    if (w <= 0) return null;
-    final light = ((m['light_layers'] as num?)?.toInt() ?? 0) > 0;
-    return WindowSpec(w, (m['method'] ?? 'wave').toString(), light);
+  factory WindowSpec.fromMap(Map<String, dynamic> map) {
+    return WindowSpec(
+      title: (map['title'] ?? '').toString(),
+      width: parseNumber(map['width']),
+      height: parseNumber(map['height']),
+      curtainType: (map['curtainType'] ?? 'wave').toString(),
+      hasHeavy: map['hasHeavy'] != false,
+      hasLight: map['hasLight'] != false,
+      enabled: map['enabled'] != false,
+    );
   }
 }
 
 class BalconySpec {
-  final List<double> parts;
+  final String title;
+  final double width;
+  final double height;
+  final int avezCount;
+  final bool enabled;
 
-  const BalconySpec(this.parts);
+  const BalconySpec({
+    required this.title,
+    required this.width,
+    required this.height,
+    required this.avezCount,
+    this.enabled = true,
+  });
 
-  static BalconySpec? fromMap(Map<dynamic, dynamic> m) {
-    if (m['enabled'] == false) return null;
-    final parts = (m['parts'] ?? '')
-        .toString()
-        .split('+')
-        .map(parseNumber)
-        .where((v) => v > 0)
-        .toList();
-    if (parts.isEmpty) return null;
-    return BalconySpec(parts);
+  factory BalconySpec.fromMap(Map<String, dynamic> m) {
+    return BalconySpec(
+      title: (m['title'] ?? '').toString(),
+      width: parseNumber(m['width']),
+      height: parseNumber(m['height']),
+      avezCount: parseNumber(m['avezCount']).round(),
+      enabled: m['enabled'] != false,
+    );
   }
 }
 
-// ============================ المخرجات ============================
+// ============================ بنود الفاتورة ============================
 
-class AutoLine {
+class InvoiceLine {
   final String key;
-  final String name;
+  final String label;
   final String unit;
-  final String note;
   final double qty;
-  final String priceKey;
+  final double unitPrice;
+  final String? note;
+  final bool isFabric;
 
-  /// بند بيتكتب يدوي (كوبشة، نقل، تركيب بلكونة): ما بيتعتبرش ناقص لو كميته 1
-  final bool manual;
-
-  const AutoLine({
+  const InvoiceLine({
     required this.key,
-    required this.name,
+    required this.label,
     required this.unit,
     required this.qty,
-    required this.priceKey,
-    this.note = '',
-    this.manual = false,
+    required this.unitPrice,
+    this.note,
+    this.isFabric = false,
   });
+
+  double get total => roundMoney(qty * unitPrice);
+
+  InvoiceLine copyWith({double? qty, double? unitPrice}) {
+    return InvoiceLine(
+      key: key,
+      label: label,
+      unit: unit,
+      qty: qty ?? this.qty,
+      unitPrice: unitPrice ?? this.unitPrice,
+      note: note,
+      isFabric: isFabric,
+    );
+  }
 }
 
-class InvoiceAuto {
-  final List<AutoLine> fabric;
-  final List<AutoLine> accessories;
-  final double totalWidth;
-  final int windows;
+class ApartmentInvoice {
+  final List<InvoiceLine> fabricLines;
+  final List<InvoiceLine> accessoryLines;
 
-  const InvoiceAuto(
-    this.fabric,
-    this.accessories,
-    this.totalWidth,
-    this.windows,
-  );
+  const ApartmentInvoice({
+    required this.fabricLines,
+    required this.accessoryLines,
+  });
+
+  double get fabricTotal => fabricLines.fold(0.0, (s, l) => s + l.total);
+  double get accessoryTotal => accessoryLines.fold(0.0, (s, l) => s + l.total);
+  double get grandTotal => roundMoney(fabricTotal + accessoryTotal);
 }
 
-// ============================ ستائر الشقة ============================
+class BalconyInvoice {
+  final List<InvoiceLine> fabricLines;
+  final List<InvoiceLine> accessoryLines;
 
-InvoiceAuto calcApartment(List<WindowSpec> windows, Map<String, double> p) {
-  double totalWidth = 0, heavy = 0, light = 0;
-  double waveWidth = 0, doubleWidth = 0, trackM = 0, pipeM = 0;
-  double waveLight = 0, prepM = 0, pressTape = 0;
-  var cantilevers = 0, qamqam = 0;
+  const BalconyInvoice({
+    required this.fabricLines,
+    required this.accessoryLines,
+  });
 
-  for (final w in windows) {
-    final x = w.width;
-    totalWidth += x;
-    final layers = w.hasLight ? 2 : 1;
+  double get fabricTotal => fabricLines.fold(0.0, (s, l) => s + l.total);
+  double get accessoryTotal => accessoryLines.fold(0.0, (s, l) => s + l.total);
+  double get grandTotal => roundMoney(fabricTotal + accessoryTotal);
+}
 
-    if (w.method == 'press') {
-      heavy += 2.5 * x;
-      final l = w.hasLight ? 2 * x : 0.0;
-      light += l;
-      pressTape += 2.5 * x + l;
-      pipeM += x * layers;
-      cantilevers += x > 3 ? 3 : 2;
-      qamqam += 2 * layers;
-    } else {
-      heavy += 3 * x;
-      trackM += x * layers;
+// ============================ محرك الحسابات ============================
 
-      if (w.method == 'doubleWave') {
-        final l = w.hasLight ? 3 * x : 0.0;
-        light += l;
-        doubleWidth += x;
-        prepM += 3 * x + l; // شريط وتجهيز على الكتان والقطيفة
-      } else {
-        final l = w.hasLight ? 2 * x : 0.0;
-        light += l;
-        waveLight += l;
-        waveWidth += x;
-        prepM += 3 * x; // على القطيفة بس
-      }
+ApartmentInvoice calculateApartmentInvoice({
+  required List<WindowSpec> windows,
+  Map<String, double>? customPrices,
+}) {
+  final prices = defaultPrices();
+  if (customPrices != null) prices.addAll(customPrices);
+
+  final active = windows.where((w) => w.enabled && w.width > 0).toList();
+
+  double rawLinen = 0;
+  double rawVelvet = 0;
+
+  double trackMeters = 0;
+  int waveHolders = 0;
+  int doubleHolders = 0;
+  double waveTapeMeters = 0;
+
+  double pressPipeMeters = 0;
+  int cantilevers = 0;
+  int qamqams = 0;
+  double pressTapeMeters = 0;
+
+  int windowCount = active.length;
+
+  for (final w in active) {
+    final type = w.curtainType;
+    final wM = w.width;
+
+    if (type == 'wave') {
+      if (w.hasLight) rawLinen += wM * 2.0;
+      if (w.hasHeavy) rawVelvet += wM * 3.0;
+
+      final trackCount = (w.hasLight && w.hasHeavy) ? 2 : 1;
+      final m = wM * trackCount;
+      trackMeters += m;
+      waveHolders += (wM * 2 * trackCount).round();
+      waveTapeMeters += m;
+    } else if (type == 'double_wave') {
+      if (w.hasLight) rawLinen += wM * 3.0;
+      if (w.hasHeavy) rawVelvet += wM * 3.0;
+
+      final trackCount = (w.hasLight && w.hasHeavy) ? 2 : 1;
+      final m = wM * trackCount;
+      trackMeters += m;
+      doubleHolders += (wM * 2 * trackCount).round();
+      waveTapeMeters += m;
+    } else if (type == 'press') {
+      if (w.hasLight) rawLinen += wM * 2.0;
+      if (w.hasHeavy) rawVelvet += wM * 2.5;
+
+      final pipeCount = (w.hasLight && w.hasHeavy) ? 2 : 1;
+      pressPipeMeters += wM * pipeCount;
+      cantilevers += 2 * pipeCount;
+      qamqams += 2 * pipeCount;
+      pressTapeMeters += wM * pipeCount;
     }
   }
 
-  final linen = ceilMeters(light).toDouble();
-  final velvet = ceilMeters(heavy).toDouble();
-  final tapeQty = ceilMeters(pressTape).toDouble();
-  final rings = pressTape > 0
-      ? ceilMeters(tapeQty * (p['rings_per_m_apartment'] ?? 7)).toDouble()
-      : 0.0;
+  final finalLinen = ceilMeters(rawLinen).toDouble();
+  final finalVelvet = ceilMeters(rawVelvet).toDouble();
 
-  final fabric = [
-    AutoLine(
-      key: 'linen',
-      name: 'كتان (خفيف)',
-      unit: 'متر',
-      qty: linen,
-      priceKey: 'fabric_linen',
-    ),
-    AutoLine(
-      key: 'velvet',
-      name: 'قطيفة / قماش ثقيل',
-      unit: 'متر',
-      qty: velvet,
-      priceKey: 'fabric_velvet',
-    ),
-  ];
+  final ringsPerM = prices['rings_per_m_apartment'] ?? 7;
+  final totalRings = (pressTapeMeters * ringsPerM).round();
+  final singleRingPrice = prices['ring_unit'] ?? 3.5;
+  final ringDrillPrice = prices['press_drill'] ?? 1.5;
 
-  final acc = <AutoLine>[
-    AutoLine(
-      key: 'track',
-      name: 'مسار ويفي معدني',
-      unit: 'متر',
-      qty: ceilMeters(trackM).toDouble(),
-      priceKey: 'track',
-      note: 'قدام وورا',
-    ),
-    AutoLine(
-      key: 'holder_wave',
-      name: 'حوامل تراك (ويفي)',
-      unit: 'حامل',
-      qty: ceilMeters(2 * waveWidth).toDouble(),
-      priceKey: 'holder_wave',
-      note: 'كل متر = 2 حامل',
-    ),
-    AutoLine(
-      key: 'holder_double',
-      name: 'حوامل تراك (دابل ويفي)',
-      unit: 'حامل',
-      qty: ceilMeters(2 * doubleWidth).toDouble(),
-      priceKey: 'holder_double',
-      note: 'كل متر = 2 حامل',
-    ),
-    AutoLine(
-      key: 'wave_tape',
-      name: 'شريط ويفي كبسولة',
-      unit: 'متر',
-      qty: ceilMeters(prepM).toDouble(),
-      priceKey: 'wave_tape',
-    ),
-    AutoLine(
-      key: 'wave_prep',
-      name: 'تجهيز نظام الويفي',
-      unit: 'متر',
-      qty: ceilMeters(prepM).toDouble(),
-      priceKey: 'wave_prep',
-    ),
-    AutoLine(
-      key: 'kasrat',
-      name: 'شريط تجميع كسرات',
-      unit: 'متر',
-      qty: ceilMeters(waveLight).toDouble(),
-      priceKey: 'kasrat',
-      note: 'على الكتان (ويفي عادي)',
-    ),
-    AutoLine(
-      key: 'pipe_press',
-      name: 'ماسورة 4G (كبس)',
-      unit: 'متر',
-      qty: ceilMeters(pipeM).toDouble(),
-      priceKey: 'pipe_press',
-      note: 'قدام وورا',
-    ),
-    AutoLine(
-      key: 'cantilever',
-      name: 'كابولي فورجية',
-      unit: 'قطعة',
-      qty: cantilevers.toDouble(),
-      priceKey: 'cantilever_forgia',
-      note: 'أقل من أو = 3م: 2 • أكتر: 3',
-    ),
-    AutoLine(
-      key: 'qamqam',
-      name: 'قمقم فورجية',
-      unit: 'قطعة',
-      qty: qamqam.toDouble(),
-      priceKey: 'qamqam_forgia',
-      note: '2 قدام + 2 ورا',
-    ),
-    AutoLine(
-      key: 'press_tape',
-      name: 'شريط كبس',
-      unit: 'متر',
-      qty: tapeQty,
-      priceKey: 'press_tape',
-      note: 'على الثقيل والخفيف',
-    ),
-    AutoLine(
-      key: 'rings',
-      name: 'حلقات كبس',
-      unit: 'حلقة',
-      qty: rings,
-      priceKey: 'ring_unit',
-      note: 'كسر الكيس بيتحسب',
-    ),
-    AutoLine(
-      key: 'drill',
-      name: 'تخريم وتركيب حلقات',
-      unit: 'حلقة',
-      qty: rings,
-      priceKey: 'press_drill',
-    ),
-    const AutoLine(
-      key: 'kobsha',
-      name: 'كوبشة',
-      unit: 'قطعة',
-      qty: 1,
-      priceKey: 'kobsha',
-      note: 'السعر يدوي (100 / 200 / 300)',
-      manual: true,
-    ),
-    AutoLine(
-      key: 'install',
-      name: 'مصنعية التركيب',
-      unit: 'شباك',
-      qty: windows.length.toDouble(),
-      priceKey: 'install_window',
-    ),
-    AutoLine(
-      key: 'sew_light',
-      name: 'خياطة خفيف',
-      unit: 'متر',
-      qty: linen,
-      priceKey: 'sew_light',
-    ),
-    AutoLine(
-      key: 'sew_heavy',
-      name: 'خياطة تقيل',
-      unit: 'متر',
-      qty: velvet,
-      priceKey: 'sew_heavy',
-    ),
-    const AutoLine(
-      key: 'transport',
-      name: 'موصلات ونقل',
-      unit: 'مرة',
-      qty: 1,
-      priceKey: 'transport',
-      note: 'حسب الاتفاق',
-      manual: true,
-    ),
-  ];
+  final fabricLines = <InvoiceLine>[];
+  if (finalLinen > 0) {
+    fabricLines.add(
+      InvoiceLine(
+        key: 'fabric_linen',
+        label: 'كتان خفيف',
+        unit: 'متر',
+        qty: finalLinen,
+        unitPrice: prices['fabric_linen'] ?? 130,
+        isFabric: true,
+      ),
+    );
+  }
+  if (finalVelvet > 0) {
+    fabricLines.add(
+      InvoiceLine(
+        key: 'fabric_velvet',
+        label: 'قطيفة / قماش ثقيل',
+        unit: 'متر',
+        qty: finalVelvet,
+        unitPrice: prices['fabric_velvet'] ?? 150,
+        isFabric: true,
+      ),
+    );
+  }
 
-  return InvoiceAuto(fabric, acc, totalWidth, windows.length);
+  final accLines = <InvoiceLine>[];
+
+  if (trackMeters > 0) {
+    accLines.add(
+      InvoiceLine(
+        key: 'track',
+        label: 'مسار ويفي معدني',
+        unit: 'متر',
+        qty: roundMoney(trackMeters),
+        unitPrice: prices['track'] ?? 75,
+      ),
+    );
+  }
+  if (waveHolders > 0) {
+    accLines.add(
+      InvoiceLine(
+        key: 'holder_wave',
+        label: 'حامل تراك (ويفي)',
+        unit: 'حامل',
+        qty: waveHolders.toDouble(),
+        unitPrice: prices['holder_wave'] ?? 40,
+      ),
+    );
+  }
+  if (doubleHolders > 0) {
+    accLines.add(
+      InvoiceLine(
+        key: 'holder_double',
+        label: 'حامل تراك (دابل ويفي)',
+        unit: 'حامل',
+        qty: doubleHolders.toDouble(),
+        unitPrice: prices['holder_double'] ?? 55,
+      ),
+    );
+  }
+  if (waveTapeMeters > 0) {
+    accLines.add(
+      InvoiceLine(
+        key: 'wave_tape',
+        label: 'شريط ويفي كبسولة',
+        unit: 'متر',
+        qty: roundMoney(waveTapeMeters),
+        unitPrice: prices['wave_tape'] ?? 55,
+      ),
+    );
+    accLines.add(
+      InvoiceLine(
+        key: 'wave_prep',
+        label: 'تجهيز نظام الويفي',
+        unit: 'متر',
+        qty: roundMoney(waveTapeMeters),
+        unitPrice: prices['wave_prep'] ?? 20,
+      ),
+    );
+    accLines.add(
+      InvoiceLine(
+        key: 'kasrat',
+        label: 'شريط تجميع كسرات',
+        unit: 'متر',
+        qty: roundMoney(waveTapeMeters),
+        unitPrice: prices['kasrat'] ?? 15,
+      ),
+    );
+  }
+
+  if (pressPipeMeters > 0) {
+    accLines.add(
+      InvoiceLine(
+        key: 'pipe_press',
+        label: 'ماسورة 4G',
+        unit: 'متر',
+        qty: roundMoney(pressPipeMeters),
+        unitPrice: prices['pipe_press'] ?? 70,
+      ),
+    );
+    accLines.add(
+      InvoiceLine(
+        key: 'cantilever_forgia',
+        label: 'كابولي فورجية',
+        unit: 'قطعة',
+        qty: cantilevers.toDouble(),
+        unitPrice: prices['cantilever_forgia'] ?? 50,
+      ),
+    );
+    accLines.add(
+      InvoiceLine(
+        key: 'qamqam_forgia',
+        label: 'قمقم فورجية',
+        unit: 'قطعة',
+        qty: qamqams.toDouble(),
+        unitPrice: prices['qamqam_forgia'] ?? 45,
+      ),
+    );
+    accLines.add(
+      InvoiceLine(
+        key: 'press_tape',
+        label: 'شريط كبس',
+        unit: 'متر',
+        qty: roundMoney(pressTapeMeters),
+        unitPrice: prices['press_tape'] ?? 15,
+      ),
+    );
+    if (totalRings > 0) {
+      accLines.add(
+        InvoiceLine(
+          key: 'ring_unit',
+          label: 'حلقات كبس',
+          unit: 'حلقة',
+          qty: totalRings.toDouble(),
+          unitPrice: singleRingPrice,
+        ),
+      );
+      accLines.add(
+        InvoiceLine(
+          key: 'press_drill',
+          label: 'تخريم وتثبيت الحلقات',
+          unit: 'حلقة',
+          qty: totalRings.toDouble(),
+          unitPrice: ringDrillPrice,
+        ),
+      );
+    }
+  }
+
+  if (finalLinen > 0) {
+    accLines.add(
+      InvoiceLine(
+        key: 'sew_light',
+        label: 'خياطة قماش خفيف',
+        unit: 'متر',
+        qty: finalLinen,
+        unitPrice: prices['sew_light'] ?? 25,
+      ),
+    );
+  }
+  if (finalVelvet > 0) {
+    accLines.add(
+      InvoiceLine(
+        key: 'sew_heavy',
+        label: 'خياطة قماش ثقيل',
+        unit: 'متر',
+        qty: finalVelvet,
+        unitPrice: prices['sew_heavy'] ?? 30,
+      ),
+    );
+  }
+
+  if (windowCount > 0) {
+    accLines.add(
+      InvoiceLine(
+        key: 'install_window',
+        label: 'مصنعية وتركيب الشبابيك',
+        unit: 'شباك',
+        qty: windowCount.toDouble(),
+        unitPrice: prices['install_window'] ?? 100,
+      ),
+    );
+  }
+
+  return ApartmentInvoice(fabricLines: fabricLines, accessoryLines: accLines);
 }
 
-// ============================ البلكونة ============================
+BalconyInvoice calculateBalconyInvoice({
+  required List<BalconySpec> balconies,
+  required String fabricKey,
+  Map<String, double>? customPrices,
+}) {
+  final prices = defaultPrices();
+  if (customPrices != null) prices.addAll(customPrices);
 
-InvoiceAuto calcBalcony(
-  List<BalconySpec> balconies,
-  String fabricKey,
-  Map<String, double> p,
-) {
-  final parts = [for (final b in balconies) ...b.parts];
-  final total = parts.fold<double>(0, (a, b) => a + b);
-  final fabricQty = roundMoney(total * 1.5);
-  final rings = ceilMeters(
-    fabricQty * (p['rings_per_m_balcony'] ?? 6),
-  ).toDouble();
-  final avez = parts.fold<int>(0, (a, x) => a + (x > 3 ? 3 : 2));
+  final active = balconies.where((b) => b.enabled && b.width > 0).toList();
 
-  final fabric = [
-    AutoLine(
-      key: 'balc_fabric',
-      name: kBalconyFabrics[fabricKey] ?? 'قماش بلكونة',
-      unit: 'متر',
-      qty: fabricQty,
-      priceKey: fabricKey,
-      note: 'المقاسات × 1.5',
-    ),
-  ];
+  final totalWidth = active.fold(0.0, (s, b) => s + b.width);
+  final totalAvez = active.fold(0, (s, b) => s + b.avezCount);
 
-  final acc = <AutoLine>[
-    AutoLine(
-      key: 'balc_pipe',
-      name: 'ماسورة 4G',
-      unit: 'متر',
-      qty: roundMoney(total),
-      priceKey: 'balc_pipe',
-      note: 'على إجمالي المقاسات',
-    ),
-    AutoLine(
-      key: 'balc_tape',
-      name: 'شريط كبس',
-      unit: 'متر',
-      qty: fabricQty,
-      priceKey: 'balc_tape',
-      note: 'على كمية القماش',
-    ),
-    AutoLine(
-      key: 'balc_rings',
-      name: 'حلقات كبس',
-      unit: 'حلقة',
-      qty: rings,
-      priceKey: 'ring_unit',
-      note: 'كسر الكيس بيتحسب',
-    ),
-    AutoLine(
-      key: 'balc_drill',
-      name: 'تخريم حلقات',
-      unit: 'حلقة',
-      qty: rings,
-      priceKey: 'press_drill',
-    ),
-    AutoLine(
-      key: 'balc_avez',
-      name: 'أفيز',
-      unit: 'قطعة',
-      qty: avez.toDouble(),
-      priceKey: 'balc_avez',
-      note: 'أقل من أو = 3م: 2 • أكتر: 3',
-    ),
-    const AutoLine(
-      key: 'balc_install',
-      name: 'تركيب بلكونة',
-      unit: 'بلكونة',
-      qty: 1,
-      priceKey: 'balc_install',
-      note: 'السعر يدوي (100 / 200 / 300)',
-      manual: true,
-    ),
-    AutoLine(
-      key: 'balc_sew',
-      name: 'خياطة بلكونة',
-      unit: 'متر',
-      qty: fabricQty,
-      priceKey: 'balc_sew',
-    ),
-  ];
+  final fabricMeters = roundMoney(totalWidth * 1.5);
 
-  return InvoiceAuto(fabric, acc, total, balconies.length);
+  final fabricLabel = kBalconyFabrics[fabricKey] ?? 'قماش بلكونة';
+  final fabricPrice = prices[fabricKey] ?? 100;
+
+  final ringsPerM = prices['rings_per_m_balcony'] ?? 6;
+  final totalRings = (fabricMeters * ringsPerM).round();
+  final singleRingPrice = prices['ring_unit'] ?? 3.5;
+  final ringDrillPrice = prices['press_drill'] ?? 1.5;
+
+  final fabricLines = <InvoiceLine>[];
+  if (fabricMeters > 0) {
+    fabricLines.add(
+      InvoiceLine(
+        key: fabricKey,
+        label: fabricLabel,
+        unit: 'متر',
+        qty: fabricMeters,
+        unitPrice: fabricPrice,
+        isFabric: true,
+      ),
+    );
+  }
+
+  final accLines = <InvoiceLine>[];
+  if (totalWidth > 0) {
+    accLines.add(
+      InvoiceLine(
+        key: 'balc_pipe',
+        label: 'ماسورة 4G (بلكونة)',
+        unit: 'متر',
+        qty: roundMoney(totalWidth),
+        unitPrice: prices['balc_pipe'] ?? 70,
+      ),
+    );
+    accLines.add(
+      InvoiceLine(
+        key: 'balc_tape',
+        label: 'شريط كبس (بلكونة)',
+        unit: 'متر',
+        qty: fabricMeters,
+        unitPrice: prices['balc_tape'] ?? 15,
+      ),
+    );
+    if (totalRings > 0) {
+      accLines.add(
+        InvoiceLine(
+          key: 'ring_unit',
+          label: 'حلقات كبس',
+          unit: 'حلقة',
+          qty: totalRings.toDouble(),
+          unitPrice: singleRingPrice,
+        ),
+      );
+      accLines.add(
+        InvoiceLine(
+          key: 'press_drill',
+          label: 'تخريم وتثبيت الحلقات',
+          unit: 'حلقة',
+          qty: totalRings.toDouble(),
+          unitPrice: ringDrillPrice,
+        ),
+      );
+    }
+  }
+
+  if (totalAvez > 0) {
+    accLines.add(
+      InvoiceLine(
+        key: 'balc_avez',
+        label: 'أفيز بلكونة',
+        unit: 'قطعة',
+        qty: totalAvez.toDouble(),
+        unitPrice: prices['balc_avez'] ?? 20,
+      ),
+    );
+  }
+
+  if (fabricMeters > 0) {
+    accLines.add(
+      InvoiceLine(
+        key: 'balc_sew',
+        label: 'خياطة قماش البلكونة',
+        unit: 'متر',
+        qty: fabricMeters,
+        unitPrice: prices['balc_sew'] ?? 30,
+      ),
+    );
+  }
+
+  return BalconyInvoice(fabricLines: fabricLines, accessoryLines: accLines);
 }

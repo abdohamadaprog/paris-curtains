@@ -1,61 +1,78 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../../../../core/constants/app_colors.dart';
+import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'invoice_calculator.dart';
 
-// ألوان وهوية ستائر باريس الملكية الفاخرة (Dark & Gold)
-const Color _gold = AppColors.primaryGold;
-const Color _goldLight = AppColors.lightGold;
-const Color _goldDeep = AppColors.goldDeep;
-const Color _bgDark = Color(0xFF0C0E14);
-const Color _cardDark = Color(0xFF161622);
-const Color _cardDark2 = Color(0xFF1E2030);
-const Color _borderGold = Color(0x55C7A064);
-const Color _success = Color(0xFF4ADE80);
-const Color _danger = Color(0xFFFF5252);
+/// دالة مساعدة لتحويل أي نص أو رقم إلى أرقام عربية مشرقية (٠١٢٣٤٥٦٧٨٩)
+String _arNum(dynamic value) {
+  if (value == null) return '٠';
+  final s = value.toString();
+  const en = '0123456789';
+  const ar = '٠١٢٣٤٥٦٧٨٩';
+  final buffer = StringBuffer();
+  for (final char in s.split('')) {
+    final idx = en.indexOf(char);
+    if (idx != -1) {
+      buffer.write(ar[idx]);
+    } else {
+      buffer.write(char);
+    }
+  }
+  return buffer.toString();
+}
 
-/// كلاس مخصص لتوافق تام مع كل إصدارات دارت وفلاتر القديمة والجديدة
+/// قراءة الأرقام بأمان من أي نوع (double, int, String, null)
+/// تحل مشكلة type 'Null' is not a subtype of type 'String'
+/// ومشكلة type 'double' is not a subtype of type 'String'
+double _safeNum(dynamic val) {
+  if (val == null) return 0.0;
+  if (val is num) return val.toDouble();
+  final s = val.toString();
+  const arabic = '٠١٢٣٤٥٦٧٨٩';
+  final b = StringBuffer();
+  for (final ch in s.split('')) {
+    final i = arabic.indexOf(ch);
+    b.write(i >= 0 ? '$i' : ch);
+  }
+  final clean = b
+      .toString()
+      .replaceAll('،', '.')
+      .replaceAll('٫', '.')
+      .replaceAll(',', '.')
+      .trim();
+  return double.tryParse(clean) ?? 0.0;
+}
+
+String _money(dynamic v) {
+  final d = _safeNum(v);
+  final r = roundMoney(d);
+  if (r == r.roundToDouble()) {
+    return _arNum(r.toInt().toString());
+  }
+  return _arNum(r.toStringAsFixed(2));
+}
+
+String _fmtQty(dynamic q) {
+  final d = _safeNum(q);
+  if (d == d.roundToDouble()) {
+    return _arNum(d.toInt().toString());
+  }
+  return _arNum(d.toStringAsFixed(2));
+}
+
+/// هيكل بيانات تجميعي لإجماليات الفاتورة
 class _InvoiceTotals {
   final double fabric;
   final double acc;
   const _InvoiceTotals({required this.fabric, required this.acc});
 }
 
-/// تحويل الأرقام إلى أرقام عربية مشرقية (٠١٢٣٤٥٦٧٨٩)
-String _ar(String s) =>
-    s.replaceAllMapped(RegExp(r'[0-9]'), (m) => '٠١٢٣٤٥٦٧٨٩'[int.parse(m[0]!)]);
-
-String _money(double v) {
-  if (v.isNaN || v.isInfinite) return '٠';
-  final r = roundMoney(v);
-  final f = NumberFormat(r == r.roundToDouble() ? '#,##0' : '#,##0.00', 'en');
-  return _ar(f.format(r));
-}
-
-class _Custom {
-  static int _next = 0;
-  _Custom({
-    required this.name,
-    required this.qty,
-    required this.price,
-    required this.balcony,
-  });
-  final int id = _next++;
-  String name;
-  double qty;
-  double price;
-  final bool balcony;
-
-  Map<String, dynamic> toMap() => {
-    'name': name,
-    'qty': qty,
-    'price': price,
-    'balcony': balcony,
-  };
-}
-
+/// ============================================================================
+/// صفحة فاتورة ستائر باريس الفاخرة — تجربة بريميوم عربية متكاملة
+/// ترتيب الأعمدة: [الكمية] | [البند] | [السعر] | [الإجمالي]
+/// بدون نصوص فرعية مشتتة، أرقام عربية مشرقية، وتعديل فوري ذكي
+/// ============================================================================
 class InvoicePage extends StatefulWidget {
   const InvoicePage({
     super.key,
@@ -76,495 +93,419 @@ class InvoicePage extends StatefulWidget {
   State<InvoicePage> createState() => _InvoicePageState();
 }
 
-class _InvoicePageState extends State<InvoicePage> {
+class _InvoicePageState extends State<InvoicePage>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
   bool _loading = true;
-  bool _balconyTab = false;
-  bool _dirty = false;
-  bool _saving = false;
+  String? _loadError;
 
-  // خيارات الفاتورة المعتمدة
-  bool _includeFabric = false;
-  bool _includeBalcony = false;
-  double _depositPaid = 0.0; // العربون المدفوع (مقدم)
-
-  Map<String, double> _globalDefaults = defaultPrices();
-  Map<String, double> _prices = defaultPrices();
-  final Map<String, double> _qtyOverride = {};
-  final List<_Custom> _custom = [];
-  String _balconyFabric = 'fabric_dak';
+  // المدخلات المجلوبة من قياسات العميل
   List<WindowSpec> _windows = [];
   List<BalconySpec> _balconies = [];
 
-  final TextEditingController _depositController = TextEditingController();
+  // أسعار مخصصة
+  final Map<String, double> _customPrices = {};
+
+  // تعديلات يدوية على البنود المحسوبة (key -> override)
+  final Map<String, double> _aptQtyOverride = {};
+  final Map<String, double> _aptPriceOverride = {};
+  final Map<String, double> _balcQtyOverride = {};
+  final Map<String, double> _balcPriceOverride = {};
+
+  // بنود إضافية مخصصة
+  final List<InvoiceLine> _aptCustomLines = [];
+  final List<InvoiceLine> _balcCustomLines = [];
+
+  // نوع قماش البلكونة
+  String _balconyFabricKey = 'fabric_dak';
+
+  // العربون المدفوع
+  double _depositPaid = 0;
+
+  // حالة الحفظ
+  bool _saving = false;
+  bool _savedRecently = false;
 
   @override
   void initState() {
     super.initState();
-    _balconyTab = widget.startOnBalcony;
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.startOnBalcony ? 1 : 0,
+    );
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _load();
   }
 
   @override
   void dispose() {
-    _depositController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
   // ============================ جلب البيانات ============================
+
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
 
-    // 1. محاولة جلب أسعار السيرفر الافتراضية بأمان (بدون تعطيل الصفحة لو فشلت)
     try {
-      final docGlobal = await FirebaseFirestore.instance
-          .collection('settings')
-          .doc('invoice_prices')
-          .get();
-      if (docGlobal.exists && docGlobal.data() != null) {
-        final m = docGlobal.data()!;
-        _globalDefaults = {
-          for (final d in kPriceDefs) d.key: parseNumber(m[d.key] ?? d.value),
-        };
+      final docRef = FirebaseFirestore.instance
+          .collection('clients')
+          .doc(widget.clientId);
+      final doc = await docRef.get();
+      final data = doc.data() ?? {};
+
+      // قراءة الشبابيك
+      final rawWindows = data['measurements'];
+      if (rawWindows is List) {
+        _windows = rawWindows
+            .whereType<Map>()
+            .map((m) => WindowSpec.fromMap(Map<String, dynamic>.from(m)))
+            .toList();
       }
-    } catch (_) {
-      // الاعتماد على الأسعار الافتراضية
-    }
 
-    _prices = {..._globalDefaults};
+      // قراءة البلكونات
+      final rawBalc = data['balconies'];
+      if (rawBalc is List) {
+        _balconies = rawBalc
+            .whereType<Map>()
+            .map((m) => BalconySpec.fromMap(Map<String, dynamic>.from(m)))
+            .toList();
+      }
 
-    // 2. جلب بيانات العميل
-    try {
-      if (widget.clientId.trim().isNotEmpty) {
-        final doc = await FirebaseFirestore.instance
-            .collection('clients')
-            .doc(widget.clientId)
-            .get();
-        final data = doc.data() ?? {};
-
-        final rawWindows = (data['measurements'] as List<dynamic>?) ?? [];
-        _windows = [
-          for (final m in rawWindows)
-            if (m is Map && WindowSpec.fromMap(m) != null)
-              WindowSpec.fromMap(m)!,
-        ];
-
-        final rawBalc = (data['balconies'] as List<dynamic>?) ?? [];
-        _balconies = [
-          for (final m in rawBalc)
-            if (m is Map && BalconySpec.fromMap(m) != null)
-              BalconySpec.fromMap(m)!,
-        ];
-
-        final inv = data['invoice'];
-        if (inv is Map) {
-          _includeFabric = inv['include_fabric'] == true;
-          _includeBalcony = inv['include_balcony'] == true;
-          _depositPaid = parseNumber(inv['deposit_paid']);
-          _depositController.text = _depositPaid > 0 ? '$_depositPaid' : '';
-
-          final p = inv['prices'];
-          if (p is Map) {
-            for (final e in p.entries) {
-              _prices['${e.key}'] = parseNumber(e.value);
-            }
-          }
-          final q = inv['qty_overrides'];
-          if (q is Map) {
-            for (final e in q.entries) {
-              _qtyOverride['${e.key}'] = parseNumber(e.value);
-            }
-          }
-          final bf = inv['balcony_fabric'];
-          if (bf is String && kBalconyFabrics.containsKey(bf)) {
-            _balconyFabric = bf;
-          }
-          final cust = inv['custom'];
-          if (cust is List) {
-            _custom.clear();
-            for (final c in cust) {
-              if (c is Map) {
-                _custom.add(
-                  _Custom(
-                    name: '${c['name'] ?? ''}',
-                    qty: parseNumber(c['qty']),
-                    price: parseNumber(c['price']),
-                    balcony: c['balcony'] == true,
-                  ),
-                );
-              }
-            }
-          }
+      // قراءة فاتورة سابقة إن وجدت
+      final inv = data['invoice'];
+      if (inv is Map) {
+        final rawPrices = inv['prices'];
+        if (rawPrices is Map) {
+          rawPrices.forEach((k, v) {
+            _customPrices[k.toString()] = _safeNum(v);
+          });
+        }
+        final rawAptQ = inv['apt_qty_override'];
+        if (rawAptQ is Map) {
+          rawAptQ.forEach((k, v) {
+            _aptQtyOverride[k.toString()] = _safeNum(v);
+          });
+        }
+        final rawAptP = inv['apt_price_override'];
+        if (rawAptP is Map) {
+          rawAptP.forEach((k, v) {
+            _aptPriceOverride[k.toString()] = _safeNum(v);
+          });
+        }
+        final rawBalcQ = inv['balc_qty_override'];
+        if (rawBalcQ is Map) {
+          rawBalcQ.forEach((k, v) {
+            _balcQtyOverride[k.toString()] = _safeNum(v);
+          });
+        }
+        final rawBalcP = inv['balc_price_override'];
+        if (rawBalcP is Map) {
+          rawBalcP.forEach((k, v) {
+            _balcPriceOverride[k.toString()] = _safeNum(v);
+          });
+        }
+        if (inv['balcony_fabric_key'] is String) {
+          _balconyFabricKey = inv['balcony_fabric_key'] as String;
+        }
+        if (inv['deposit_paid'] != null) {
+          _depositPaid = _safeNum(inv['deposit_paid']);
         }
       }
-    } catch (e) {
-      debugPrint('Error loading invoice: $e');
-      _snack('تنبيه: تم فتح الفاتورة بالبيانات الافتراضية');
-    }
 
-    if (mounted) {
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadError = e.toString();
+          _loading = false;
+        });
+      }
     }
   }
 
-  // ============================ حفظ الفاتورة ============================
-  Future<bool> _save() async {
-    if (widget.clientId.trim().isEmpty) return false;
+  // ============================ الحفظ في Firestore ============================
+
+  Future<void> _save() async {
+    if (_saving) return;
     setState(() => _saving = true);
+
     try {
-      final aptTotals = _totalsFor(false);
-      final balTotals = _totalsFor(true);
-
-      final double totalBill =
-          (aptTotals.acc +
-                  (_includeFabric ? aptTotals.fabric : 0) +
-                  (_includeBalcony ? (balTotals.acc + balTotals.fabric) : 0))
-              .toDouble();
-      final double remaining = (totalBill - _depositPaid) > 0
-          ? (totalBill - _depositPaid)
-          : 0.0;
-
-      await FirebaseFirestore.instance
+      final docRef = FirebaseFirestore.instance
           .collection('clients')
-          .doc(widget.clientId)
-          .set({
-            'invoice': {
-              'prices': _prices,
-              'qty_overrides': _qtyOverride,
-              'custom': [for (final c in _custom) c.toMap()],
-              'balcony_fabric': _balconyFabric,
-              'include_fabric': _includeFabric,
-              'include_balcony': _includeBalcony,
-              'deposit_paid': _depositPaid,
-              'apartment_fabric_total': aptTotals.fabric,
-              'apartment_accessories_total': aptTotals.acc,
-              'balcony_fabric_total': balTotals.fabric,
-              'balcony_accessories_total': balTotals.acc,
-              'grand_total': roundMoney(totalBill),
-              'remaining_balance': roundMoney(remaining),
-              'updated_at': FieldValue.serverTimestamp(),
-            },
-            'totalCost': roundMoney(totalBill),
-            'depositPaid': roundMoney(_depositPaid),
-            'remainingBalance': roundMoney(remaining),
-          }, SetOptions(merge: true));
+          .doc(widget.clientId);
+
+      final payload = {
+        'prices': _customPrices,
+        'apt_qty_override': _aptQtyOverride,
+        'apt_price_override': _aptPriceOverride,
+        'balc_qty_override': _balcQtyOverride,
+        'balc_price_override': _balcPriceOverride,
+        'balcony_fabric_key': _balconyFabricKey,
+        'deposit_paid': _depositPaid,
+        'saved_at': FieldValue.serverTimestamp(),
+      };
+
+      await docRef.set({'invoice': payload}, SetOptions(merge: true));
 
       if (mounted) {
         setState(() {
-          _dirty = false;
           _saving = false;
+          _savedRecently = true;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تم حفظ الفاتورة بنجاح في ملف العميل',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            backgroundColor: Color(0xFF10B981),
+            duration: Duration(seconds: 2),
+          ),
+        );
       }
-      _snack('تم حفظ الفاتورة بنجاح ✨');
-      return true;
     } catch (e) {
-      if (mounted) setState(() => _saving = false);
-      _snack('تعذر الحفظ: $e');
-      return false;
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('فشل الحفظ: $e', textAlign: TextAlign.center),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
     }
   }
 
-  void _snack(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: _cardDark2,
-        behavior: SnackBarBehavior.floating,
-      ),
+  // ============================ الحسابات المطبقة ============================
+
+  ApartmentInvoice _getApartmentInvoice() {
+    final base = calculateApartmentInvoice(
+      windows: _windows,
+      customPrices: _customPrices,
+    );
+
+    List<InvoiceLine> apply(List<InvoiceLine> list) {
+      return list.map((l) {
+        final q = _aptQtyOverride[l.key] ?? l.qty;
+        final p = _aptPriceOverride[l.key] ?? l.unitPrice;
+        return l.copyWith(qty: q, unitPrice: p);
+      }).toList();
+    }
+
+    return ApartmentInvoice(
+      fabricLines: apply(base.fabricLines),
+      accessoryLines: [...apply(base.accessoryLines), ..._aptCustomLines],
     );
   }
 
-  // ============================ الحسابات ============================
-  InvoiceAuto _autoFor(bool balcony) => balcony
-      ? calcBalcony(_balconies, _balconyFabric, _prices)
-      : calcApartment(_windows, _prices);
+  BalconyInvoice _getBalconyInvoice() {
+    final base = calculateBalconyInvoice(
+      balconies: _balconies,
+      fabricKey: _balconyFabricKey,
+      customPrices: _customPrices,
+    );
 
-  double _qtyOf(AutoLine l) => _qtyOverride[l.key] ?? l.qty;
-  double _priceOf(AutoLine l) => _prices[l.priceKey] ?? 0.0;
-  double _lineTotal(AutoLine l) => roundMoney(_qtyOf(l) * _priceOf(l));
+    List<InvoiceLine> apply(List<InvoiceLine> list) {
+      return list.map((l) {
+        final q = _balcQtyOverride[l.key] ?? l.qty;
+        final p = _balcPriceOverride[l.key] ?? l.unitPrice;
+        return l.copyWith(qty: q, unitPrice: p);
+      }).toList();
+    }
 
-  bool _visible(AutoLine l) {
-    if (l.manual) return true;
-    return _qtyOf(l) > 0;
+    return BalconyInvoice(
+      fabricLines: apply(base.fabricLines),
+      accessoryLines: [...apply(base.accessoryLines), ..._balcCustomLines],
+    );
   }
 
-  _InvoiceTotals _totalsFor(bool balcony) {
-    final auto = _autoFor(balcony);
-    var f = 0.0, a = 0.0;
-    for (final l in auto.fabric) {
-      f += _lineTotal(l);
-    }
-    for (final l in auto.accessories) {
-      if (_visible(l)) a += _lineTotal(l);
-    }
-    for (final c in _custom.where((c) => c.balcony == balcony)) {
-      a += roundMoney(c.qty * c.price);
-    }
-    return _InvoiceTotals(fabric: roundMoney(f), acc: roundMoney(a));
-  }
+  // ============================ الواجهة الرئيسية ============================
 
-  void _touch(VoidCallback fn) {
-    setState(() {
-      fn();
-      _dirty = true;
-    });
-  }
-
-  void _setQty(AutoLine l, double v) => _touch(() {
-    if ((v - l.qty).abs() < 1e-9) {
-      _qtyOverride.remove(l.key);
-    } else {
-      _qtyOverride[l.key] = v;
-    }
-  });
-
-  void _setPrice(String key, double v) => _touch(() => _prices[key] = v);
-
-  // ============================ إرسال الفاتورة عبر واتساب ============================
-  Future<void> _shareOnWhatsApp() async {
-    final aptTotals = _totalsFor(false);
-    final balTotals = _totalsFor(true);
-    final autoApt = _autoFor(false);
-
-    final double totalBill =
-        aptTotals.acc +
-        (_includeFabric ? aptTotals.fabric : 0) +
-        (_includeBalcony ? (balTotals.acc + balTotals.fabric) : 0);
-    final double remaining = (totalBill - _depositPaid) > 0
-        ? (totalBill - _depositPaid)
-        : 0.0;
-
-    final buffer = StringBuffer();
-    buffer.writeln('✨ *فاتورة حساب معتمدة — ستائر باريس* ✨');
-    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━');
-    buffer.writeln('👤 *العميل:* ${widget.clientName}');
-    if ((widget.phone ?? '').isNotEmpty) {
-      buffer.writeln('📱 *الهاتف:* ${widget.phone}');
-    }
-    if ((widget.address ?? '').isNotEmpty) {
-      buffer.writeln('📍 *العنوان:* ${widget.address}');
-    }
-    buffer.writeln(
-      '🪟 *عدد الشبابيك:* ${_ar('${autoApt.windows}')} شبابيك (إجمالي عرض: ${_ar('${autoApt.totalWidth}')} م)',
-    );
-    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━');
-    buffer.writeln('🛠️ *المصنعيات والتركيب الداخلي:*');
-    buffer.writeln(
-      '• تركيب داخلي للشقة (ثابت ١٠٠ج للشباك): ${_money((autoApt.windows * 100).toDouble())} ج.م',
-    );
-    buffer.writeln('• إجمالي المصنعيات والتجهيز: ${_money(aptTotals.acc)} ج.م');
-
-    if (_includeFabric) {
-      buffer.writeln('━━━━━━━━━━━━━━━━━━━━━');
-      buffer.writeln('🧵 *أقمشة الستائر:*');
-      buffer.writeln('• إجمالي الأقمشة: ${_money(aptTotals.fabric)} ج.م');
-    } else {
-      buffer.writeln(
-        '*(ملاحظة: القماش توريد العميل وغير مضاف في هذه الفاتورة)*',
-      );
-    }
-
-    if (_includeBalcony && balTotals.acc > 0) {
-      buffer.writeln('━━━━━━━━━━━━━━━━━━━━━');
-      buffer.writeln(
-        '🏖️ *حساب البلكونات:* ${_money(balTotals.acc + balTotals.fabric)} ج.م',
-      );
-    }
-
-    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━');
-    buffer.writeln('💰 *إجمالي الحساب المطلوب:* ${_money(totalBill)} ج.م');
-    if (_depositPaid > 0) {
-      buffer.writeln('✅ *تم دفع عربون:* ${_money(_depositPaid)} ج.م');
-    }
-    buffer.writeln(
-      '🔥 *المتبقي عند الاستلام والتركيب:* ${_money(remaining)} ج.م',
-    );
-    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━');
-    buffer.writeln('📜 *الضمان:* ضمان شامل 3 سنوات على التراكات والإكسسوارات.');
-
-    final phoneClean = (widget.phone ?? '').replaceAll(RegExp(r'\D'), '');
-    final uri = Uri.parse(
-      'https://wa.me/2$phoneClean?text=${Uri.encodeComponent(buffer.toString())}',
-    );
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      _snack('تعذر فتح تطبيق واتساب');
-    }
-  }
-
-  // ============================ الواجهة ============================
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _bgDark,
-      appBar: AppBar(
-        backgroundColor: _cardDark,
-        elevation: 0,
-        title: Text(
-          'فاتورة: ${widget.clientName}',
-          style: const TextStyle(
-            color: _gold,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'إعدادات الأسعار',
-            icon: const Icon(Icons.tune_rounded, color: _gold),
-            onPressed: _openPrices,
-          ),
-          IconButton(
-            tooltip: 'مشاركة عبر واتساب',
-            icon: const Icon(Icons.share_rounded, color: _success),
-            onPressed: _shareOnWhatsApp,
-          ),
-          IconButton(
-            tooltip: 'حفظ الفاتورة',
-            icon: _saving
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: _gold,
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0F172A),
+        appBar: _buildAppBar(),
+        body: _loading
+            ? const Center(
+                child: CircularProgressIndicator(color: Color(0xFFC5A059)),
+              )
+            : _loadError != null
+            ? _buildErrorView()
+            : Column(
+                children: [
+                  _buildClientBanner(),
+                  _buildTabBar(),
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [_buildApartmentTab(), _buildBalconyTab()],
                     ),
-                  )
-                : Icon(
-                    _dirty ? Icons.save_rounded : Icons.check_circle_outline,
-                    color: _dirty ? _goldLight : Colors.white38,
                   ),
-            onPressed: _saving ? null : _save,
-          ),
-        ],
+                  _buildBottomSummaryBar(),
+                ],
+              ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: _gold))
-          : _content(),
     );
   }
 
-  Widget _content() {
-    final auto = _autoFor(_balconyTab);
-    final t = _totalsFor(_balconyTab);
-    final aptTotals = _totalsFor(false);
-    final balTotals = _totalsFor(true);
-
-    final double grandTotal =
-        aptTotals.acc +
-        (_includeFabric ? aptTotals.fabric : 0) +
-        (_includeBalcony ? (balTotals.acc + balTotals.fabric) : 0);
-
-    final double remaining = (grandTotal - _depositPaid) > 0
-        ? (grandTotal - _depositPaid)
-        : 0.0;
-
-    final accessories = auto.accessories.where(_visible).toList();
-    final customHere = _custom.where((c) => c.balcony == _balconyTab).toList();
-
-    return Column(
-      children: [
-        _tabs(),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(14, 4, 14, 16),
-            children: [
-              _clientCard(auto),
-              _configBar(aptTotals, balTotals),
-              const SizedBox(height: 12),
-
-              _sectionBar(
-                'أولاً : أقمشة الستائر (${_includeFabric ? "مشمولة بالحساب" : "توريد الزبون - استرشادي"})',
-                total: t.fabric,
-                isFabric: true,
-              ),
-              _tableHeader(),
-              if (_balconyTab) _fabricChoice(),
-              for (final l in auto.fabric) _lineRow(l),
-              _subtotal('إجمالي الأقمشة', t.fabric, isSubdued: !_includeFabric),
-
-              const SizedBox(height: 16),
-
-              _sectionBar(
-                'ثانياً : المصنعيات والإكسسوار والتركيب',
-                total: t.acc,
-                isFabric: false,
-              ),
-              _tableHeader(),
-              for (final l in accessories) _lineRow(l),
-              for (final c in customHere) _customRow(c),
-              _addCustomButton(),
-              _subtotal('إجمالي المصنعية والإكسسوار', t.acc),
-
-              const SizedBox(height: 20),
-
-              // كرت الملخص المالي وتسوية الحساب (إجمالي، عربون، متبقي)
-              _financialSettlementCard(grandTotal, remaining),
-              const SizedBox(height: 80),
-            ],
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: const Color(0xFF1E293B),
+      elevation: 0,
+      centerTitle: true,
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Icon(Icons.receipt_long_rounded, color: Color(0xFFC5A059), size: 22),
+          SizedBox(width: 8),
+          Text(
+            'فاتورة ستائر باريس',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 18,
+              letterSpacing: 0.3,
+              color: Colors.white,
+            ),
           ),
+        ],
+      ),
+      actions: [
+        IconButton(
+          tooltip: 'إعدادات الأسعار الافتراضية',
+          icon: const Icon(Icons.tune_rounded, color: Color(0xFF94A3B8)),
+          onPressed: _openPriceSettings,
         ),
-        _bottomActionBar(grandTotal, remaining),
+        IconButton(
+          tooltip: 'مشاركة الفاتورة كنص',
+          icon: const Icon(Icons.share_rounded, color: Color(0xFFC5A059)),
+          onPressed: _shareAsText,
+        ),
+        IconButton(
+          tooltip: 'حفظ الفاتورة',
+          icon: _saving
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFFC5A059),
+                  ),
+                )
+              : Icon(
+                  _savedRecently
+                      ? Icons.check_circle_rounded
+                      : Icons.save_rounded,
+                  color: _savedRecently
+                      ? const Color(0xFF10B981)
+                      : const Color(0xFFC5A059),
+                ),
+          onPressed: _save,
+        ),
       ],
     );
   }
 
-  Widget _tabs() {
+  Widget _buildClientBanner() {
     return Container(
-      color: _cardDark,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1E293B),
+        border: Border(bottom: BorderSide(color: Color(0xFF334155), width: 1)),
+      ),
       child: Row(
         children: [
-          Expanded(
-            child: InkWell(
-              onTap: () => setState(() => _balconyTab = false),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                      color: !_balconyTab ? _gold : Colors.transparent,
-                      width: 2.5,
-                    ),
-                  ),
-                ),
-                child: Center(
-                  child: Text(
-                    'فاتورة ستائر الشقة (${_windows.length})',
-                    style: TextStyle(
-                      color: !_balconyTab ? _gold : Colors.white60,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFC5A059), Color(0xFFE2C481)],
               ),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.person_rounded,
+              color: Color(0xFF0F172A),
+              size: 22,
             ),
           ),
+          const SizedBox(width: 12),
           Expanded(
-            child: InkWell(
-              onTap: () => setState(() => _balconyTab = true),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                      color: _balconyTab ? _gold : Colors.transparent,
-                      width: 2.5,
-                    ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.clientName.isEmpty
+                      ? 'عميل بدون اسم'
+                      : widget.clientName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                child: Center(
-                  child: Text(
-                    'فاتورة البلكونات (${_balconies.length})',
-                    style: TextStyle(
-                      color: _balconyTab ? _gold : Colors.white60,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    if (widget.phone != null && widget.phone!.isNotEmpty) ...[
+                      const Icon(
+                        Icons.phone_iphone_rounded,
+                        size: 13,
+                        color: Color(0xFF94A3B8),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _arNum(widget.phone!),
+                        style: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    if (widget.address != null &&
+                        widget.address!.isNotEmpty) ...[
+                      const Icon(
+                        Icons.location_on_outlined,
+                        size: 13,
+                        color: Color(0xFF94A3B8),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          widget.address!,
+                          style: const TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-              ),
+              ],
             ),
           ),
         ],
@@ -572,883 +513,1567 @@ class _InvoicePageState extends State<InvoicePage> {
     );
   }
 
-  Widget _clientCard(InvoiceAuto auto) {
+  Widget _buildTabBar() {
     return Container(
-      margin: const EdgeInsets.only(top: 8),
+      color: const Color(0xFF1E293B),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      child: Container(
+        height: 42,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF334155)),
+        ),
+        child: TabBar(
+          controller: _tabController,
+          indicator: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFC5A059), Color(0xFFD4AF37)],
+            ),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          labelColor: const Color(0xFF0F172A),
+          unselectedLabelColor: const Color(0xFF94A3B8),
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.w900,
+            fontSize: 13,
+            fontFamily: 'Cairo',
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+            fontFamily: 'Cairo',
+          ),
+          tabs: [
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.home_rounded, size: 16),
+                  const SizedBox(width: 6),
+                  Text(
+                    'ستائر الشقة (${_arNum(_windows.where((w) => w.enabled).length)})',
+                  ),
+                ],
+              ),
+            ),
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.balcony_rounded, size: 16),
+                  const SizedBox(width: 6),
+                  Text(
+                    'ستائر البلكونة (${_arNum(_balconies.where((b) => b.enabled).length)})',
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.error_outline_rounded,
+              color: Color(0xFFEF4444),
+              size: 48,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'تعذر تحميل بيانات الفاتورة',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _loadError ?? '',
+              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _load,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('إعادة المحاولة'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFC5A059),
+                foregroundColor: const Color(0xFF0F172A),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================ تبويب الشقة ============================
+
+  Widget _buildApartmentTab() {
+    final invoice = _getApartmentInvoice();
+
+    if (_windows.where((w) => w.enabled).isEmpty) {
+      return _buildEmptyState(
+        icon: Icons.curtains_rounded,
+        title: 'لا توجد مقاسات مسجلة للشقة',
+        sub: 'أضف مقاسات الشبابيك من شاشة مقاسات العميل أولاً',
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 80),
+      children: [
+        _buildSectionCard(
+          title: 'الأقمشة المطلوبة',
+          icon: Icons.texture_rounded,
+          accent: const Color(0xFFC5A059),
+          lines: invoice.fabricLines,
+          totalLabel: 'إجمالي الأقمشة',
+          totalVal: invoice.fabricTotal,
+          onEditQty: (key, current) => _openQuickEdit(
+            title: 'تعديل أمتار القماش',
+            current: current,
+            unit: 'متر',
+            onSave: (v) => setState(() => _aptQtyOverride[key] = v),
+          ),
+          onEditPrice: (key, current) => _openQuickEdit(
+            title: 'تعديل سعر المتر',
+            current: current,
+            unit: 'ج.م',
+            onSave: (v) => setState(() => _aptPriceOverride[key] = v),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildSectionCard(
+          title: 'المستلزمات، المواسير والتفصيل',
+          icon: Icons.hardware_rounded,
+          accent: const Color(0xFF38BDF8),
+          lines: invoice.accessoryLines,
+          totalLabel: 'إجمالي المستلزمات',
+          totalVal: invoice.accessoryTotal,
+          onEditQty: (key, current) => _openQuickEdit(
+            title: 'تعديل الكمية',
+            current: current,
+            unit: '',
+            onSave: (v) => setState(() => _aptQtyOverride[key] = v),
+          ),
+          onEditPrice: (key, current) => _openQuickEdit(
+            title: 'تعديل سعر الوحدة',
+            current: current,
+            unit: 'ج.م',
+            onSave: (v) => setState(() => _aptPriceOverride[key] = v),
+          ),
+        ),
+        const SizedBox(height: 10),
+        _buildAddCustomLineButton(isBalcony: false),
+      ],
+    );
+  }
+
+  // ============================ تبويب البلكونة ============================
+
+  Widget _buildBalconyTab() {
+    final invoice = _getBalconyInvoice();
+
+    if (_balconies.where((b) => b.enabled).isEmpty) {
+      return _buildEmptyState(
+        icon: Icons.balcony_rounded,
+        title: 'لا توجد مقاسات مسجلة للبلكونة',
+        sub: 'أضف أضلاع البلكونة من شاشة مقاسات العميل أولاً',
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 80),
+      children: [
+        _buildBalconyFabricSelector(),
+        const SizedBox(height: 12),
+        _buildSectionCard(
+          title: 'قماش البلكونة',
+          icon: Icons.texture_rounded,
+          accent: const Color(0xFF10B981),
+          lines: invoice.fabricLines,
+          totalLabel: 'إجمالي قماش البلكونة',
+          totalVal: invoice.fabricTotal,
+          onEditQty: (key, current) => _openQuickEdit(
+            title: 'تعديل أمتار القماش',
+            current: current,
+            unit: 'متر',
+            onSave: (v) => setState(() => _balcQtyOverride[key] = v),
+          ),
+          onEditPrice: (key, current) => _openQuickEdit(
+            title: 'تعديل سعر المتر',
+            current: current,
+            unit: 'ج.م',
+            onSave: (v) => setState(() => _balcPriceOverride[key] = v),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildSectionCard(
+          title: 'المواسير والمستلزمات والتركيب',
+          icon: Icons.build_circle_rounded,
+          accent: const Color(0xFFA855F7),
+          lines: invoice.accessoryLines,
+          totalLabel: 'إجمالي مستلزمات البلكونة',
+          totalVal: invoice.accessoryTotal,
+          onEditQty: (key, current) => _openQuickEdit(
+            title: 'تعديل الكمية',
+            current: current,
+            unit: '',
+            onSave: (v) => setState(() => _balcQtyOverride[key] = v),
+          ),
+          onEditPrice: (key, current) => _openQuickEdit(
+            title: 'تعديل سعر الوحدة',
+            current: current,
+            unit: 'ج.م',
+            onSave: (v) => setState(() => _balcPriceOverride[key] = v),
+          ),
+        ),
+        const SizedBox(height: 10),
+        _buildAddCustomLineButton(isBalcony: true),
+      ],
+    );
+  }
+
+  Widget _buildBalconyFabricSelector() {
+    return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _cardDark,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _borderGold),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.clientName,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: _goldLight,
-                  ),
-                ),
-                if ((widget.phone ?? '').isNotEmpty)
-                  Text(
-                    widget.phone!,
-                    style: const TextStyle(fontSize: 12, color: Colors.white70),
-                  ),
-              ],
-            ),
-          ),
-          _statBox('الشبابيك', '${auto.windows}'),
-          const SizedBox(width: 8),
-          _statBox('إجمالي العرض', '${auto.totalWidth} م'),
-        ],
-      ),
-    );
-  }
-
-  Widget _statBox(String title, String val) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.black26,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white12),
-      ),
-      child: Column(
-        children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 10, color: Colors.white54),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            _ar(val),
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: _gold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _configBar(_InvoiceTotals apt, _InvoiceTotals bal) {
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: _cardDark2,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: const Text(
-                'إضافة القماش للحساب',
-                style: TextStyle(fontSize: 12, color: Colors.white),
-              ),
-              value: _includeFabric,
-              activeColor: _gold,
-              onChanged: (v) => _touch(() => _includeFabric = v ?? false),
-            ),
-          ),
-          Expanded(
-            child: CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: const Text(
-                'ضم البلكونة للفاتورة',
-                style: TextStyle(fontSize: 12, color: Colors.white),
-              ),
-              value: _includeBalcony,
-              activeColor: _gold,
-              onChanged: (v) => _touch(() => _includeBalcony = v ?? false),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _sectionBar(
-    String title, {
-    required double total,
-    required bool isFabric,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E2030),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _gold.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: _goldLight,
-            ),
-          ),
-          Text(
-            '${_money(total)} ج.م',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: isFabric && !_includeFabric ? Colors.white38 : _gold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _tableHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-      color: Colors.black38,
-      child: const Row(
-        children: [
-          Expanded(
-            flex: 5,
-            child: Text(
-              'البند والمواصفات',
-              style: TextStyle(fontSize: 11, color: Colors.white60),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              'الكمية',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11, color: Colors.white60),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              'السعر',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11, color: Colors.white60),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Text(
-              'الإجمالي',
-              textAlign: TextAlign.end,
-              style: TextStyle(fontSize: 11, color: Colors.white60),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _fabricChoice() => Container(
-    padding: const EdgeInsets.all(8),
-    color: _cardDark,
-    child: Row(
-      children: [
-        const Text(
-          'نوع قماش البلكونة:',
-          style: TextStyle(fontSize: 12, color: Colors.white70),
-        ),
-        const SizedBox(width: 8),
-        DropdownButton<String>(
-          value: _balconyFabric,
-          dropdownColor: _cardDark2,
-          style: const TextStyle(color: _gold, fontSize: 13),
-          underline: const SizedBox(),
-          items: [
-            for (final e in kBalconyFabrics.entries)
-              DropdownMenuItem(value: e.key, child: Text(e.value)),
-          ],
-          onChanged: (v) {
-            if (v != null) _touch(() => _balconyFabric = v);
-          },
-        ),
-      ],
-    ),
-  );
-
-  Widget _lineRow(AutoLine l) {
-    final qty = _qtyOf(l);
-    final price = _priceOf(l);
-    final total = _lineTotal(l);
-    final bool isFixedInstall = l.key == 'install';
-
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF161622),
-        border: Border(bottom: BorderSide(color: Color(0x1FFFFFFF))),
-      ),
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 5,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l.name,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                if (l.note.isNotEmpty)
-                  Text(
-                    l.note,
-                    style: const TextStyle(fontSize: 10, color: Colors.white54),
-                  ),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: _NumBox(value: qty, onChanged: (v) => _setQty(l, v)),
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            flex: 2,
-            child: isFixedInstall
-                ? Center(
-                    child: Text(
-                      _ar('${price.toInt()}'),
-                      style: const TextStyle(color: _gold, fontSize: 13),
-                    ),
-                  )
-                : _NumBox(
-                    value: price,
-                    highlight: true,
-                    onChanged: (v) => _setPrice(l.priceKey, v),
-                  ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Text(
-              '${_money(total)} ج',
-              textAlign: TextAlign.end,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: _goldLight,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _customRow(_Custom c) {
-    return Container(
-      color: const Color(0xFF1A1D2B),
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 5,
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(
-                    Icons.remove_circle,
-                    color: _danger,
-                    size: 16,
-                  ),
-                  onPressed: () => _touch(() => _custom.remove(c)),
-                ),
-                Expanded(
-                  child: Text(
-                    c.name,
-                    style: const TextStyle(fontSize: 12, color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: _NumBox(
-              value: c.qty,
-              onChanged: (v) => _touch(() => c.qty = v),
-            ),
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            flex: 2,
-            child: _NumBox(
-              value: c.price,
-              highlight: true,
-              onChanged: (v) => _touch(() => c.price = v),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Text(
-              '${_money(c.qty * c.price)} ج',
-              textAlign: TextAlign.end,
-              style: const TextStyle(fontSize: 12, color: _goldLight),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _addCustomButton() => TextButton.icon(
-    icon: const Icon(Icons.add, color: _gold, size: 16),
-    label: const Text(
-      'إضافة بند يدوي مخصص',
-      style: TextStyle(color: _gold, fontSize: 12),
-    ),
-    onPressed: _addCustom,
-  );
-
-  Widget _subtotal(String label, double value, {bool isSubdued = false}) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      color: Colors.black26,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: isSubdued ? Colors.white38 : Colors.white70,
-            ),
-          ),
-          Text(
-            '${_money(value)} ج.م',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: isSubdued ? Colors.white38 : _gold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================ كرت الملخص المالي وتسوية الحساب ============================
-  // المعادلة المعتمدة: حسابنا 10 آلاف - دفع 5 آلاف = فاضل 5 آلاف
-  Widget _financialSettlementCard(double grandTotal, double remaining) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1E2030), Color(0xFF141522)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _gold, width: 1.5),
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF334155)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
+          Row(
+            children: const [
+              Icon(Icons.palette_rounded, color: Color(0xFF10B981), size: 18),
+              SizedBox(width: 8),
               Text(
-                'الملخص المالي وتسوية الحساب',
+                'نوع قماش ستارة البلكونة',
                 style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                  color: _goldLight,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
                 ),
-              ),
-              Text(
-                'بالجنيه المصري (EGP)',
-                style: TextStyle(fontSize: 10, color: Colors.white54),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Row(
-            children: [
-              // 1. الإجمالي المطلوب
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.black45,
+            children: kBalconyFabrics.entries.map((e) {
+              final selected = e.key == _balconyFabricKey;
+              final p = _customPrices[e.key] ?? defaultPrices()[e.key] ?? 0;
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: InkWell(
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.white12),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'إجمالي الحساب',
-                        style: TextStyle(fontSize: 10, color: Colors.white54),
+                    onTap: () => setState(() => _balconyFabricKey = e.key),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 4,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${_money(grandTotal)} ج',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? const Color(0xFF10B981).withValues(alpha: 0.18)
+                            : const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: selected
+                              ? const Color(0xFF10B981)
+                              : const Color(0xFF334155),
+                          width: selected ? 1.5 : 1,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _includeFabric ? 'شامل القماش' : 'مصنعية وإكسسوار',
-                        style: const TextStyle(fontSize: 9, color: _gold),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-
-              // 2. العربون المدفوع
-              Expanded(
-                child: InkWell(
-                  onTap: _editDepositDialog,
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: _success.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: _success.withValues(alpha: 0.4),
+                      child: Column(
+                        children: [
+                          Text(
+                            e.value,
+                            style: TextStyle(
+                              color: selected
+                                  ? Colors.white
+                                  : const Color(0xFF94A3B8),
+                              fontWeight: selected
+                                  ? FontWeight.w900
+                                  : FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '${_money(p)} ج/م',
+                            style: TextStyle(
+                              color: selected
+                                  ? const Color(0xFF10B981)
+                                  : const Color(0xFF64748B),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================ كارت القسم والجدول ============================
+
+  Widget _buildSectionCard({
+    required String title,
+    required IconData icon,
+    required Color accent,
+    required List<InvoiceLine> lines,
+    required String totalLabel,
+    required double totalVal,
+    required void Function(String key, double current) onEditQty,
+    required void Function(String key, double current) onEditPrice,
+  }) {
+    if (lines.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      child: Column(
+        children: [
+          // رأس القسم
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.08),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(13),
+              ),
+              border: Border(
+                bottom: BorderSide(color: accent.withValues(alpha: 0.2)),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: accent, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: accent,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${_arNum(lines.length)} بنود',
+                  style: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // رأس الأعمدة: [الكمية] | [البند] | [السعر] | [الإجمالي]
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.6),
+            child: Row(
+              children: const [
+                SizedBox(
+                  width: 65,
+                  child: Text(
+                    'الكمية',
+                    style: TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'البند',
+                    style: TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 65,
+                  child: Text(
+                    'السعر',
+                    style: TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                SizedBox(
+                  width: 80,
+                  child: Text(
+                    'الإجمالي',
+                    style: TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.left,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // أسطر البنود — بدون وصف فرعي متكلف ومضغوطة لشاشة الهاتف
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: lines.length,
+            separatorBuilder: (_, _) =>
+                const Divider(color: Color(0xFF334155), height: 1),
+            itemBuilder: (ctx, i) {
+              final line = lines[i];
+              return Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    // الكمية ككبسولة ذكية تفتح شيت التعديل
+                    InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => onEditQty(line.key, line.qty),
+                      child: Container(
+                        width: 65,
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F172A),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF334155)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              _fmtQty(line.qty),
+                              style: const TextStyle(
+                                color: Color(0xFFF1F5F9),
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              ),
+                            ),
+                            if (line.unit.isNotEmpty) ...[
+                              const SizedBox(width: 2),
+                              Text(
+                                line.unit,
+                                style: const TextStyle(
+                                  color: Color(0xFF64748B),
+                                  fontSize: 9,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    // اسم البند وحده صافياً بدون كلام تحته
+                    Expanded(
+                      child: Text(
+                        line.label,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+
+                    // السعر ككبسولة ذكية
+                    InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => onEditPrice(line.key, line.unitPrice),
+                      child: Container(
+                        width: 65,
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F172A),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF334155)),
+                        ),
+                        child: Text(
+                          _money(line.unitPrice),
+                          style: const TextStyle(
+                            color: Color(0xFFE2E8F0),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    // إجمالي البند
+                    SizedBox(
+                      width: 72,
+                      child: Text(
+                        '${_money(line.total)} ج',
+                        style: TextStyle(
+                          color: accent,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                        ),
+                        textAlign: TextAlign.left,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+
+          // فوتر القسم
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: const BoxDecoration(
+              color: Color(0xFF0F172A),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(13)),
+              border: Border(top: BorderSide(color: Color(0xFF334155))),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  totalLabel,
+                  style: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${_money(totalVal)} ج.م',
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String title,
+    required String sub,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF334155)),
+              ),
+              child: Icon(icon, size: 48, color: const Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              sub,
+              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddCustomLineButton({required bool isBalcony}) {
+    return TextButton.icon(
+      onPressed: () => _openAddCustomLineDialog(isBalcony: isBalcony),
+      icon: const Icon(
+        Icons.add_circle_outline_rounded,
+        size: 18,
+        color: Color(0xFFC5A059),
+      ),
+      label: const Text(
+        'إضافة بند يدوي مخصص للفاتورة',
+        style: TextStyle(
+          color: Color(0xFFC5A059),
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+        ),
+      ),
+    );
+  }
+
+  // ============================ الشريط المالي السفلي (المعادلة) ============================
+
+  Widget _buildBottomSummaryBar() {
+    final aptInv = _getApartmentInvoice();
+    final balcInv = _getBalconyInvoice();
+
+    final isApartmentTab = _tabController.index == 0;
+    final currentTabTotal = isApartmentTab
+        ? aptInv.grandTotal
+        : balcInv.grandTotal;
+
+    final combinedTotal = roundMoney(aptInv.grandTotal + balcInv.grandTotal);
+    final remaining = roundMoney(combinedTotal - _depositPaid);
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF1E293B),
+        border: Border(top: BorderSide(color: Color(0xFF334155), width: 1.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black38,
+            offset: Offset(0, -3),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // السطر الأول: تفصيل الحساب والعربون
+              Row(
+                children: [
+                  // إجمالي الفاتورة الحالية
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'تم دفع عربون',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: _success,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Icon(Icons.edit, size: 12, color: _success),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
                         Text(
-                          _depositPaid > 0
-                              ? '${_money(_depositPaid)} ج'
-                              : '٠ ج',
+                          isApartmentTab ? 'فاتورة الشقة' : 'فاتورة البلكونة',
                           style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                            color: _success,
+                            color: Color(0xFF94A3B8),
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 2),
                         Text(
-                          _depositPaid > 0
-                              ? 'مخصوم من الإجمالي'
-                              : 'اضغط لتعديل',
+                          '${_money(currentTabTotal)} ج',
                           style: const TextStyle(
-                            fontSize: 9,
-                            color: Colors.white70,
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 8),
 
-              // 3. المتبقي عند الاستلام
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF3B1017),
+                  // زر تعديل العربون
+                  InkWell(
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: _danger, width: 1.5),
+                    onTap: _openDepositDialog,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF334155)),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(
+                                Icons.payments_rounded,
+                                size: 13,
+                                color: Color(0xFF10B981),
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'العربون المدفوع',
+                                style: TextStyle(
+                                  color: Color(0xFF94A3B8),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${_money(_depositPaid)} ج',
+                            style: const TextStyle(
+                              color: Color(0xFF10B981),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+
+                  const SizedBox(width: 10),
+
+                  // المتبقي الصافي
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: remaining > 0
+                            ? [
+                                const Color(0xFFDC2626).withValues(alpha: 0.2),
+                                const Color(0xFFEF4444).withValues(alpha: 0.1),
+                              ]
+                            : [
+                                const Color(0xFF10B981).withValues(alpha: 0.2),
+                                const Color(0xFF059669).withValues(alpha: 0.1),
+                              ],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: remaining > 0
+                            ? const Color(0xFFEF4444)
+                            : const Color(0xFF10B981),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          remaining > 0 ? 'المتبقي مطلوب' : 'خالص بالكامل',
+                          style: TextStyle(
+                            color: remaining > 0
+                                ? const Color(0xFFFCA5A5)
+                                : const Color(0xFF6EE7B7),
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${_money(remaining.abs())} ج',
+                          style: TextStyle(
+                            color: remaining > 0
+                                ? const Color(0xFFEF4444)
+                                : const Color(0xFF10B981),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              // السطر الثاني: إجمالي الحسابين معاً لو الشقة والبلكونة موجودين
+              if (_windows.any((w) => w.enabled) &&
+                  _balconies.any((b) => b.enabled))
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'المتبقي للاستلام',
+                        'إجمالي الشقة والبلكونة معاً:',
                         style: TextStyle(
-                          fontSize: 10,
-                          color: Color(0xFFFF9E9E),
-                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF94A3B8),
+                          fontSize: 11,
                         ),
                       ),
-                      const SizedBox(height: 4),
                       Text(
-                        '${_money(remaining)} ج',
+                        '${_money(combinedTotal)} ج.م',
                         style: const TextStyle(
-                          fontSize: 16,
+                          color: Color(0xFFC5A059),
                           fontWeight: FontWeight.w900,
-                          color: Color(0xFFFF5252),
+                          fontSize: 12,
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      const Text(
-                        'يدفع عند التركيب',
-                        style: TextStyle(fontSize: 9, color: Colors.white70),
                       ),
                     ],
                   ),
                 ),
-              ),
             ],
           ),
-          if (_depositPaid > 0)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                '💡 معادلة الحساب: (حسابنا ${_money(grandTotal)} ج - دفع ${_money(_depositPaid)} ج = فاضل ${_money(remaining)} ج)',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Colors.white70,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _bottomActionBar(double grandTotal, double remaining) {
-    return Container(
-      color: _cardDark,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'المتبقي: ${_money(remaining)} ج.م',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: _danger,
-                    ),
-                  ),
-                  Text(
-                    'الإجمالي ${_money(grandTotal)} ج • مدفوع ${_money(_depositPaid)} ج',
-                    style: const TextStyle(fontSize: 11, color: Colors.white54),
-                  ),
-                ],
-              ),
-            ),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _gold,
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
-              ),
-              icon: const Icon(Icons.share, size: 16),
-              label: const Text(
-                'واتساب',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              onPressed: _shareOnWhatsApp,
-            ),
-          ],
         ),
       ),
     );
   }
 
-  // ============================ النوافذ ============================
-  Future<void> _editDepositDialog() async {
-    final ctrl = TextEditingController(
-      text: _depositPaid > 0 ? _depositPaid.toStringAsFixed(0) : '',
-    );
-    final ok = await showDialog<bool>(
+  // ============================ ديالوج التعديل السريع الذكي ============================
+
+  void _openQuickEdit({
+    required String title,
+    required double current,
+    required String unit,
+    required void Function(double val) onSave,
+  }) {
+    final controller = TextEditingController(text: current.toString());
+    double tempVal = current;
+
+    showModalBottomSheet<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E2030),
-        title: const Text(
-          'تسجيل العربون المدفوع (مقدم)',
-          style: TextStyle(color: _goldLight, fontWeight: FontWeight.bold),
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            void update(double delta) {
+              final next = (tempVal + delta).clamp(0.0, 9999.0);
+              tempVal = roundMoney(next);
+              controller.text = tempVal == tempVal.roundToDouble()
+                  ? tempVal.toInt().toString()
+                  : tempVal.toString();
+              setModalState(() {});
+            }
+
+            return Directionality(
+              textDirection: TextDirection.rtl,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  16,
+                  20,
+                  MediaQuery.of(ctx).viewInsets.bottom + 20,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF475569),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // عرض الرقم بوضوح فائق
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 20,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFC5A059)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            _arNum(controller.text),
+                            style: const TextStyle(
+                              color: Color(0xFFC5A059),
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          if (unit.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Text(
+                              unit,
+                              style: const TextStyle(
+                                color: Color(0xFF94A3B8),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // أزرار الزيادة والنقصان السريعة
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildStepButton(label: '٥-', onTap: () => update(-5)),
+                        const SizedBox(width: 8),
+                        _buildStepButton(label: '١-', onTap: () => update(-1)),
+                        const SizedBox(width: 8),
+                        _buildStepButton(
+                          label: '٠٫٥-',
+                          onTap: () => update(-0.5),
+                        ),
+                        const SizedBox(width: 14),
+                        _buildStepButton(
+                          label: '+٠٫٥',
+                          onTap: () => update(0.5),
+                          isPositive: true,
+                        ),
+                        const SizedBox(width: 8),
+                        _buildStepButton(
+                          label: '+١',
+                          onTap: () => update(1),
+                          isPositive: true,
+                        ),
+                        const SizedBox(width: 8),
+                        _buildStepButton(
+                          label: '+٥',
+                          onTap: () => update(5),
+                          isPositive: true,
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // حقل إدخال يدوي مباشر
+                    TextField(
+                      controller: controller,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: const Color(0xFF0F172A),
+                        hintText: 'أو اكتب القيمة مباشرة',
+                        hintStyle: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 12,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF334155),
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                      ),
+                      onChanged: (val) {
+                        tempVal = _safeNum(val);
+                        setModalState(() {});
+                      },
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // أزرار الحفظ والإلغاء
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text(
+                              'إلغاء',
+                              style: TextStyle(color: Color(0xFF94A3B8)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              final v = _safeNum(controller.text);
+                              onSave(v);
+                              Navigator.pop(ctx);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFC5A059),
+                              foregroundColor: const Color(0xFF0F172A),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            child: const Text(
+                              'تطبيق التعديل',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildStepButton({
+    required String label,
+    required VoidCallback onTap,
+    bool isPositive = false,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: isPositive
+              ? const Color(0xFFC5A059).withValues(alpha: 0.18)
+              : const Color(0xFF0F172A),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isPositive
+                ? const Color(0xFFC5A059)
+                : const Color(0xFF334155),
+          ),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'المبلغ اللي العميل دفعه عربون ليتم خصمه من الإجمالي:',
-              style: TextStyle(color: Colors.white70, fontSize: 13),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isPositive ? const Color(0xFFC5A059) : Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 12,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================ ديالوج العربون ============================
+
+  void _openDepositDialog() {
+    final controller = TextEditingController(
+      text: _depositPaid == 0
+          ? ''
+          : (_depositPaid == _depositPaid.roundToDouble()
+                ? _depositPaid.toInt().toString()
+                : _depositPaid.toString()),
+    );
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            backgroundColor: const Color(0xFF1E293B),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ctrl,
+            title: Row(
+              children: const [
+                Icon(Icons.payments_rounded, color: Color(0xFF10B981)),
+                SizedBox(width: 8),
+                Text(
+                  'تسجيل العربون المدفوع',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            content: TextField(
+              controller: controller,
               autofocus: true,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
               style: const TextStyle(
-                color: _success,
-                fontSize: 20,
+                color: Colors.white,
                 fontWeight: FontWeight.bold,
+                fontSize: 18,
               ),
+              textAlign: TextAlign.center,
               decoration: InputDecoration(
-                suffixText: 'ج.م',
-                suffixStyle: const TextStyle(color: _gold),
                 filled: true,
-                fillColor: Colors.black38,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: _gold),
+                fillColor: const Color(0xFF0F172A),
+                hintText: 'مثال: ٥٠٠٠',
+                hintStyle: const TextStyle(
+                  color: Color(0xFF64748B),
+                  fontSize: 13,
                 ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('إلغاء', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: _gold),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'تأكيد وحفظ',
-              style: TextStyle(color: Colors.black),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (ok == true) {
-      final v = parseNumber(ctrl.text);
-      _touch(() => _depositPaid = v);
-      await _save();
-    }
-  }
-
-  Future<void> _addCustom() async {
-    final nCtrl = TextEditingController();
-    final qCtrl = TextEditingController(text: '1');
-    final pCtrl = TextEditingController();
-
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E2030),
-        title: const Text('إضافة بند يدوي', style: TextStyle(color: _gold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nCtrl,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(labelText: 'اسم البند'),
-            ),
-            TextField(
-              controller: qCtrl,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(labelText: 'الكمية'),
-            ),
-            TextField(
-              controller: pCtrl,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(labelText: 'سعر الوحدة'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: _gold),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('إضافة', style: TextStyle(color: Colors.black)),
-          ),
-        ],
-      ),
-    );
-
-    if (ok == true && nCtrl.text.trim().isNotEmpty) {
-      _touch(() {
-        _custom.add(
-          _Custom(
-            name: nCtrl.text.trim(),
-            qty: parseNumber(qCtrl.text) > 0 ? parseNumber(qCtrl.text) : 1.0,
-            price: parseNumber(pCtrl.text),
-            balcony: _balconyTab,
-          ),
-        );
-      });
-    }
-  }
-
-  Future<void> _openPrices() async {
-    await showModalBottomSheet(
-      context: context,
-      backgroundColor: _cardDark2,
-      isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setMState) => DraggableScrollableSheet(
-          initialChildSize: 0.8,
-          builder: (_, sc) => ListView(
-            controller: sc,
-            padding: const EdgeInsets.all(16),
-            children: [
-              const Text(
-                'إعدادات الأسعار الافتراضية',
-                style: TextStyle(
-                  color: _gold,
-                  fontSize: 16,
+                suffixText: 'ج.م',
+                suffixStyle: const TextStyle(
+                  color: Color(0xFF10B981),
                   fontWeight: FontWeight.bold,
                 ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF334155)),
+                ),
               ),
-              const SizedBox(height: 12),
-              for (final d in kPriceDefs)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  'إلغاء',
+                  style: TextStyle(color: Color(0xFF94A3B8)),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  final v = _safeNum(controller.text);
+                  setState(() => _depositPaid = v);
+                  Navigator.pop(ctx);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text(
+                  'حفظ العربون',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ============================ ديالوج إضافة بند مخصص ============================
+
+  void _openAddCustomLineDialog({required bool isBalcony}) {
+    final labelCtrl = TextEditingController();
+    final qtyCtrl = TextEditingController(text: '1');
+    final priceCtrl = TextEditingController();
+    final unitCtrl = TextEditingController(text: 'قطعة');
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            backgroundColor: const Color(0xFF1E293B),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Text(
+              isBalcony
+                  ? 'إضافة بند لفاتورة البلكونة'
+                  : 'إضافة بند لفاتورة الشقة',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: labelCtrl,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: 'اسم البند',
+                      labelStyle: TextStyle(color: Color(0xFF94A3B8)),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          d.label,
+                        child: TextField(
+                          controller: qtyCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           style: const TextStyle(color: Colors.white),
+                          decoration: const InputDecoration(
+                            labelText: 'الكمية',
+                            labelStyle: TextStyle(color: Color(0xFF94A3B8)),
+                          ),
                         ),
                       ),
-                      SizedBox(
-                        width: 80,
-                        child: _NumBox(
-                          value: _prices[d.key] ?? d.value,
-                          highlight: true,
-                          onChanged: (v) {
-                            _setPrice(d.key, v);
-                            setMState(() {});
-                          },
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: unitCtrl,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: const InputDecoration(
+                            labelText: 'الوحدة (متر/قطعة..)',
+                            labelStyle: TextStyle(color: Color(0xFF94A3B8)),
+                          ),
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: priceCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: 'سعر الوحدة (ج.م)',
+                      labelStyle: TextStyle(color: Color(0xFF94A3B8)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  'إلغاء',
+                  style: TextStyle(color: Color(0xFF94A3B8)),
                 ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  final label = labelCtrl.text.trim();
+                  if (label.isEmpty) return;
+                  final q = _safeNum(qtyCtrl.text);
+                  final p = _safeNum(priceCtrl.text);
+                  final key = 'custom_${DateTime.now().millisecondsSinceEpoch}';
+
+                  final line = InvoiceLine(
+                    key: key,
+                    label: label,
+                    unit: unitCtrl.text.trim(),
+                    qty: q <= 0 ? 1 : q,
+                    unitPrice: p,
+                  );
+
+                  setState(() {
+                    if (isBalcony) {
+                      _balcCustomLines.add(line);
+                    } else {
+                      _aptCustomLines.add(line);
+                    }
+                  });
+
+                  Navigator.pop(ctx);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFC5A059),
+                  foregroundColor: const Color(0xFF0F172A),
+                ),
+                child: const Text(
+                  'إضافة البند',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
             ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
-}
 
-class _NumBox extends StatefulWidget {
-  const _NumBox({
-    super.key,
-    required this.value,
-    required this.onChanged,
-    this.highlight = false,
-  });
+  // ============================ ديالوج الأسعار الافتراضية ============================
 
-  final double value;
-  final ValueChanged<double> onChanged;
-  final bool highlight;
+  void _openPriceSettings() {
+    final localCopy = Map<String, double>.from(defaultPrices())
+      ..addAll(_customPrices);
 
-  @override
-  State<_NumBox> createState() => _NumBoxState();
-}
-
-class _NumBoxState extends State<_NumBox> {
-  late final TextEditingController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = TextEditingController(text: _format(widget.value));
-  }
-
-  @override
-  void didUpdateWidget(covariant _NumBox old) {
-    super.didUpdateWidget(old);
-    if ((old.value - widget.value).abs() > 1e-9) {
-      _ctrl.text = _format(widget.value);
-    }
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  String _format(double v) => v == 0
-      ? ''
-      : (v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1));
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 32,
-      decoration: BoxDecoration(
-        color: Colors.black45,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: widget.highlight
-              ? _gold.withValues(alpha: 0.5)
-              : Colors.white12,
-        ),
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: TextField(
-        controller: _ctrl,
-        textAlign: TextAlign.center,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        style: TextStyle(
-          color: widget.highlight ? _goldLight : Colors.white,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Directionality(
+              textDirection: TextDirection.rtl,
+              child: Container(
+                height: MediaQuery.of(ctx).size.height * 0.75,
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF475569),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: const [
+                        Icon(Icons.tune_rounded, color: Color(0xFFC5A059)),
+                        SizedBox(width: 8),
+                        Text(
+                          'تعديل قائمة الأسعار الافتراضية',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: ListView.separated(
+                        itemCount: kPriceDefs.length,
+                        separatorBuilder: (_, _) =>
+                            const Divider(color: Color(0xFF334155), height: 1),
+                        itemBuilder: (_, i) {
+                          final def = kPriceDefs[i];
+                          final current = localCopy[def.key] ?? def.value;
+                          return ListTile(
+                            dense: true,
+                            title: Text(
+                              def.label,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'الوحدة: ${def.unit}',
+                              style: const TextStyle(
+                                color: Color(0xFF94A3B8),
+                                fontSize: 11,
+                              ),
+                            ),
+                            trailing: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0F172A),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: const Color(0xFF334155),
+                                ),
+                              ),
+                              child: Text(
+                                '${_money(current)} ج',
+                                style: const TextStyle(
+                                  color: Color(0xFFC5A059),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            onTap: () {
+                              _openQuickEdit(
+                                title: 'تعديل سعر: ${def.label}',
+                                current: current,
+                                unit: 'ج/${def.unit}',
+                                onSave: (v) {
+                                  localCopy[def.key] = v;
+                                  setModalState(() {});
+                                },
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text(
+                              'إلغاء',
+                              style: TextStyle(color: Color(0xFF94A3B8)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                _customPrices.clear();
+                                _customPrices.addAll(localCopy);
+                              });
+                              Navigator.pop(ctx);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFC5A059),
+                              foregroundColor: const Color(0xFF0F172A),
+                            ),
+                            child: const Text(
+                              'تطبيق الأسعار الجديدة',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ============================ مشاركة نص الفاتورة (واتساب) ============================
+
+  void _shareAsText() {
+    final aptInv = _getApartmentInvoice();
+    final balcInv = _getBalconyInvoice();
+    final combined = roundMoney(aptInv.grandTotal + balcInv.grandTotal);
+    final remaining = roundMoney(combined - _depositPaid);
+
+    final b = StringBuffer();
+    b.writeln('━━━━━━━━━━━━━━━━━━━━');
+    b.writeln('✨ ستائر باريس — PARIS CURTAINS ✨');
+    b.writeln('━━━━━━━━━━━━━━━━━━━━');
+    b.writeln('👤 العميل: ${widget.clientName}');
+    if (widget.phone != null && widget.phone!.isNotEmpty) {
+      b.writeln('📱 الهاتف: ${_arNum(widget.phone!)}');
+    }
+    b.writeln('━━━━━━━━━━━━━━━━━━━━');
+
+    if (_windows.any((w) => w.enabled)) {
+      b.writeln('🏠 [ستائر الشقة]');
+      for (final l in aptInv.fabricLines) {
+        b.writeln(
+          '• ${l.label}: ${_fmtQty(l.qty)} ${l.unit} × ${_money(l.unitPrice)} = ${_money(l.total)} ج',
+        );
+      }
+      for (final l in aptInv.accessoryLines) {
+        b.writeln(
+          '• ${l.label}: ${_fmtQty(l.qty)} ${l.unit} × ${_money(l.unitPrice)} = ${_money(l.total)} ج',
+        );
+      }
+      b.writeln('🔹 إجمالي الشقة: ${_money(aptInv.grandTotal)} ج.م');
+      b.writeln('');
+    }
+
+    if (_balconies.any((b) => b.enabled)) {
+      b.writeln('🌿 [ستائر البلكونة]');
+      for (final l in balcInv.fabricLines) {
+        b.writeln(
+          '• ${l.label}: ${_fmtQty(l.qty)} ${l.unit} × ${_money(l.unitPrice)} = ${_money(l.total)} ج',
+        );
+      }
+      for (final l in balcInv.accessoryLines) {
+        b.writeln(
+          '• ${l.label}: ${_fmtQty(l.qty)} ${l.unit} × ${_money(l.unitPrice)} = ${_money(l.total)} ج',
+        );
+      }
+      b.writeln('🔹 إجمالي البلكونة: ${_money(balcInv.grandTotal)} ج.م');
+      b.writeln('');
+    }
+
+    b.writeln('━━━━━━━━━━━━━━━━━━━━');
+    b.writeln('💰 الحساب الإجمالي: ${_money(combined)} ج.م');
+    b.writeln('💵 العربون المدفوع: ${_money(_depositPaid)} ج.م');
+    b.writeln('⚖️ المتبقي الصافي: ${_money(remaining)} ج.م');
+    b.writeln('━━━━━━━━━━━━━━━━━━━━');
+    b.writeln('شكراً لثقتكم بنا ✨ ستائر باريس ترحب بكم دائماً');
+
+    Clipboard.setData(ClipboardData(text: b.toString()));
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'تم نسخ نص الفاتورة بالكامل! جاهز للإرسال على واتساب 📲',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold),
         ),
-        decoration: const InputDecoration(
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.zero,
-          isDense: true,
-        ),
-        onSubmitted: (t) {
-          final v = parseNumber(t);
-          widget.onChanged(v);
-        },
+        backgroundColor: Color(0xFFC5A059),
+        duration: Duration(seconds: 3),
       ),
     );
   }
