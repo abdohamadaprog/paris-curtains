@@ -246,7 +246,24 @@ ApartmentInvoice calculateApartmentInvoice({
   int windowCount = active.length;
 
   for (final w in active) {
-    final type = w.curtainType;
+    final rawType = w.curtainType.trim().toLowerCase();
+    // دعم القيم القديمة والجديدة القادمة من شاشة القياسات، بما فيها الاسم العربي.
+    final type =
+        (rawType == 'press' ||
+            rawType == 'ring' ||
+            rawType == 'rings' ||
+            rawType == 'eyelet' ||
+            rawType == 'grommet' ||
+            rawType.contains('كبس') ||
+            rawType.contains('حلقة') ||
+            rawType.contains('حلقات'))
+        ? 'press'
+        : (rawType == 'double_wave' ||
+              rawType == 'double-wave' ||
+              rawType.contains('دابل') ||
+              rawType.contains('double'))
+        ? 'double_wave'
+        : 'wave';
     final wM = w.width;
 
     if (type == 'wave') {

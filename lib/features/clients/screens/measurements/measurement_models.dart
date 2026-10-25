@@ -47,7 +47,7 @@ class _Measurement {
     final h = toDouble(height.text);
 
     // مضاعفات القماش بناءً على الطراز
-    final heavyMultiplier = method == _WorkMethod.press ? 2.5 : 3.0;
+    final heavyMultiplier = method == _WorkMethod.press ? 2.5 : 1.5;
     final lightMultiplier = method == _WorkMethod.doubleWave ? 3.0 : 2.0;
 
     // خصومات الارتفاع بالسنتيمتر بناءً على السقف ونوع التعليق
@@ -97,7 +97,7 @@ class _Measurement {
           heavyWheels = auto;
         }
       }
-      // القماش الأساسي = 3 أضعاف العرض (ويفي)، وحسبة العجل للإرشاد بس في سطر العجل
+      // القماش الأساسي = 1.5 ضعف العرض (ويفي)، وحسبة العجل للإرشاد بس في سطر العجل
       heavyMeters = w > 0 ? (w * heavyMultiplier) : 0;
     } else {
       heavyWheels = 0; // الحلقات (كبس) مفيهاش عجل

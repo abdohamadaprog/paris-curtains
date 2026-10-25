@@ -397,6 +397,7 @@ class _InvoicePageState extends State<InvoicePage>
             ? _buildErrorView()
             : Column(
                 children: [
+                  _buildClientHero(),
                   _buildTabBar(),
                   Expanded(
                     child: TabBarView(
@@ -413,66 +414,284 @@ class _InvoicePageState extends State<InvoicePage>
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: const Color(0xFF161622),
+      backgroundColor: const Color(0xFF0C0E14),
+      surfaceTintColor: Colors.transparent,
       elevation: 0,
-      centerTitle: true,
-      title: const Text(
-        'فاتورة باريس',
-        textDirection: TextDirection.rtl,
-        style: TextStyle(
-          fontWeight: FontWeight.w900,
-          fontSize: 18,
-          height: 1.25,
-          letterSpacing: 0,
-          color: Color(0xFFE6C98A),
-        ),
+      centerTitle: false,
+      toolbarHeight: 72,
+      titleSpacing: 16,
+      title: Row(
+        children: [
+          Container(
+            width: 43,
+            height: 43,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFE8CE91), Color(0xFF9C713A)],
+              ),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x339E7A43),
+                  blurRadius: 14,
+                  offset: Offset(0, 5),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.receipt_long_rounded,
+              color: Color(0xFF101016),
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 11),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'باريس للستائر',
+                  style: TextStyle(
+                    color: Color(0xFFF6E7C3),
+                    fontSize: 17,
+                    height: 1.15,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'INVOICE STUDIO  •  2026',
+                  style: TextStyle(
+                    color: Color(0xFF8F8A80),
+                    fontSize: 9,
+                    letterSpacing: 1.25,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
       actions: [
-        IconButton(
-          tooltip: 'إعدادات الأسعار الافتراضية',
-          icon: const Icon(Icons.tune_rounded, color: Color(0xFF94A3B8)),
+        _appBarAction(
+          icon: Icons.tune_rounded,
+          tooltip: 'إعدادات الأسعار',
           onPressed: _openPriceSettings,
         ),
-        IconButton(
-          tooltip: 'مشاركة الفاتورة كنص',
-          icon: const Icon(Icons.share_rounded, color: Color(0xFFC7A064)),
+        _appBarAction(
+          icon: Icons.share_rounded,
+          tooltip: 'مشاركة الفاتورة',
           onPressed: _shareAsText,
         ),
-        IconButton(
-          tooltip: 'حفظ الفاتورة',
-          icon: _saving
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Color(0xFFC7A064),
-                  ),
-                )
-              : Icon(
-                  _savedRecently
-                      ? Icons.check_circle_rounded
-                      : Icons.save_rounded,
-                  color: _savedRecently
-                      ? const Color(0xFF10B981)
-                      : const Color(0xFFC7A064),
+        Padding(
+          padding: const EdgeInsetsDirectional.only(start: 2, end: 10),
+          child: Material(
+            color: const Color(0xFF211D17),
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: _save,
+              child: SizedBox(
+                width: 42,
+                height: 42,
+                child: Center(
+                  child: _saving
+                      ? const SizedBox(
+                          width: 19,
+                          height: 19,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Color(0xFFE6C98A),
+                          ),
+                        )
+                      : Icon(
+                          _savedRecently
+                              ? Icons.check_circle_rounded
+                              : Icons.save_rounded,
+                          color: _savedRecently
+                              ? const Color(0xFF34D399)
+                              : const Color(0xFFE6C98A),
+                          size: 21,
+                        ),
                 ),
-          onPressed: _save,
+              ),
+            ),
+          ),
         ),
       ],
     );
   }
 
+  Widget _appBarAction({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+  }) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(end: 3),
+      child: IconButton(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        style: IconButton.styleFrom(
+          backgroundColor: const Color(0xFF171821),
+          fixedSize: const Size(39, 39),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: const BorderSide(color: Color(0x223E3B35)),
+          ),
+        ),
+        icon: Icon(icon, color: const Color(0xFFD9C08A), size: 19),
+      ),
+    );
+  }
+
+  Widget _buildClientHero() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 2, 14, 10),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [Color(0xFF28231C), Color(0xFF191A21), Color(0xFF15161D)],
+        ),
+        border: Border.all(color: const Color(0x55C7A064)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x18000000),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: const Color(0x22D6B879),
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: const Color(0x66D6B879)),
+                ),
+                child: const Icon(
+                  Icons.person_rounded,
+                  color: Color(0xFFE6C98A),
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'فاتورة العميل',
+                      style: TextStyle(
+                        color: Color(0xFFB7A98D),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      widget.clientName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    if ((widget.address ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.location_on_outlined,
+                            size: 13,
+                            color: Color(0xFFB9A16E),
+                          ),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              widget.address!.trim(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFFB8B8C0),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF16352D),
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(color: const Color(0x4434D399)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.verified_rounded,
+                      size: 12,
+                      color: Color(0xFF6EE7B7),
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      'جاهزة',
+                      style: TextStyle(
+                        color: Color(0xFF6EE7B7),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTabBar() {
     return Container(
-      color: const Color(0xFF161622),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      color: const Color(0xFF0C0E14),
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
       child: Container(
-        height: 42,
+        height: 46,
         decoration: BoxDecoration(
           color: const Color(0xFF0C0E14),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0x5555c7a064)),
+          border: Border.all(color: const Color(0x446C5837)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x12000000),
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
         ),
         child: TabBar(
           controller: _tabController,
@@ -585,27 +804,6 @@ class _InvoicePageState extends State<InvoicePage>
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 80),
       children: [
         _buildSectionCard(
-          title: 'الأقمشة المطلوبة',
-          icon: Icons.texture_rounded,
-          accent: const Color(0xFFC7A064),
-          lines: invoice.fabricLines,
-          totalLabel: 'إجمالي الأقمشة',
-          totalVal: invoice.fabricTotal,
-          onEditQty: (key, current) => _openQuickEdit(
-            title: 'تعديل أمتار القماش',
-            current: current,
-            unit: 'متر',
-            onSave: (v) => setState(() => _aptQtyOverride[key] = v),
-          ),
-          onEditPrice: (key, current) => _openQuickEdit(
-            title: 'تعديل سعر المتر',
-            current: current,
-            unit: 'ج.م',
-            onSave: (v) => setState(() => _aptPriceOverride[key] = v),
-          ),
-        ),
-        const SizedBox(height: 12),
-        _buildSectionCard(
           title: 'المستلزمات، المواسير والتفصيل',
           icon: Icons.hardware_rounded,
           accent: const Color(0xFF38BDF8),
@@ -620,6 +818,27 @@ class _InvoicePageState extends State<InvoicePage>
           ),
           onEditPrice: (key, current) => _openQuickEdit(
             title: 'تعديل سعر الوحدة',
+            current: current,
+            unit: 'ج.م',
+            onSave: (v) => setState(() => _aptPriceOverride[key] = v),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildSectionCard(
+          title: 'الأقمشة المطلوبة',
+          icon: Icons.texture_rounded,
+          accent: const Color(0xFFC7A064),
+          lines: invoice.fabricLines,
+          totalLabel: 'إجمالي الأقمشة',
+          totalVal: invoice.fabricTotal,
+          onEditQty: (key, current) => _openQuickEdit(
+            title: 'تعديل أمتار القماش',
+            current: current,
+            unit: 'متر',
+            onSave: (v) => setState(() => _aptQtyOverride[key] = v),
+          ),
+          onEditPrice: (key, current) => _openQuickEdit(
+            title: 'تعديل سعر المتر',
             current: current,
             unit: 'ج.م',
             onSave: (v) => setState(() => _aptPriceOverride[key] = v),
@@ -647,6 +866,27 @@ class _InvoicePageState extends State<InvoicePage>
     return ListView(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 80),
       children: [
+        _buildSectionCard(
+          title: 'المواسير والمستلزمات والتركيب',
+          icon: Icons.build_circle_rounded,
+          accent: const Color(0xFFA855F7),
+          lines: invoice.accessoryLines,
+          totalLabel: 'إجمالي مستلزمات البلكونة',
+          totalVal: invoice.accessoryTotal,
+          onEditQty: (key, current) => _openQuickEdit(
+            title: 'تعديل الكمية',
+            current: current,
+            unit: '',
+            onSave: (v) => setState(() => _balcQtyOverride[key] = v),
+          ),
+          onEditPrice: (key, current) => _openQuickEdit(
+            title: 'تعديل سعر الوحدة',
+            current: current,
+            unit: 'ج.م',
+            onSave: (v) => setState(() => _balcPriceOverride[key] = v),
+          ),
+        ),
+        const SizedBox(height: 12),
         _buildBalconyFabricSelector(),
         const SizedBox(height: 12),
         _buildSectionCard(
@@ -670,26 +910,6 @@ class _InvoicePageState extends State<InvoicePage>
           ),
         ),
         const SizedBox(height: 12),
-        _buildSectionCard(
-          title: 'المواسير والمستلزمات والتركيب',
-          icon: Icons.build_circle_rounded,
-          accent: const Color(0xFFA855F7),
-          lines: invoice.accessoryLines,
-          totalLabel: 'إجمالي مستلزمات البلكونة',
-          totalVal: invoice.accessoryTotal,
-          onEditQty: (key, current) => _openQuickEdit(
-            title: 'تعديل الكمية',
-            current: current,
-            unit: '',
-            onSave: (v) => setState(() => _balcQtyOverride[key] = v),
-          ),
-          onEditPrice: (key, current) => _openQuickEdit(
-            title: 'تعديل سعر الوحدة',
-            current: current,
-            unit: 'ج.م',
-            onSave: (v) => setState(() => _balcPriceOverride[key] = v),
-          ),
-        ),
         const SizedBox(height: 10),
         _buildAddCustomLineButton(isBalcony: true),
       ],
@@ -698,90 +918,55 @@ class _InvoicePageState extends State<InvoicePage>
 
   Widget _buildBalconyFabricSelector() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: const Color(0xFF161622),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0x5555c7a064)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: const [
-              Icon(Icons.palette_rounded, color: Color(0xFF10B981), size: 18),
-              SizedBox(width: 8),
-              Text(
-                'نوع قماش ستارة البلكونة',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-              ),
-            ],
+          const Icon(Icons.palette_rounded, color: Color(0xFF10B981), size: 18),
+          const SizedBox(width: 8),
+          const Text(
+            'قماش البلكونة',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
           ),
-          const SizedBox(height: 10),
-          Row(
-            children: kBalconyFabrics.entries.map((e) {
-              final selected = e.key == _balconyFabricKey;
-              final p = _customPrices[e.key] ?? defaultPrices()[e.key] ?? 0;
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(10),
-                    onTap: () => setState(() => _balconyFabricKey = e.key),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 8,
-                        horizontal: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? const Color(0xFF10B981).withValues(alpha: 0.18)
-                            : const Color(0xFF0C0E14),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: selected
-                              ? const Color(0xFF10B981)
-                              : const Color(0x5555c7a064),
-                          width: selected ? 1.5 : 1,
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            e.value,
-                            style: TextStyle(
-                              color: selected
-                                  ? Colors.white
-                                  : const Color(0xFF94A3B8),
-                              fontWeight: selected
-                                  ? FontWeight.w900
-                                  : FontWeight.w600,
-                              fontSize: 12,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            '${_money(p)} ج/م',
-                            style: TextStyle(
-                              color: selected
-                                  ? const Color(0xFF10B981)
-                                  : const Color(0xFF64748B),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: kBalconyFabrics.containsKey(_balconyFabricKey)
+                    ? _balconyFabricKey
+                    : 'fabric_dak',
+                isExpanded: true,
+                dropdownColor: const Color(0xFF161622),
+                icon: const Icon(Icons.expand_more, color: Color(0xFF10B981)),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                 ),
-              );
-            }).toList(),
+                items: kBalconyFabrics.entries.map((e) {
+                  final price =
+                      _customPrices[e.key] ?? defaultPrices()[e.key] ?? 0;
+                  return DropdownMenuItem<String>(
+                    value: e.key,
+                    child: Text(
+                      '${e.value} — ${_money(price)} ج/م',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) setState(() => _balconyFabricKey = value);
+                },
+              ),
+            ),
           ),
         ],
       ),
@@ -805,9 +990,17 @@ class _InvoicePageState extends State<InvoicePage>
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF161622),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0x5555c7a064)),
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(color: const Color(0x446C5837)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x16000000),
+            blurRadius: 13,
+            offset: Offset(0, 5),
+          ),
+        ],
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
           // رأس القسم
