@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -59,13 +58,6 @@ String _fmtQty(dynamic q) {
     return _arNum(d.toInt().toString());
   }
   return _arNum(d.toStringAsFixed(2));
-}
-
-/// هيكل بيانات تجميعي لإجماليات الفاتورة
-class _InvoiceTotals {
-  final double fabric;
-  final double acc;
-  const _InvoiceTotals({required this.fabric, required this.acc});
 }
 
 /// ============================================================================
@@ -219,6 +211,30 @@ class _InvoicePageState extends State<InvoicePage>
         if (inv['deposit_paid'] != null) {
           _depositPaid = _safeNum(inv['deposit_paid']);
         }
+        List<InvoiceLine> readCustom(dynamic raw) {
+          if (raw is! List) return <InvoiceLine>[];
+          return raw
+              .whereType<Map>()
+              .map((item) {
+                final m = Map<String, dynamic>.from(item);
+                return InvoiceLine(
+                  key:
+                      (m['key'] ??
+                              'custom_${DateTime.now().microsecondsSinceEpoch}')
+                          .toString(),
+                  label: (m['label'] ?? '').toString(),
+                  unit: (m['unit'] ?? 'قطعة').toString(),
+                  qty: _safeNum(m['qty']),
+                  unitPrice: _safeNum(m['unitPrice']),
+                  isFabric: m['isFabric'] == true,
+                );
+              })
+              .where((line) => line.label.trim().isNotEmpty)
+              .toList();
+        }
+
+        _aptCustomLines.addAll(readCustom(inv['apt_custom_lines']));
+        _balcCustomLines.addAll(readCustom(inv['balc_custom_lines']));
       }
 
       if (mounted) {
@@ -245,18 +261,48 @@ class _InvoicePageState extends State<InvoicePage>
           .collection('clients')
           .doc(widget.clientId);
 
+      final apt = _getApartmentInvoice();
+      final balc = _getBalconyInvoice();
+      final grandTotal = roundMoney(apt.grandTotal + balc.grandTotal);
+      final remaining = (grandTotal - _depositPaid) < 0
+          ? 0.0
+          : roundMoney(grandTotal - _depositPaid);
+      List<Map<String, dynamic>> serializeCustom(List<InvoiceLine> lines) =>
+          lines
+              .map(
+                (line) => {
+                  'key': line.key,
+                  'label': line.label,
+                  'unit': line.unit,
+                  'qty': line.qty,
+                  'unitPrice': line.unitPrice,
+                  'isFabric': line.isFabric,
+                },
+              )
+              .toList();
       final payload = {
         'prices': _customPrices,
         'apt_qty_override': _aptQtyOverride,
         'apt_price_override': _aptPriceOverride,
         'balc_qty_override': _balcQtyOverride,
         'balc_price_override': _balcPriceOverride,
+        'apt_custom_lines': serializeCustom(_aptCustomLines),
+        'balc_custom_lines': serializeCustom(_balcCustomLines),
         'balcony_fabric_key': _balconyFabricKey,
         'deposit_paid': _depositPaid,
+        'apartment_total': apt.grandTotal,
+        'balcony_total': balc.grandTotal,
+        'grand_total': grandTotal,
+        'remaining_balance': remaining,
         'saved_at': FieldValue.serverTimestamp(),
       };
 
-      await docRef.set({'invoice': payload}, SetOptions(merge: true));
+      await docRef.set({
+        'invoice': payload,
+        'totalCost': grandTotal,
+        'depositPaid': _depositPaid,
+        'remainingBalance': remaining,
+      }, SetOptions(merge: true));
 
       if (mounted) {
         setState(() {
@@ -341,17 +387,16 @@ class _InvoicePageState extends State<InvoicePage>
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: const Color(0xFF0C0E14),
         appBar: _buildAppBar(),
         body: _loading
             ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFFC5A059)),
+                child: CircularProgressIndicator(color: Color(0xFFC7A064)),
               )
             : _loadError != null
             ? _buildErrorView()
             : Column(
                 children: [
-                  _buildClientBanner(),
                   _buildTabBar(),
                   Expanded(
                     child: TabBarView(
@@ -368,24 +413,19 @@ class _InvoicePageState extends State<InvoicePage>
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: const Color(0xFF1E293B),
+      backgroundColor: const Color(0xFF161622),
       elevation: 0,
       centerTitle: true,
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: const [
-          Icon(Icons.receipt_long_rounded, color: Color(0xFFC5A059), size: 22),
-          SizedBox(width: 8),
-          Text(
-            'فاتورة ستائر باريس',
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 18,
-              letterSpacing: 0.3,
-              color: Colors.white,
-            ),
-          ),
-        ],
+      title: const Text(
+        'فاتورة باريس',
+        textDirection: TextDirection.rtl,
+        style: TextStyle(
+          fontWeight: FontWeight.w900,
+          fontSize: 18,
+          height: 1.25,
+          letterSpacing: 0,
+          color: Color(0xFFE6C98A),
+        ),
       ),
       actions: [
         IconButton(
@@ -395,7 +435,7 @@ class _InvoicePageState extends State<InvoicePage>
         ),
         IconButton(
           tooltip: 'مشاركة الفاتورة كنص',
-          icon: const Icon(Icons.share_rounded, color: Color(0xFFC5A059)),
+          icon: const Icon(Icons.share_rounded, color: Color(0xFFC7A064)),
           onPressed: _shareAsText,
         ),
         IconButton(
@@ -406,7 +446,7 @@ class _InvoicePageState extends State<InvoicePage>
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Color(0xFFC5A059),
+                    color: Color(0xFFC7A064),
                   ),
                 )
               : Icon(
@@ -415,7 +455,7 @@ class _InvoicePageState extends State<InvoicePage>
                       : Icons.save_rounded,
                   color: _savedRecently
                       ? const Color(0xFF10B981)
-                      : const Color(0xFFC5A059),
+                      : const Color(0xFFC7A064),
                 ),
           onPressed: _save,
         ),
@@ -423,116 +463,26 @@ class _InvoicePageState extends State<InvoicePage>
     );
   }
 
-  Widget _buildClientBanner() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: const BoxDecoration(
-        color: Color(0xFF1E293B),
-        border: Border(bottom: BorderSide(color: Color(0xFF334155), width: 1)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFC5A059), Color(0xFFE2C481)],
-              ),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(
-              Icons.person_rounded,
-              color: Color(0xFF0F172A),
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.clientName.isEmpty
-                      ? 'عميل بدون اسم'
-                      : widget.clientName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    if (widget.phone != null && widget.phone!.isNotEmpty) ...[
-                      const Icon(
-                        Icons.phone_iphone_rounded,
-                        size: 13,
-                        color: Color(0xFF94A3B8),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _arNum(widget.phone!),
-                        style: const TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                    ],
-                    if (widget.address != null &&
-                        widget.address!.isNotEmpty) ...[
-                      const Icon(
-                        Icons.location_on_outlined,
-                        size: 13,
-                        color: Color(0xFF94A3B8),
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          widget.address!,
-                          style: const TextStyle(
-                            color: Color(0xFF94A3B8),
-                            fontSize: 12,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildTabBar() {
     return Container(
-      color: const Color(0xFF1E293B),
+      color: const Color(0xFF161622),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: Container(
         height: 42,
         decoration: BoxDecoration(
-          color: const Color(0xFF0F172A),
+          color: const Color(0xFF0C0E14),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF334155)),
+          border: Border.all(color: const Color(0x5555c7a064)),
         ),
         child: TabBar(
           controller: _tabController,
           indicator: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFFC5A059), Color(0xFFD4AF37)],
+              colors: [Color(0xFFC7A064), Color(0xFFE6C98A)],
             ),
             borderRadius: BorderRadius.circular(10),
           ),
-          labelColor: const Color(0xFF0F172A),
+          labelColor: const Color(0xFF0C0E14),
           unselectedLabelColor: const Color(0xFF94A3B8),
           labelStyle: const TextStyle(
             fontWeight: FontWeight.w900,
@@ -608,8 +558,8 @@ class _InvoicePageState extends State<InvoicePage>
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('إعادة المحاولة'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFC5A059),
-                foregroundColor: const Color(0xFF0F172A),
+                backgroundColor: const Color(0xFFC7A064),
+                foregroundColor: const Color(0xFF0C0E14),
               ),
             ),
           ],
@@ -637,7 +587,7 @@ class _InvoicePageState extends State<InvoicePage>
         _buildSectionCard(
           title: 'الأقمشة المطلوبة',
           icon: Icons.texture_rounded,
-          accent: const Color(0xFFC5A059),
+          accent: const Color(0xFFC7A064),
           lines: invoice.fabricLines,
           totalLabel: 'إجمالي الأقمشة',
           totalVal: invoice.fabricTotal,
@@ -750,9 +700,9 @@ class _InvoicePageState extends State<InvoicePage>
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
+        color: const Color(0xFF161622),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF334155)),
+        border: Border.all(color: const Color(0x5555c7a064)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -790,12 +740,12 @@ class _InvoicePageState extends State<InvoicePage>
                       decoration: BoxDecoration(
                         color: selected
                             ? const Color(0xFF10B981).withValues(alpha: 0.18)
-                            : const Color(0xFF0F172A),
+                            : const Color(0xFF0C0E14),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: selected
                               ? const Color(0xFF10B981)
-                              : const Color(0xFF334155),
+                              : const Color(0x5555c7a064),
                           width: selected ? 1.5 : 1,
                         ),
                       ),
@@ -854,9 +804,9 @@ class _InvoicePageState extends State<InvoicePage>
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
+        color: const Color(0xFF161622),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF334155)),
+        border: Border.all(color: const Color(0x5555c7a064)),
       ),
       child: Column(
         children: [
@@ -899,7 +849,7 @@ class _InvoicePageState extends State<InvoicePage>
           // رأس الأعمدة: [الكمية] | [البند] | [السعر] | [الإجمالي]
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            color: const Color(0xFF0F172A).withValues(alpha: 0.6),
+            color: const Color(0xFF0C0E14).withValues(alpha: 0.6),
             child: Row(
               children: const [
                 SizedBox(
@@ -959,7 +909,7 @@ class _InvoicePageState extends State<InvoicePage>
             physics: const NeverScrollableScrollPhysics(),
             itemCount: lines.length,
             separatorBuilder: (_, _) =>
-                const Divider(color: Color(0xFF334155), height: 1),
+                const Divider(color: Color(0x5555c7a064), height: 1),
             itemBuilder: (ctx, i) {
               final line = lines[i];
               return Container(
@@ -977,9 +927,9 @@ class _InvoicePageState extends State<InvoicePage>
                         width: 65,
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A),
+                          color: const Color(0xFF0C0E14),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF334155)),
+                          border: Border.all(color: const Color(0x5555c7a064)),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -1031,9 +981,9 @@ class _InvoicePageState extends State<InvoicePage>
                         width: 65,
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A),
+                          color: const Color(0xFF0C0E14),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF334155)),
+                          border: Border.all(color: const Color(0x5555c7a064)),
                         ),
                         child: Text(
                           _money(line.unitPrice),
@@ -1072,9 +1022,9 @@ class _InvoicePageState extends State<InvoicePage>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: const BoxDecoration(
-              color: Color(0xFF0F172A),
+              color: Color(0xFF0C0E14),
               borderRadius: BorderRadius.vertical(bottom: Radius.circular(13)),
-              border: Border(top: BorderSide(color: Color(0xFF334155))),
+              border: Border(top: BorderSide(color: Color(0x5555c7a064))),
             ),
             child: Row(
               children: [
@@ -1117,9 +1067,9 @@ class _InvoicePageState extends State<InvoicePage>
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
+                color: const Color(0xFF161622),
                 shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF334155)),
+                border: Border.all(color: const Color(0x5555c7a064)),
               ),
               child: Icon(icon, size: 48, color: const Color(0xFF64748B)),
             ),
@@ -1150,12 +1100,12 @@ class _InvoicePageState extends State<InvoicePage>
       icon: const Icon(
         Icons.add_circle_outline_rounded,
         size: 18,
-        color: Color(0xFFC5A059),
+        color: Color(0xFFC7A064),
       ),
       label: const Text(
         'إضافة بند يدوي مخصص للفاتورة',
         style: TextStyle(
-          color: Color(0xFFC5A059),
+          color: Color(0xFFC7A064),
           fontWeight: FontWeight.bold,
           fontSize: 13,
         ),
@@ -1179,8 +1129,8 @@ class _InvoicePageState extends State<InvoicePage>
 
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF1E293B),
-        border: Border(top: BorderSide(color: Color(0xFF334155), width: 1.5)),
+        color: Color(0xFF161622),
+        border: Border(top: BorderSide(color: Color(0x5555c7a064), width: 1.5)),
         boxShadow: [
           BoxShadow(
             color: Colors.black38,
@@ -1234,9 +1184,9 @@ class _InvoicePageState extends State<InvoicePage>
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0F172A),
+                        color: const Color(0xFF0C0E14),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFF334155)),
+                        border: Border.all(color: const Color(0x5555c7a064)),
                       ),
                       child: Column(
                         children: [
@@ -1339,7 +1289,7 @@ class _InvoicePageState extends State<InvoicePage>
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
+                    color: const Color(0xFF0C0E14),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -1355,7 +1305,7 @@ class _InvoicePageState extends State<InvoicePage>
                       Text(
                         '${_money(combinedTotal)} ج.م',
                         style: const TextStyle(
-                          color: Color(0xFFC5A059),
+                          color: Color(0xFFC7A064),
                           fontWeight: FontWeight.w900,
                           fontSize: 12,
                         ),
@@ -1384,7 +1334,7 @@ class _InvoicePageState extends State<InvoicePage>
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF1E293B),
+      backgroundColor: const Color(0xFF161622),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -1438,9 +1388,9 @@ class _InvoicePageState extends State<InvoicePage>
                         horizontal: 20,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0F172A),
+                        color: const Color(0xFF0C0E14),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFC5A059)),
+                        border: Border.all(color: const Color(0xFFC7A064)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -1448,7 +1398,7 @@ class _InvoicePageState extends State<InvoicePage>
                           Text(
                             _arNum(controller.text),
                             style: const TextStyle(
-                              color: Color(0xFFC5A059),
+                              color: Color(0xFFC7A064),
                               fontSize: 32,
                               fontWeight: FontWeight.w900,
                             ),
@@ -1517,7 +1467,7 @@ class _InvoicePageState extends State<InvoicePage>
                       textAlign: TextAlign.center,
                       decoration: InputDecoration(
                         filled: true,
-                        fillColor: const Color(0xFF0F172A),
+                        fillColor: const Color(0xFF0C0E14),
                         hintText: 'أو اكتب القيمة مباشرة',
                         hintStyle: const TextStyle(
                           color: Color(0xFF64748B),
@@ -1526,7 +1476,7 @@ class _InvoicePageState extends State<InvoicePage>
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: const BorderSide(
-                            color: Color(0xFF334155),
+                            color: Color(0x5555c7a064),
                           ),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
@@ -1564,8 +1514,8 @@ class _InvoicePageState extends State<InvoicePage>
                               Navigator.pop(ctx);
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFC5A059),
-                              foregroundColor: const Color(0xFF0F172A),
+                              backgroundColor: const Color(0xFFC7A064),
+                              foregroundColor: const Color(0xFF0C0E14),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
@@ -1604,19 +1554,19 @@ class _InvoicePageState extends State<InvoicePage>
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: isPositive
-              ? const Color(0xFFC5A059).withValues(alpha: 0.18)
-              : const Color(0xFF0F172A),
+              ? const Color(0xFFC7A064).withValues(alpha: 0.18)
+              : const Color(0xFF0C0E14),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isPositive
-                ? const Color(0xFFC5A059)
-                : const Color(0xFF334155),
+                ? const Color(0xFFC7A064)
+                : const Color(0x5555c7a064),
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isPositive ? const Color(0xFFC5A059) : Colors.white,
+            color: isPositive ? const Color(0xFFC7A064) : Colors.white,
             fontWeight: FontWeight.w900,
             fontSize: 12,
           ),
@@ -1642,7 +1592,7 @@ class _InvoicePageState extends State<InvoicePage>
         return Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            backgroundColor: const Color(0xFF1E293B),
+            backgroundColor: const Color(0xFF161622),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -1674,7 +1624,7 @@ class _InvoicePageState extends State<InvoicePage>
               textAlign: TextAlign.center,
               decoration: InputDecoration(
                 filled: true,
-                fillColor: const Color(0xFF0F172A),
+                fillColor: const Color(0xFF0C0E14),
                 hintText: 'مثال: ٥٠٠٠',
                 hintStyle: const TextStyle(
                   color: Color(0xFF64748B),
@@ -1687,7 +1637,7 @@ class _InvoicePageState extends State<InvoicePage>
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF334155)),
+                  borderSide: const BorderSide(color: Color(0x5555c7a064)),
                 ),
               ),
             ),
@@ -1735,7 +1685,7 @@ class _InvoicePageState extends State<InvoicePage>
         return Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            backgroundColor: const Color(0xFF1E293B),
+            backgroundColor: const Color(0xFF161622),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -1840,8 +1790,8 @@ class _InvoicePageState extends State<InvoicePage>
                   Navigator.pop(ctx);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFC5A059),
-                  foregroundColor: const Color(0xFF0F172A),
+                  backgroundColor: const Color(0xFFC7A064),
+                  foregroundColor: const Color(0xFF0C0E14),
                 ),
                 child: const Text(
                   'إضافة البند',
@@ -1864,7 +1814,7 @@ class _InvoicePageState extends State<InvoicePage>
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF1E293B),
+      backgroundColor: const Color(0xFF161622),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -1889,7 +1839,7 @@ class _InvoicePageState extends State<InvoicePage>
                     const SizedBox(height: 12),
                     Row(
                       children: const [
-                        Icon(Icons.tune_rounded, color: Color(0xFFC5A059)),
+                        Icon(Icons.tune_rounded, color: Color(0xFFC7A064)),
                         SizedBox(width: 8),
                         Text(
                           'تعديل قائمة الأسعار الافتراضية',
@@ -1905,8 +1855,10 @@ class _InvoicePageState extends State<InvoicePage>
                     Expanded(
                       child: ListView.separated(
                         itemCount: kPriceDefs.length,
-                        separatorBuilder: (_, _) =>
-                            const Divider(color: Color(0xFF334155), height: 1),
+                        separatorBuilder: (_, _) => const Divider(
+                          color: Color(0x5555c7a064),
+                          height: 1,
+                        ),
                         itemBuilder: (_, i) {
                           final def = kPriceDefs[i];
                           final current = localCopy[def.key] ?? def.value;
@@ -1932,16 +1884,16 @@ class _InvoicePageState extends State<InvoicePage>
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0F172A),
+                                color: const Color(0xFF0C0E14),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: const Color(0xFF334155),
+                                  color: const Color(0x5555c7a064),
                                 ),
                               ),
                               child: Text(
                                 '${_money(current)} ج',
                                 style: const TextStyle(
-                                  color: Color(0xFFC5A059),
+                                  color: Color(0xFFC7A064),
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -1985,8 +1937,8 @@ class _InvoicePageState extends State<InvoicePage>
                               Navigator.pop(ctx);
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFC5A059),
-                              foregroundColor: const Color(0xFF0F172A),
+                              backgroundColor: const Color(0xFFC7A064),
+                              foregroundColor: const Color(0xFF0C0E14),
                             ),
                             child: const Text(
                               'تطبيق الأسعار الجديدة',
@@ -2072,7 +2024,7 @@ class _InvoicePageState extends State<InvoicePage>
           textAlign: TextAlign.center,
           style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold),
         ),
-        backgroundColor: Color(0xFFC5A059),
+        backgroundColor: Color(0xFFC7A064),
         duration: Duration(seconds: 3),
       ),
     );

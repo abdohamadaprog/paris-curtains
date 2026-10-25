@@ -128,13 +128,12 @@ class _ParisClientMeasurementsPageState
       totalWheels += (c.heavyWheels + c.lightWheels);
     }
 
-    return WillPopScope(
-      onWillPop: () async {
-        if (_expandedId != null) {
+    return PopScope(
+      canPop: _expandedId == null,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _expandedId != null) {
           _closeCard();
-          return false;
         }
-        return true;
       },
       child: Scaffold(
         backgroundColor: _bg,
@@ -249,17 +248,15 @@ class _ParisClientMeasurementsPageState
                     child: ReorderableListView.builder(
                       padding: const EdgeInsets.fromLTRB(10, 2, 10, 16),
                       itemCount: _measurements.length + _balconies.length,
-                      onReorder: (oldIndex, newIndex) {
+                      onReorderItem: (oldIndex, newIndex) {
+                        // onReorderItem يمرر فهرس الوجهة النهائي بعد النقل،
+                        // لذلك لا نحتاج إلى إنقاص newIndex كما في onReorder.
                         if (oldIndex >= _measurements.length ||
-                            newIndex > _measurements.length) {
+                            newIndex < 0 ||
+                            newIndex >= _measurements.length) {
                           return;
                         }
                         setState(() {
-                          if (newIndex > oldIndex) newIndex--;
-                          if (newIndex < 0 ||
-                              newIndex >= _measurements.length) {
-                            return;
-                          }
                           final item = _measurements.removeAt(oldIndex);
                           _measurements.insert(newIndex, item);
                         });

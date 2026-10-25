@@ -27,13 +27,9 @@ class _ClientsListPageState extends State<ClientsListPage>
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String _search = '';
-  int _sortMode = 0; // 0 موعد التركيب • 1 الأحدث تسجيلاً • 2 الأقدم تسجيلاً • 3 الاسم
+  int _sortMode =
+      0; // 0 موعد التركيب • 1 الأحدث تسجيلاً • 2 الأقدم تسجيلاً • 3 الاسم
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _allDocs = const [];
-
-
-
-
-
 
   @override
   void initState() {
@@ -48,26 +44,6 @@ class _ClientsListPageState extends State<ClientsListPage>
     _searchFocusNode.dispose();
     super.dispose();
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  // بتتنادى من ملفات الـ extensions بدل setState مباشرة
-  void _rebuild(VoidCallback fn) => setState(fn);
 
   @override
   Widget build(BuildContext context) {
@@ -189,33 +165,33 @@ class _ClientsListPageState extends State<ClientsListPage>
                 children: [
                   Expanded(
                     child: TextField(
-                focusNode: _searchFocusNode,
-                controller: _searchController,
-                onChanged: (value) =>
-                    setState(() => _search = value.trim().toLowerCase()),
-                style: TextStyle(color: textColor),
-                decoration:
-                    _inputDecoration(
-                      'بحث عن عميل بالاسم أو الهاتف أو العنوان',
-                    ).copyWith(
-                      prefixIcon: const Icon(
-                        Icons.search_rounded,
-                        color: _gold,
-                      ),
-                      suffixIcon: _search.isEmpty
-                          ? null
-                          : IconButton(
-                              tooltip: 'مسح البحث',
-                              icon: Icon(
-                                Icons.close_rounded,
-                                color: _mutedText(context),
-                              ),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() => _search = '');
-                              },
+                      focusNode: _searchFocusNode,
+                      controller: _searchController,
+                      onChanged: (value) =>
+                          setState(() => _search = value.trim().toLowerCase()),
+                      style: TextStyle(color: textColor),
+                      decoration:
+                          _inputDecoration(
+                            'بحث عن عميل بالاسم أو الهاتف أو العنوان',
+                          ).copyWith(
+                            prefixIcon: const Icon(
+                              Icons.search_rounded,
+                              color: _gold,
                             ),
-                    ),
+                            suffixIcon: _search.isEmpty
+                                ? null
+                                : IconButton(
+                                    tooltip: 'مسح البحث',
+                                    icon: Icon(
+                                      Icons.close_rounded,
+                                      color: _mutedText(context),
+                                    ),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() => _search = '');
+                                    },
+                                  ),
+                          ),
                     ),
                   ),
                   PopupMenuButton<int>(
@@ -364,6 +340,4 @@ class _ClientsListPageState extends State<ClientsListPage>
       ),
     );
   }
-
-
 }

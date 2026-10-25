@@ -208,7 +208,7 @@ class _Balcony {
         .split('+')
         .fold<double>(
           0.0,
-          (sum, part) => sum + (double.tryParse(part.trim()) ?? 0.0),
+          (total, part) => total + (double.tryParse(part.trim()) ?? 0.0),
         );
   }
 

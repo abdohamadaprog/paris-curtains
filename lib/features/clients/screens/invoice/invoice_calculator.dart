@@ -78,6 +78,10 @@ const List<PriceDef> kPriceDefs = [
   PriceDef('balc_tape', 'شريط كبس (بلكونة)', 'متر', 15),
   PriceDef('balc_avez', 'أفيز', 'قطعة', 20),
   PriceDef('balc_sew', 'خياطة بلكونة', 'متر', 30),
+  // بنود يدوية ثابتة الظهور، وسعرها يحدده المستخدم داخل الفاتورة.
+  PriceDef('kobsha', 'كوبشة', 'بند', 0),
+  PriceDef('transport', 'موصلات ونقل', 'بند', 0),
+  PriceDef('balc_install', 'تركيب بلكونة', 'بند', 0),
 ];
 
 Map<String, double> defaultPrices() => {
@@ -246,22 +250,21 @@ ApartmentInvoice calculateApartmentInvoice({
     final wM = w.width;
 
     if (type == 'wave') {
+      // الويفي العادي: الواجهة الأمامية ويفي، والخلفية كسرات عادية؛
+      // لذلك المسار والحامل والشريط الويفي تُحسب للواجهة فقط.
       if (w.hasLight) rawLinen += wM * 2.0;
       if (w.hasHeavy) rawVelvet += wM * 3.0;
-
-      final trackCount = (w.hasLight && w.hasHeavy) ? 2 : 1;
-      final m = wM * trackCount;
-      trackMeters += m;
-      waveHolders += (wM * 2 * trackCount).round();
-      waveTapeMeters += m;
+      trackMeters += wM;
+      waveHolders += 3;
+      waveTapeMeters += wM;
     } else if (type == 'double_wave') {
+      // الدابل ويفي: الطبقتان ويفي، واستهلاك القماش 3 أضعاف لكل نوع موجود.
       if (w.hasLight) rawLinen += wM * 3.0;
       if (w.hasHeavy) rawVelvet += wM * 3.0;
-
       final trackCount = (w.hasLight && w.hasHeavy) ? 2 : 1;
       final m = wM * trackCount;
       trackMeters += m;
-      doubleHolders += (wM * 2 * trackCount).round();
+      doubleHolders += 3 * trackCount;
       waveTapeMeters += m;
     } else if (type == 'press') {
       if (w.hasLight) rawLinen += wM * 2.0;
@@ -269,9 +272,11 @@ ApartmentInvoice calculateApartmentInvoice({
 
       final pipeCount = (w.hasLight && w.hasHeavy) ? 2 : 1;
       pressPipeMeters += wM * pipeCount;
-      cantilevers += 2 * pipeCount;
+      cantilevers += wM > 3 ? 3 : 2;
       qamqams += 2 * pipeCount;
-      pressTapeMeters += wM * pipeCount;
+      // شريط الكبس يتبع استهلاك القماش الفعلي، لا عدد المواسير فقط.
+      if (w.hasHeavy) pressTapeMeters += wM * 2.5;
+      if (w.hasLight) pressTapeMeters += wM * 2.0;
     }
   }
 
@@ -279,7 +284,7 @@ ApartmentInvoice calculateApartmentInvoice({
   final finalVelvet = ceilMeters(rawVelvet).toDouble();
 
   final ringsPerM = prices['rings_per_m_apartment'] ?? 7;
-  final totalRings = (pressTapeMeters * ringsPerM).round();
+  final totalRings = ceilMeters(pressTapeMeters * ringsPerM);
   final singleRingPrice = prices['ring_unit'] ?? 3.5;
   final ringDrillPrice = prices['press_drill'] ?? 1.5;
 
@@ -468,6 +473,28 @@ ApartmentInvoice calculateApartmentInvoice({
     );
   }
 
+  // البنود اليدوية لا تختفي حتى لو كميتها أو سعرها صفر.
+  accLines.add(
+    InvoiceLine(
+      key: 'kobsha',
+      label: 'كوبشة',
+      unit: 'بند',
+      qty: 1,
+      unitPrice: prices['kobsha'] ?? 0,
+      note: 'السعر يدوي (100 / 200 / 300)',
+    ),
+  );
+  accLines.add(
+    InvoiceLine(
+      key: 'transport',
+      label: 'موصلات ونقل',
+      unit: 'بند',
+      qty: 1,
+      unitPrice: prices['transport'] ?? 0,
+      note: 'حسب الاتفاق',
+    ),
+  );
+
   return ApartmentInvoice(fabricLines: fabricLines, accessoryLines: accLines);
 }
 
@@ -482,7 +509,10 @@ BalconyInvoice calculateBalconyInvoice({
   final active = balconies.where((b) => b.enabled && b.width > 0).toList();
 
   final totalWidth = active.fold(0.0, (s, b) => s + b.width);
-  final totalAvez = active.fold(0, (s, b) => s + b.avezCount);
+  final totalAvez = active.fold<int>(
+    0,
+    (s, b) => s + (b.avezCount > 0 ? b.avezCount : (b.width > 3 ? 3 : 2)),
+  );
 
   final fabricMeters = roundMoney(totalWidth * 1.5);
 
@@ -490,7 +520,7 @@ BalconyInvoice calculateBalconyInvoice({
   final fabricPrice = prices[fabricKey] ?? 100;
 
   final ringsPerM = prices['rings_per_m_balcony'] ?? 6;
-  final totalRings = (fabricMeters * ringsPerM).round();
+  final totalRings = ceilMeters(fabricMeters * ringsPerM);
   final singleRingPrice = prices['ring_unit'] ?? 3.5;
   final ringDrillPrice = prices['press_drill'] ?? 1.5;
 
@@ -573,6 +603,18 @@ BalconyInvoice calculateBalconyInvoice({
       ),
     );
   }
+
+  // بند تركيب البلكونة يظل ظاهرًا حتى يحدد المستخدم سعره.
+  accLines.add(
+    InvoiceLine(
+      key: 'balc_install',
+      label: 'تركيب بلكونة',
+      unit: 'بند',
+      qty: 1,
+      unitPrice: prices['balc_install'] ?? 0,
+      note: 'السعر يدوي (100 / 200 / 300)',
+    ),
+  );
 
   return BalconyInvoice(fabricLines: fabricLines, accessoryLines: accLines);
 }

@@ -1,55 +1,110 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:paris_curtian_app/features/clients/screens/invoice/invoice_calculator.dart';
 
-double _sum(List<AutoLine> lines, Map<String, double> p) =>
-    lines.fold(0.0, (a, l) => a + l.qty * (p[l.priceKey] ?? 0));
+double _sum(List<InvoiceLine> lines) =>
+    lines.fold(0.0, (total, line) => total + line.total);
 
-AutoLine _line(InvoiceAuto r, String key) =>
-    [...r.fabric, ...r.accessories].firstWhere((l) => l.key == key);
+InvoiceLine _line(ApartmentInvoice invoice, String key) => [
+  ...invoice.fabricLines,
+  ...invoice.accessoryLines,
+].firstWhere((line) => line.key == key);
+
+InvoiceLine _balconyLine(BalconyInvoice invoice, String key) => [
+  ...invoice.fabricLines,
+  ...invoice.accessoryLines,
+].firstWhere((line) => line.key == key);
 
 void main() {
-  test('شقة: 6 شبابيك 10.5م ويفي بكتان = 14,995 (الكوبشة 250)', () {
-    final p = defaultPrices()..['kobsha'] = 250;
-    final ws = List.generate(6, (_) => const WindowSpec(1.75, 'wave', true));
-    final r = calcApartment(ws, p);
-    expect(_sum(r.fabric, p), 7530);
-    expect(_sum(r.accessories, p), 7465);
-    expect(_line(r, 'linen').qty, 21);
-    expect(_line(r, 'velvet').qty, 32);
-    expect(_line(r, 'holder_wave').qty, 21);
-    expect(_line(r, 'install').qty, 6);
+  test('شقة: 6 شبابيك بعرض إجمالي 10.5م بنظام ويفي', () {
+    final windows = List.generate(
+      6,
+      (index) => WindowSpec(
+        title: 'شباك ${index + 1}',
+        width: 1.75,
+        height: 2.8,
+        curtainType: 'wave',
+        hasHeavy: true,
+        hasLight: true,
+      ),
+    );
+
+    final invoice = calculateApartmentInvoice(windows: windows);
+
+    expect(_sum(invoice.fabricLines), 7530);
+    expect(_line(invoice, 'fabric_linen').qty, 21);
+    expect(_line(invoice, 'fabric_velvet').qty, 32);
+    expect(_line(invoice, 'track').qty, 21);
+    expect(_line(invoice, 'holder_wave').qty, 42);
+    expect(_line(invoice, 'install_window').qty, 6);
+    expect(_sum(invoice.accessoryLines), 7230);
+    expect(invoice.grandTotal, 14760);
   });
 
   test('شقة مختلطة: ويفي + دابل ويفي + كبس', () {
-    final p = defaultPrices()..['kobsha'] = 200;
-    final ws = [
-      const WindowSpec(3.0, 'wave', true),
-      const WindowSpec(2.0, 'doubleWave', true),
-      const WindowSpec(2.5, 'press', true),
-      const WindowSpec(1.0, 'press', false),
+    const windows = [
+      WindowSpec(
+        title: 'ويفي',
+        width: 3,
+        height: 2.8,
+        curtainType: 'wave',
+        hasHeavy: true,
+        hasLight: true,
+      ),
+      WindowSpec(
+        title: 'دابل ويفي',
+        width: 2,
+        height: 2.8,
+        curtainType: 'double_wave',
+        hasHeavy: true,
+        hasLight: true,
+      ),
+      WindowSpec(
+        title: 'كبس ثقيل وخفيف',
+        width: 2.5,
+        height: 2.8,
+        curtainType: 'press',
+        hasHeavy: true,
+        hasLight: true,
+      ),
+      WindowSpec(
+        title: 'كبس خفيف',
+        width: 1,
+        height: 2.8,
+        curtainType: 'press',
+        hasHeavy: false,
+        hasLight: true,
+      ),
     ];
-    final r = calcApartment(ws, p);
-    expect(_sum(r.fabric, p), 5810);
-    expect(_sum(r.accessories, p), 6210); // 5740 + كابولي 4×50 + قمقم 6×45
-    expect(_line(r, 'rings').qty, 98);
-    expect(_line(r, 'cantilever').qty, 4);
-    expect(_line(r, 'holder_double').qty, 4);
+
+    final invoice = calculateApartmentInvoice(windows: windows);
+
+    expect(_sum(invoice.fabricLines), 5770);
+    expect(_line(invoice, 'fabric_linen').qty, 19);
+    expect(_line(invoice, 'fabric_velvet').qty, 22);
+    expect(_line(invoice, 'holder_wave').qty, 12);
+    expect(_line(invoice, 'holder_double').qty, 8);
+    expect(_line(invoice, 'ring_unit').qty, 42);
+    expect(_line(invoice, 'cantilever_forgia').qty, 6);
+    expect(_sum(invoice.accessoryLines), 5395);
+    expect(invoice.grandTotal, 11165);
   });
 
-  test('بلكونة 3+1+1 دك', () {
-    final p = defaultPrices();
-    final r = calcBalcony(
-      [
-        const BalconySpec([3, 1, 1]),
-      ],
-      'fabric_dak',
-      p,
+  test('بلكونة: عرض إجمالي 5م وقماش دك', () {
+    const balconies = [
+      BalconySpec(title: 'بلكونة', width: 5, height: 2.5, avezCount: 6),
+    ];
+
+    final invoice = calculateBalconyInvoice(
+      balconies: balconies,
+      fabricKey: 'fabric_dak',
     );
-    expect(_line(r, 'balc_fabric').qty, 7.5);
-    expect(_sum(r.fabric, p), 750);
-    expect(_sum(r.accessories, p), 1032.5);
-    expect(_line(r, 'balc_rings').qty, 45);
-    expect(_line(r, 'balc_avez').qty, 6);
+
+    expect(_balconyLine(invoice, 'fabric_dak').qty, 7.5);
+    expect(_sum(invoice.fabricLines), 750);
+    expect(_sum(invoice.accessoryLines), 1032.5);
+    expect(_balconyLine(invoice, 'ring_unit').qty, 45);
+    expect(_balconyLine(invoice, 'balc_avez').qty, 6);
+    expect(invoice.grandTotal, 1782.5);
   });
 
   test('تقريب الأمتار لا يتأثر بأخطاء الفاصلة', () {
