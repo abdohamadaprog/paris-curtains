@@ -16,35 +16,23 @@ const Color _borderGold = Color(0x55C7A064);
 const Color _success = Color(0xFF4ADE80);
 const Color _danger = Color(0xFFFF5252);
 
-/// بنود أسعار تتطلب إدخال يدوي إذا لزم
-const List<PriceDef> _manualPriceDefs = [
-  PriceDef('kobsha', 'كوبشة', 'قطعة', 0),
-  PriceDef('transport', 'موصلات ونقل', 'مرة', 0),
-  PriceDef('balc_install', 'تركيب بلكونة', 'بلكونة', 0),
-];
+/// كلاس مخصص لتوافق تام مع كل إصدارات دارت وفلاتر القديمة والجديدة
+class _InvoiceTotals {
+  final double fabric;
+  final double acc;
+  const _InvoiceTotals({required this.fabric, required this.acc});
+}
 
 /// تحويل الأرقام إلى أرقام عربية مشرقية (٠١٢٣٤٥٦٧٨٩)
 String _ar(String s) =>
     s.replaceAllMapped(RegExp(r'[0-9]'), (m) => '٠١٢٣٤٥٦٧٨٩'[int.parse(m[0]!)]);
 
 String _money(double v) {
+  if (v.isNaN || v.isInfinite) return '٠';
   final r = roundMoney(v);
   final f = NumberFormat(r == r.roundToDouble() ? '#,##0' : '#,##0.00', 'en');
   return _ar(f.format(r));
 }
-
-String _qtyText(double v) {
-  final s = v == v.roundToDouble()
-      ? v.toInt().toString()
-      : v
-            .toStringAsFixed(2)
-            .replaceAll(RegExp(r'0+$'), '')
-            .replaceAll(RegExp(r'\.$'), '');
-  return _ar(s);
-}
-
-double _toDouble(dynamic v) =>
-    v is num ? v.toDouble() : parseNumber('${v ?? ''}');
 
 class _Custom {
   static int _next = 0;
@@ -90,14 +78,13 @@ class InvoicePage extends StatefulWidget {
 
 class _InvoicePageState extends State<InvoicePage> {
   bool _loading = true;
-  String? _error;
   bool _balconyTab = false;
   bool _dirty = false;
   bool _saving = false;
 
   // خيارات الفاتورة المعتمدة
-  bool _includeFabric = false; // القماش اختياري - الاستندر مصنعية وإكسسوار
-  bool _includeBalcony = false; // إضافة البلكونة للفاتورة
+  bool _includeFabric = false;
+  bool _includeBalcony = false;
   double _depositPaid = 0.0; // العربون المدفوع (مقدم)
 
   Map<String, double> _globalDefaults = defaultPrices();
@@ -125,11 +112,9 @@ class _InvoicePageState extends State<InvoicePage> {
 
   // ============================ جلب البيانات ============================
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    setState(() => _loading = true);
 
+    // 1. محاولة جلب أسعار السيرفر الافتراضية بأمان (بدون تعطيل الصفحة لو فشلت)
     try {
       final docGlobal = await FirebaseFirestore.instance
           .collection('settings')
@@ -138,83 +123,92 @@ class _InvoicePageState extends State<InvoicePage> {
       if (docGlobal.exists && docGlobal.data() != null) {
         final m = docGlobal.data()!;
         _globalDefaults = {
-          for (final d in kPriceDefs) d.key: _toDouble(m[d.key] ?? d.value),
+          for (final d in kPriceDefs) d.key: parseNumber(m[d.key] ?? d.value),
         };
       }
+    } catch (_) {
+      // الاعتماد على الأسعار الافتراضية
+    }
 
-      final doc = await FirebaseFirestore.instance
-          .collection('clients')
-          .doc(widget.clientId)
-          .get();
-      final data = doc.data() ?? {};
+    _prices = {..._globalDefaults};
 
-      final rawWindows = (data['measurements'] as List<dynamic>?) ?? [];
-      _windows = [
-        for (final m in rawWindows)
-          if (m is Map && WindowSpec.fromMap(m) != null) WindowSpec.fromMap(m)!,
-      ];
+    // 2. جلب بيانات العميل
+    try {
+      if (widget.clientId.trim().isNotEmpty) {
+        final doc = await FirebaseFirestore.instance
+            .collection('clients')
+            .doc(widget.clientId)
+            .get();
+        final data = doc.data() ?? {};
 
-      final rawBalc = (data['balconies'] as List<dynamic>?) ?? [];
-      _balconies = [
-        for (final m in rawBalc)
-          if (m is Map && BalconySpec.fromMap(m) != null)
-            BalconySpec.fromMap(m)!,
-      ];
+        final rawWindows = (data['measurements'] as List<dynamic>?) ?? [];
+        _windows = [
+          for (final m in rawWindows)
+            if (m is Map && WindowSpec.fromMap(m) != null)
+              WindowSpec.fromMap(m)!,
+        ];
 
-      _prices = {..._globalDefaults};
+        final rawBalc = (data['balconies'] as List<dynamic>?) ?? [];
+        _balconies = [
+          for (final m in rawBalc)
+            if (m is Map && BalconySpec.fromMap(m) != null)
+              BalconySpec.fromMap(m)!,
+        ];
 
-      final inv = data['invoice'];
-      if (inv is Map) {
-        _includeFabric = inv['include_fabric'] == true;
-        _includeBalcony = inv['include_balcony'] == true;
-        _depositPaid = _toDouble(inv['deposit_paid']);
-        _depositController.text = _depositPaid > 0 ? '$_depositPaid' : '';
+        final inv = data['invoice'];
+        if (inv is Map) {
+          _includeFabric = inv['include_fabric'] == true;
+          _includeBalcony = inv['include_balcony'] == true;
+          _depositPaid = parseNumber(inv['deposit_paid']);
+          _depositController.text = _depositPaid > 0 ? '$_depositPaid' : '';
 
-        final p = inv['prices'];
-        if (p is Map) {
-          for (final e in p.entries) {
-            _prices['${e.key}'] = _toDouble(e.value);
+          final p = inv['prices'];
+          if (p is Map) {
+            for (final e in p.entries) {
+              _prices['${e.key}'] = parseNumber(e.value);
+            }
           }
-        }
-        final q = inv['qty_overrides'];
-        if (q is Map) {
-          for (final e in q.entries) {
-            _qtyOverride['${e.key}'] = _toDouble(e.value);
+          final q = inv['qty_overrides'];
+          if (q is Map) {
+            for (final e in q.entries) {
+              _qtyOverride['${e.key}'] = parseNumber(e.value);
+            }
           }
-        }
-        final bf = inv['balcony_fabric'];
-        if (bf is String && kBalconyFabrics.containsKey(bf)) {
-          _balconyFabric = bf;
-        }
-        final cust = inv['custom'];
-        if (cust is List) {
-          _custom.clear();
-          for (final c in cust) {
-            if (c is Map) {
-              _custom.add(
-                _Custom(
-                  name: '${c['name'] ?? ''}',
-                  qty: _toDouble(c['qty']),
-                  price: _toDouble(c['price']),
-                  balcony: c['balcony'] == true,
-                ),
-              );
+          final bf = inv['balcony_fabric'];
+          if (bf is String && kBalconyFabrics.containsKey(bf)) {
+            _balconyFabric = bf;
+          }
+          final cust = inv['custom'];
+          if (cust is List) {
+            _custom.clear();
+            for (final c in cust) {
+              if (c is Map) {
+                _custom.add(
+                  _Custom(
+                    name: '${c['name'] ?? ''}',
+                    qty: parseNumber(c['qty']),
+                    price: parseNumber(c['price']),
+                    balcony: c['balcony'] == true,
+                  ),
+                );
+              }
             }
           }
         }
       }
-
-      setState(() => _loading = false);
     } catch (e) {
-      setState(() {
-        _loading = false;
-        _error = 'حدث خطأ أثناء تحميل الفاتورة: $e';
-      });
+      debugPrint('Error loading invoice: $e');
+      _snack('تنبيه: تم فتح الفاتورة بالبيانات الافتراضية');
+    }
+
+    if (mounted) {
+      setState(() => _loading = false);
     }
   }
 
   // ============================ حفظ الفاتورة ============================
   Future<bool> _save() async {
+    if (widget.clientId.trim().isEmpty) return false;
     setState(() => _saving = true);
     try {
       final aptTotals = _totalsFor(false);
@@ -232,7 +226,7 @@ class _InvoicePageState extends State<InvoicePage> {
       await FirebaseFirestore.instance
           .collection('clients')
           .doc(widget.clientId)
-          .update({
+          .set({
             'invoice': {
               'prices': _prices,
               'qty_overrides': _qtyOverride,
@@ -252,16 +246,18 @@ class _InvoicePageState extends State<InvoicePage> {
             'totalCost': roundMoney(totalBill),
             'depositPaid': roundMoney(_depositPaid),
             'remainingBalance': roundMoney(remaining),
-          });
+          }, SetOptions(merge: true));
 
-      setState(() {
-        _dirty = false;
-        _saving = false;
-      });
-      _snack('تم حفظ الفاتورة بنجاح');
+      if (mounted) {
+        setState(() {
+          _dirty = false;
+          _saving = false;
+        });
+      }
+      _snack('تم حفظ الفاتورة بنجاح ✨');
       return true;
     } catch (e) {
-      setState(() => _saving = false);
+      if (mounted) setState(() => _saving = false);
       _snack('تعذر الحفظ: $e');
       return false;
     }
@@ -292,7 +288,7 @@ class _InvoicePageState extends State<InvoicePage> {
     return _qtyOf(l) > 0;
   }
 
-  ({double fabric, double acc}) _totalsFor(bool balcony) {
+  _InvoiceTotals _totalsFor(bool balcony) {
     final auto = _autoFor(balcony);
     var f = 0.0, a = 0.0;
     for (final l in auto.fabric) {
@@ -304,7 +300,7 @@ class _InvoicePageState extends State<InvoicePage> {
     for (final c in _custom.where((c) => c.balcony == balcony)) {
       a += roundMoney(c.qty * c.price);
     }
-    return (fabric: roundMoney(f), acc: roundMoney(a));
+    return _InvoiceTotals(fabric: roundMoney(f), acc: roundMoney(a));
   }
 
   void _touch(VoidCallback fn) {
@@ -339,8 +335,7 @@ class _InvoicePageState extends State<InvoicePage> {
         : 0.0;
 
     final buffer = StringBuffer();
-    buffer.writeln('✨ *فاتورة حساب معتمدة — باريس للستاير* ✨');
-    buffer.writeln('م/ عبدالرحمن حمادة · هاتف: 01012345678');
+    buffer.writeln('✨ *فاتورة حساب معتمدة — ستائر باريس* ✨');
     buffer.writeln('━━━━━━━━━━━━━━━━━━━━━');
     buffer.writeln('👤 *العميل:* ${widget.clientName}');
     if ((widget.phone ?? '').isNotEmpty) {
@@ -361,7 +356,7 @@ class _InvoicePageState extends State<InvoicePage> {
 
     if (_includeFabric) {
       buffer.writeln('━━━━━━━━━━━━━━━━━━━━━');
-      buffer.writeln('🧵 *أقمشة الستائر (مشمولة بالفاتورة):*');
+      buffer.writeln('🧵 *أقمشة الستائر:*');
       buffer.writeln('• إجمالي الأقمشة: ${_money(aptTotals.fabric)} ج.م');
     } else {
       buffer.writeln(
@@ -377,7 +372,7 @@ class _InvoicePageState extends State<InvoicePage> {
     }
 
     buffer.writeln('━━━━━━━━━━━━━━━━━━━━━');
-    buffer.writeln('💰 *إجمالي الحساب:* ${_money(totalBill)} ج.م');
+    buffer.writeln('💰 *إجمالي الحساب المطلوب:* ${_money(totalBill)} ج.م');
     if (_depositPaid > 0) {
       buffer.writeln('✅ *تم دفع عربون:* ${_money(_depositPaid)} ج.م');
     }
@@ -385,9 +380,7 @@ class _InvoicePageState extends State<InvoicePage> {
       '🔥 *المتبقي عند الاستلام والتركيب:* ${_money(remaining)} ج.م',
     );
     buffer.writeln('━━━━━━━━━━━━━━━━━━━━━');
-    buffer.writeln(
-      '📜 *الضمان:* ضمان شامل 3 سنوات على التراكات والإكسسوارات الصامتة.',
-    );
+    buffer.writeln('📜 *الضمان:* ضمان شامل 3 سنوات على التراكات والإكسسوارات.');
 
     final phoneClean = (widget.phone ?? '').replaceAll(RegExp(r'\D'), '');
     final uri = Uri.parse(
@@ -418,7 +411,7 @@ class _InvoicePageState extends State<InvoicePage> {
         ),
         actions: [
           IconButton(
-            tooltip: 'إعدادات الأسعار الافتراضية',
+            tooltip: 'إعدادات الأسعار',
             icon: const Icon(Icons.tune_rounded, color: _gold),
             onPressed: _openPrices,
           ),
@@ -428,7 +421,7 @@ class _InvoicePageState extends State<InvoicePage> {
             onPressed: _shareOnWhatsApp,
           ),
           IconButton(
-            tooltip: 'حفظ',
+            tooltip: 'حفظ الفاتورة',
             icon: _saving
                 ? const SizedBox(
                     width: 20,
@@ -448,17 +441,6 @@ class _InvoicePageState extends State<InvoicePage> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: _gold))
-          : (_error != null)
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Text(
-                  _error!,
-                  style: const TextStyle(color: _danger),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            )
           : _content(),
     );
   }
@@ -657,10 +639,7 @@ class _InvoicePageState extends State<InvoicePage> {
     );
   }
 
-  Widget _configBar(
-    ({double fabric, double acc}) apt,
-    ({double fabric, double acc}) bal,
-  ) {
+  Widget _configBar(_InvoiceTotals apt, _InvoiceTotals bal) {
     return Container(
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1272,7 +1251,7 @@ class _InvoicePageState extends State<InvoicePage> {
     );
 
     if (ok == true) {
-      final v = double.tryParse(normalizeDigits(ctrl.text)) ?? 0.0;
+      final v = parseNumber(ctrl.text);
       _touch(() => _depositPaid = v);
       await _save();
     }
@@ -1333,8 +1312,8 @@ class _InvoicePageState extends State<InvoicePage> {
         _custom.add(
           _Custom(
             name: nCtrl.text.trim(),
-            qty: double.tryParse(normalizeDigits(qCtrl.text)) ?? 1.0,
-            price: double.tryParse(normalizeDigits(pCtrl.text)) ?? 0.0,
+            qty: parseNumber(qCtrl.text) > 0 ? parseNumber(qCtrl.text) : 1.0,
+            price: parseNumber(pCtrl.text),
             balcony: _balconyTab,
           ),
         );
@@ -1467,7 +1446,7 @@ class _NumBoxState extends State<_NumBox> {
           isDense: true,
         ),
         onSubmitted: (t) {
-          final v = double.tryParse(normalizeDigits(t)) ?? 0.0;
+          final v = parseNumber(t);
           widget.onChanged(v);
         },
       ),
