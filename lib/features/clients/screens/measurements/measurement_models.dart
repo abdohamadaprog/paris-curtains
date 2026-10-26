@@ -1,7 +1,7 @@
 part of '../paris_client_measurements_page.dart';
 
 // ============================================================================
-// دوال تحويل الأرقام إلى العربية وتنسيق الفواصل (مشتركة بين الصفحة والكروت)
+// دوال التنسيق والأرقام العربية
 // ============================================================================
 String _toArabic(dynamic value) {
   if (value == null) return '';
@@ -27,9 +27,11 @@ String _fmtAr(double val) => _toArabic(_fmt(val));
 // ============================================================================
 // نماذج البيانات والحسابات الهندسية الدقيقة
 // ============================================================================
+
 class _Measurement {
   static int _counter = 0;
   final int id = ++_counter;
+
   final TextEditingController name = TextEditingController(text: 'شباك');
   final TextEditingController width = TextEditingController(text: '3.00');
   final TextEditingController height = TextEditingController(text: '2.95');
@@ -46,8 +48,11 @@ class _Measurement {
     final w = toDouble(width.text);
     final h = toDouble(height.text);
 
-    // مضاعفات القماش بناءً على الطراز
-    final heavyMultiplier = method == _WorkMethod.press ? 2.5 : 1.5;
+    // مضاعفات القماش المعتمدة:
+    // الويفي العادي: ثقيل (قطيفة) = عرض × 3 ، خفيف (كتان) = عرض × 2
+    // دابل ويفي: ثقيل وخفيف كلاهما 3 أضعاف (عرض × 3)
+    // حلقات كبس: ثقيل = عرض × 2.5 ، خفيف = عرض × 2
+    final heavyMultiplier = method == _WorkMethod.press ? 2.5 : 3.0;
     final lightMultiplier = method == _WorkMethod.doubleWave ? 3.0 : 2.0;
 
     // خصومات الارتفاع بالسنتيمتر بناءً على السقف ونوع التعليق
@@ -55,33 +60,31 @@ class _Measurement {
     double lightOffset = 0;
 
     if (method == _WorkMethod.press) {
-      heavyOffset = .03;
-      lightOffset = .02;
+      heavyOffset = .03; // +3 سم
+      lightOffset = .02; // +2 سم
     } else if (method == _WorkMethod.wave && ceiling == _CeilingType.kaboli) {
-      heavyOffset = -.01;
-      lightOffset = -.04;
+      heavyOffset = -.01; // -1 سم
+      lightOffset = -.04; // -4 سم
     } else if (method == _WorkMethod.wave &&
         ceiling == _CeilingType.curtainBox) {
       heavyOffset = 0;
-      lightOffset = -.04;
+      lightOffset = -.04; // -4 سم
     } else if (method == _WorkMethod.doubleWave &&
         ceiling == _CeilingType.kaboli) {
-      heavyOffset = -.01;
-      lightOffset = -.02;
+      heavyOffset = -.01; // -1 سم
+      lightOffset = -.02; // -2 سم
     } else if (method == _WorkMethod.doubleWave &&
         ceiling == _CeilingType.curtainBox) {
-      heavyOffset = .01;
+      heavyOffset = .01; // +1 سم
       lightOffset = 0;
     }
 
     // ===== حساب العجل والقماش (ويفي / دابل ويفي) =====
-    // العجل بيتحدد من جدول المقاس، والقماش = عدد العجل × 0.148.
-    // لو المقاس 2م أو أكتر بيتقسم جنبين (مثلاً 18 + 18).
-    // الحلقات (كبس) فضلت على حسابها القديم.
     final isWave = method != _WorkMethod.press;
     var heavySides = 1;
     var heavyWheels = 0;
     double heavyMeters;
+
     if (isWave) {
       if (w > 0) {
         heavySides = _sidesForWidth(w);
@@ -97,12 +100,12 @@ class _Measurement {
           heavyWheels = auto;
         }
       }
-      // القماش الأساسي = 1.5 ضعف العرض (ويفي)، وحسبة العجل للإرشاد بس في سطر العجل
       heavyMeters = w > 0 ? (w * heavyMultiplier) : 0;
     } else {
       heavyWheels = 0; // الحلقات (كبس) مفيهاش عجل
       heavyMeters = w > 0 ? (w * heavyMultiplier) : 0;
     }
+
     final lightWheels = (lightLayers > 0 && w > 0) ? heavyWheels : 0;
     final heavyTape = w > 0 ? (w * 1.33) : 0.0;
     final lightTape = (lightLayers > 0 && w > 0) ? heavyTape : 0.0;
@@ -181,14 +184,22 @@ class _Measurement {
   }
 }
 
+// ============================================================================
+// نموذج كارت البلكونة المطور
+// ============================================================================
+
 class _Balcony {
   static int _counter = 0;
   final int id = ++_counter;
+
   final TextEditingController name = TextEditingController(text: 'بلكونة');
-  final TextEditingController parts = TextEditingController(text: '3');
+  final TextEditingController parts = TextEditingController(text: '3.00');
+  final TextEditingController height = TextEditingController(text: '2.80');
+  int? customAvez;
   bool enabled = true;
 
-  double get totalWidth {
+  // استخراج قائمة أطوال الأضلاع كمصفوفة أرقام
+  List<double> get sideList {
     final clean = parts.text
         .replaceAll('٠', '0')
         .replaceAll('١', '1')
@@ -203,18 +214,48 @@ class _Balcony {
         .replaceAll('،', '.')
         .replaceAll('٫', '.')
         .replaceAll(',', '.');
-
     return clean
         .split('+')
-        .fold<double>(
-          0.0,
-          (total, part) => total + (double.tryParse(part.trim()) ?? 0.0),
-        );
+        .map((p) => double.tryParse(p.trim()) ?? 0.0)
+        .where((w) => w > 0)
+        .toList();
   }
+
+  // إجمالي عرض البلكونة الصافي (مجموع الأضلاع)
+  double get totalWidth {
+    final list = sideList;
+    if (list.isEmpty) return 0.0;
+    return list.fold<double>(0.0, (accumulated, item) => accumulated + item);
+  }
+
+  // قاعدة الأفيز الدقيقة:
+  // لكل ضلع أو ماسورة: لو أقل من 3.00 متر بياخد 2 أفيز، لو 3.00 متر فما فوق بياخد 3 أفيز
+  int get calculatedAvez {
+    final list = sideList;
+    if (list.isEmpty) return 0;
+    int count = 0;
+    for (final side in list) {
+      count += (side >= 3.0 ? 3 : 2);
+    }
+    return count;
+  }
+
+  // عدد الأفيز الفعلي (اليدوي إن وُجد وإلا التلقائي الهندسي)
+  int get avezCount => customAvez ?? calculatedAvez;
+
+  // قماش البلكونة = إجمالي المقاسات المفرودة × 1.5
+  double get fabricMeters => ((totalWidth * 1.5 * 100).round() / 100);
+
+  // شريط الكبس للبلكونة = نفس أمتار قماش البلكونة
+  double get tapeMeters => fabricMeters;
+
+  // عدد حلقات الكبس للبلكونة = أمتار القماش × 6 حلقات لكل متر
+  int get ringsCount => (fabricMeters * 6).round();
 
   void dispose() {
     name.dispose();
     parts.dispose();
+    height.dispose();
   }
 }
 
@@ -269,6 +310,7 @@ class _DeletedCard {
     this.lightSides = 2,
     this.wheels = '',
     this.parts = '',
+    this.customAvez,
     this.enabled = true,
   });
 
@@ -290,6 +332,8 @@ class _DeletedCard {
     isBalcony: true,
     name: b.name.text,
     parts: b.parts.text,
+    height: b.height.text,
+    customAvez: b.customAvez,
     enabled: b.enabled,
   );
 
@@ -305,6 +349,7 @@ class _DeletedCard {
     lightSides: (map['light_sides'] as num?)?.toInt() ?? 2,
     wheels: (map['wheels'] ?? '').toString(),
     parts: (map['parts'] ?? '').toString(),
+    customAvez: (map['custom_avez'] as num?)?.toInt(),
     enabled: map['enabled'] != false,
   );
 
@@ -319,6 +364,7 @@ class _DeletedCard {
   final int lightSides;
   final String wheels;
   final String parts;
+  final int? customAvez;
   final bool enabled;
 
   Map<String, dynamic> toMap() => {
@@ -333,6 +379,7 @@ class _DeletedCard {
     'light_sides': lightSides,
     'wheels': wheels,
     'parts': parts,
+    'custom_avez': customAvez,
     'enabled': enabled,
   };
 
@@ -361,6 +408,8 @@ class _DeletedCard {
     final b = _Balcony();
     b.name.text = name;
     b.parts.text = parts;
+    b.height.text = height;
+    b.customAvez = customAvez;
     b.enabled = enabled;
     return b;
   }

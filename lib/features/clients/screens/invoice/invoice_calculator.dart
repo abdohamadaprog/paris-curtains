@@ -1,28 +1,45 @@
 // حسابات فواتير باريس للستائر (ستائر الشقة + البلكونة).
-// ملف Dart خالص بدون Flutter عشان نقدر نختبره بسهولة.
+// ملف Dart خالص متوافق 100% مع كافة إصدارات Flutter.
 //
-// القواعد المعتمدة:
-//  • ويفي عادي: كتان = عرض × 2 • قطيفة = عرض × 3
-//  • دابل ويفي: كتان = عرض × 3 • قطيفة = عرض × 3
-//  • حلقات كبس: قطيفة = عرض × 2.5 • كتان = عرض × 2
-//  • أمتار القماش بتتقرّب لأعلى لأقرب متر كامل في فاتورة الشقة
-//  • البلكونة: قماش = إجمالي المقاسات × 1.5 (من غير تقريب)
+// القواعد المعتمدة وفقاً لورشة باريس للستائر:
+//  • ويفي عادي: كتان خفيف (خلفي) = عرض × 2 • قطيفة ثقيل (أمامي) = عرض × 3
+//  • دابل ويفي: كتان خفيف = عرض × 3 • قطيفة ثقيل = عرض × 3
+//  • حلقات كبس: قطيفة ثقيل = عرض × 2.5 • كتان خفيف = عرض × 2
+//  • حوامل تراك الويفي: حتى 1م = 2 كابولي • حتى 2.5م = 3 كوابيل • أكبر = +1 لكل متر
+//  • كابولي مواسير الكبس: أقل من أو = 3م = 2 كابولي • أكبر من 3م = 3 كوابيل
+//  • أفيز البلكونة: لكل ضلع أقل من 3م = 2 أفيز • أكبر من أو = 3م = 3 أفيز
+//  • شريط وتجهيز الويفي: على قماش الويفي (التقيل في العادي، والطبقتين في الدابل)
+//  • شريط تجميع الكسرات: على الكتان الخلفي فقط في الويفي العادي
+//  • تقريب أمتار قماش الشقة لأعلى لأقرب متر كامل
+//  • قماش البلكونة = إجمالي المقاسات × 1.5 (بدون تقريب)
 
-/// تقريب لأعلى لأقرب متر كامل بعد تنضيف أخطاء الفاصلة العشرية
-int ceilMeters(double v) => ((v * 100).round() / 100).ceil();
+/// تقريب لأعلى لأقرب متر كامل بعد تنظيف أخطاء الفاصلة العشرية
+int ceilMeters(dynamic v) {
+  if (v == null) return 0;
+  final num? n = (v is num) ? v : double.tryParse(normalizeDigits(v));
+  if (n == null || n.isNaN || n.isInfinite) return 0;
+  return ((n * 100).round() / 100).ceil();
+}
 
-double roundMoney(double v) => (v * 100).round() / 100;
+/// تقريب المبالغ المالية لأقرب قرشين
+double roundMoney(dynamic v) {
+  if (v == null) return 0.0;
+  final num? n = (v is num) ? v : double.tryParse(normalizeDigits(v));
+  if (n == null || n.isNaN || n.isInfinite) return 0.0;
+  return ((n * 100).round()) / 100;
+}
 
-/// تحويل الأرقام العربي والفاصلة العربية لنص يقدر double.tryParse يقراه
-/// تقبل dynamic بأمان تام لتفادي أي Type Cast Exception لو القيمة null أو double
+/// تحويل الأرقام العربي والفاصلة العربية لنص يقدر double.tryParse يقراه بأمان
 String normalizeDigits(dynamic val) {
   if (val == null) return '0';
-  final s = val.toString();
+  final s = val.toString().trim();
+  if (s.isEmpty) return '0';
   const arabic = '٠١٢٣٤٥٦٧٨٩';
   final b = StringBuffer();
-  for (final ch in s.split('')) {
-    final i = arabic.indexOf(ch);
-    b.write(i >= 0 ? '$i' : ch);
+  for (int i = 0; i < s.length; i++) {
+    final ch = s[i];
+    final idx = arabic.indexOf(ch);
+    b.write(idx >= 0 ? '$idx' : ch);
   }
   return b
       .toString()
@@ -35,11 +52,25 @@ String normalizeDigits(dynamic val) {
 /// قراءة الأرقام بأمان من أي نوع (double, int, String, null)
 double parseNumber(dynamic val) {
   if (val == null) return 0.0;
-  if (val is num) return val.toDouble();
+  if (val is num) {
+    if (val.isNaN || val.isInfinite) return 0.0;
+    return val.toDouble();
+  }
   return double.tryParse(normalizeDigits(val)) ?? 0.0;
 }
 
-// ============================ الأسعار ============================
+/// حساب عدد حوامل/كوابيل تراك الويفي للشباك الواحد:
+/// • حتى 1.00 م: 2 كابولي (طرف يمين وطرف شمال)
+/// • أكبر من 1.00 م حتى 2.50 م: 3 كوابيل (طرفين + كابولي في المنتصف لمنع ترييح المسار)
+/// • أكبر من 2.50 م: يزيد كابولي إضافي لكل متر زيادة (مثلاً 3.5 م = 4 كوابيل، 4.5 م = 5 كوابيل)
+int calcWaveHoldersForWindow(double width) {
+  if (width <= 0) return 0;
+  if (width <= 1.0) return 2;
+  if (width <= 2.5) return 3;
+  return 3 + (width - 2.5).ceil();
+}
+
+// ============================ الأسعار الافتراضية ============================
 
 class PriceDef {
   final String key;
@@ -65,7 +96,7 @@ const List<PriceDef> kPriceDefs = [
   PriceDef('qamqam_forgia', 'قمقم فورجية', 'قطعة', 45),
   PriceDef('press_tape', 'شريط كبس (الشقة)', 'متر', 15),
   PriceDef('ring_unit', 'الحلقة الواحدة (كيس 350 ÷ 100)', 'حلقة', 3.5),
-  PriceDef('press_drill', 'تخريم الحلقة', 'حلقة', 1.5),
+  PriceDef('press_drill', 'تخريم وتثبيت الحلقة', 'حلقة', 1.5),
   PriceDef('sew_light', 'خياطة خفيف', 'متر', 25),
   PriceDef('sew_heavy', 'خياطة ثقيل', 'متر', 30),
   PriceDef('install_window', 'تركيب الشباك', 'شباك', 100),
@@ -78,10 +109,9 @@ const List<PriceDef> kPriceDefs = [
   PriceDef('balc_tape', 'شريط كبس (بلكونة)', 'متر', 15),
   PriceDef('balc_avez', 'أفيز', 'قطعة', 20),
   PriceDef('balc_sew', 'خياطة بلكونة', 'متر', 30),
-  // بنود يدوية ثابتة الظهور، وسعرها يحدده المستخدم داخل الفاتورة.
-  PriceDef('kobsha', 'كوبشة', 'بند', 0),
-  PriceDef('transport', 'موصلات ونقل', 'بند', 0),
-  PriceDef('balc_install', 'تركيب بلكونة', 'بند', 0),
+  PriceDef('kobsha', 'كوبشة', 'قطعة', 0),
+  PriceDef('transport', 'موصلات ونقل', 'مرة', 0),
+  PriceDef('balc_install', 'تركيب بلكونة', 'بلكونة', 0),
 ];
 
 Map<String, double> defaultPrices() => {
@@ -95,7 +125,7 @@ const Map<String, String> kBalconyFabrics = {
   'fabric_blackout_sun': 'بلاك أوت عازل للشمس',
 };
 
-// ============================ المدخلات ============================
+// ============================ مواصفات المدخلات ============================
 
 class WindowSpec {
   final String title;
@@ -107,23 +137,24 @@ class WindowSpec {
   final bool enabled;
 
   const WindowSpec({
-    required this.title,
+    this.title = '',
     required this.width,
-    required this.height,
+    this.height = 2.8,
     required this.curtainType,
-    required this.hasHeavy,
-    required this.hasLight,
+    this.hasHeavy = true,
+    this.hasLight = false,
     this.enabled = true,
   });
 
-  factory WindowSpec.fromMap(Map<String, dynamic> map) {
+  factory WindowSpec.fromMap(Map<dynamic, dynamic> map) {
+    final lightLayers = parseNumber(map['light_layers']).toInt();
     return WindowSpec(
       title: (map['title'] ?? '').toString(),
       width: parseNumber(map['width']),
-      height: parseNumber(map['height']),
-      curtainType: (map['curtainType'] ?? 'wave').toString(),
+      height: parseNumber(map['height'] ?? 2.8),
+      curtainType: (map['curtainType'] ?? map['method'] ?? 'wave').toString(),
       hasHeavy: map['hasHeavy'] != false,
-      hasLight: map['hasLight'] != false,
+      hasLight: map['hasLight'] == true || lightLayers > 0,
       enabled: map['enabled'] != false,
     );
   }
@@ -134,28 +165,47 @@ class BalconySpec {
   final double width;
   final double height;
   final int avezCount;
+  final List<double> parts;
   final bool enabled;
 
   const BalconySpec({
-    required this.title,
+    this.title = 'بلكونة',
     required this.width,
-    required this.height,
-    required this.avezCount,
+    this.height = 2.5,
+    this.avezCount = 0,
+    this.parts = const [],
     this.enabled = true,
   });
 
-  factory BalconySpec.fromMap(Map<String, dynamic> m) {
+  factory BalconySpec.fromMap(Map<dynamic, dynamic> m) {
+    final rawParts = (m['parts'] ?? '').toString().trim();
+    List<double> parts = [];
+    if (rawParts.isNotEmpty) {
+      parts = rawParts
+          .split('+')
+          .map((p) => parseNumber(p.trim()))
+          .where((v) => v > 0)
+          .toList();
+    }
+    double w = parseNumber(m['width'] ?? m['total_width']);
+    if (parts.isNotEmpty && w <= 0) {
+      w = parts.fold(0.0, (a, b) => a + b);
+    }
+    if (parts.isEmpty && w > 0) {
+      parts = [w];
+    }
     return BalconySpec(
-      title: (m['title'] ?? '').toString(),
-      width: parseNumber(m['width']),
-      height: parseNumber(m['height']),
+      title: (m['title'] ?? 'بلكونة').toString(),
+      width: w,
+      height: parseNumber(m['height'] ?? 2.5),
       avezCount: parseNumber(m['avezCount']).round(),
+      parts: parts,
       enabled: m['enabled'] != false,
     );
   }
 }
 
-// ============================ بنود الفاتورة ============================
+// ============================ بنود ومخرجات الفاتورة ============================
 
 class InvoiceLine {
   final String key;
@@ -165,6 +215,7 @@ class InvoiceLine {
   final double unitPrice;
   final String? note;
   final bool isFabric;
+  final bool manual;
 
   const InvoiceLine({
     required this.key,
@@ -174,19 +225,21 @@ class InvoiceLine {
     required this.unitPrice,
     this.note,
     this.isFabric = false,
+    this.manual = false,
   });
 
   double get total => roundMoney(qty * unitPrice);
 
-  InvoiceLine copyWith({double? qty, double? unitPrice}) {
+  InvoiceLine copyWith({double? qty, double? unitPrice, String? note}) {
     return InvoiceLine(
       key: key,
       label: label,
       unit: unit,
       qty: qty ?? this.qty,
       unitPrice: unitPrice ?? this.unitPrice,
-      note: note,
+      note: note ?? this.note,
       isFabric: isFabric,
+      manual: manual,
     );
   }
 }
@@ -219,7 +272,7 @@ class BalconyInvoice {
   double get grandTotal => roundMoney(fabricTotal + accessoryTotal);
 }
 
-// ============================ محرك الحسابات ============================
+// ============================ محرك حسابات فاتورة الشقة ============================
 
 ApartmentInvoice calculateApartmentInvoice({
   required List<WindowSpec> windows,
@@ -237,6 +290,7 @@ ApartmentInvoice calculateApartmentInvoice({
   int waveHolders = 0;
   int doubleHolders = 0;
   double waveTapeMeters = 0;
+  double kasratMeters = 0;
 
   double pressPipeMeters = 0;
   int cantilevers = 0;
@@ -247,7 +301,6 @@ ApartmentInvoice calculateApartmentInvoice({
 
   for (final w in active) {
     final rawType = w.curtainType.trim().toLowerCase();
-    // دعم القيم القديمة والجديدة القادمة من شاشة القياسات، بما فيها الاسم العربي.
     final type =
         (rawType == 'press' ||
             rawType == 'ring' ||
@@ -260,6 +313,7 @@ ApartmentInvoice calculateApartmentInvoice({
         ? 'press'
         : (rawType == 'double_wave' ||
               rawType == 'double-wave' ||
+              rawType == 'doublewave' ||
               rawType.contains('دابل') ||
               rawType.contains('double'))
         ? 'double_wave'
@@ -267,36 +321,67 @@ ApartmentInvoice calculateApartmentInvoice({
     final wM = w.width;
 
     if (type == 'wave') {
-      // الويفي العادي: الواجهة الأمامية ويفي، والخلفية كسرات عادية؛
-      // لذلك المسار والحامل والشريط الويفي تُحسب للواجهة فقط.
+      // ويفي عادي:
+      // كتان خفيف (خلفي) = عرض × 2
+      // قطيفة ثقيل (أمامي) = عرض × 3
       if (w.hasLight) rawLinen += wM * 2.0;
       if (w.hasHeavy) rawVelvet += wM * 3.0;
-      trackMeters += wM;
-      waveHolders += 3;
-      waveTapeMeters += wM;
+
+      // المسار: مسارين لو في طبقتين (مسار ويفي أمامي ومسار كسرات خلفي)
+      final trackCount = (w.hasLight && w.hasHeavy) ? 2 : 1;
+      trackMeters += wM * trackCount;
+
+      // حوامل الويفي (40 ج للحامل): حتى 1م: 2 • حتى 2.5م: 3 • أكبر: +1 لكل متر
+      waveHolders += calcWaveHoldersForWindow(wM);
+
+      // شريط وتجهيز الويفي: قد قماش الويفي (التقيل فقط)
+      if (w.hasHeavy) {
+        waveTapeMeters += wM * 3.0;
+      }
+
+      // شريط تجميع الكسرات: على الطبقة الخفيفة الخلفية فقط
+      if (w.hasLight) {
+        kasratMeters += wM * 2.0;
+      }
     } else if (type == 'double_wave') {
-      // الدابل ويفي: الطبقتان ويفي، واستهلاك القماش 3 أضعاف لكل نوع موجود.
+      // دابل ويفي:
+      // كتان خفيف = عرض × 3
+      // قطيفة ثقيل = عرض × 3
       if (w.hasLight) rawLinen += wM * 3.0;
       if (w.hasHeavy) rawVelvet += wM * 3.0;
+
       final trackCount = (w.hasLight && w.hasHeavy) ? 2 : 1;
-      final m = wM * trackCount;
-      trackMeters += m;
-      doubleHolders += 3 * trackCount;
-      waveTapeMeters += m;
+      trackMeters += wM * trackCount;
+
+      // حوامل دابل ويفي (55 ج للحامل المتين الطويل): حتى 1م: 2 • حتى 2.5م: 3 • أكبر: +1 لكل متر
+      doubleHolders += calcWaveHoldersForWindow(wM);
+
+      // شريط وتجهيز الويفي: على التقيل والخفيف كلاهما ويفي
+      double waveM = 0;
+      if (w.hasHeavy) waveM += wM * 3.0;
+      if (w.hasLight) waveM += wM * 3.0;
+      waveTapeMeters += waveM;
     } else if (type == 'press') {
+      // حلقات كبس:
+      // قطيفة ثقيل = عرض × 2.5
+      // كتان خفيف = عرض × 2
       if (w.hasLight) rawLinen += wM * 2.0;
       if (w.hasHeavy) rawVelvet += wM * 2.5;
 
       final pipeCount = (w.hasLight && w.hasHeavy) ? 2 : 1;
       pressPipeMeters += wM * pipeCount;
+
+      // كابولي فورجية: أقل من أو يساوي 3م = 2 كابولي • أكبر = 3
       cantilevers += wM > 3 ? 3 : 2;
       qamqams += 2 * pipeCount;
-      // شريط الكبس يتبع استهلاك القماش الفعلي، لا عدد المواسير فقط.
+
+      // شريط الكبس: على قد قماش المواسير كمقاس
       if (w.hasHeavy) pressTapeMeters += wM * 2.5;
       if (w.hasLight) pressTapeMeters += wM * 2.0;
     }
   }
 
+  // تقريب أمتار القماش لأعلى لأقرب متر كامل
   final finalLinen = ceilMeters(rawLinen).toDouble();
   final finalVelvet = ceilMeters(rawVelvet).toDouble();
 
@@ -352,6 +437,7 @@ ApartmentInvoice calculateApartmentInvoice({
         unit: 'حامل',
         qty: waveHolders.toDouble(),
         unitPrice: prices['holder_wave'] ?? 40,
+        note: 'حتى 1م: 2 • حتى 2.5م: 3',
       ),
     );
   }
@@ -363,6 +449,7 @@ ApartmentInvoice calculateApartmentInvoice({
         unit: 'حامل',
         qty: doubleHolders.toDouble(),
         unitPrice: prices['holder_double'] ?? 55,
+        note: 'حتى 1م: 2 • حتى 2.5م: 3',
       ),
     );
   }
@@ -372,7 +459,7 @@ ApartmentInvoice calculateApartmentInvoice({
         key: 'wave_tape',
         label: 'شريط ويفي كبسولة',
         unit: 'متر',
-        qty: roundMoney(waveTapeMeters),
+        qty: ceilMeters(waveTapeMeters).toDouble(),
         unitPrice: prices['wave_tape'] ?? 55,
       ),
     );
@@ -381,17 +468,20 @@ ApartmentInvoice calculateApartmentInvoice({
         key: 'wave_prep',
         label: 'تجهيز نظام الويفي',
         unit: 'متر',
-        qty: roundMoney(waveTapeMeters),
+        qty: ceilMeters(waveTapeMeters).toDouble(),
         unitPrice: prices['wave_prep'] ?? 20,
       ),
     );
+  }
+  if (kasratMeters > 0) {
     accLines.add(
       InvoiceLine(
         key: 'kasrat',
         label: 'شريط تجميع كسرات',
         unit: 'متر',
-        qty: roundMoney(waveTapeMeters),
+        qty: ceilMeters(kasratMeters).toDouble(),
         unitPrice: prices['kasrat'] ?? 15,
+        note: 'على الكتان الخلفي',
       ),
     );
   }
@@ -400,7 +490,7 @@ ApartmentInvoice calculateApartmentInvoice({
     accLines.add(
       InvoiceLine(
         key: 'pipe_press',
-        label: 'ماسورة 4G',
+        label: 'ماسورة 4G (كبس)',
         unit: 'متر',
         qty: roundMoney(pressPipeMeters),
         unitPrice: prices['pipe_press'] ?? 70,
@@ -413,6 +503,7 @@ ApartmentInvoice calculateApartmentInvoice({
         unit: 'قطعة',
         qty: cantilevers.toDouble(),
         unitPrice: prices['cantilever_forgia'] ?? 50,
+        note: 'أقل من أو = 3م: 2 • أكبر: 3',
       ),
     );
     accLines.add(
@@ -429,7 +520,7 @@ ApartmentInvoice calculateApartmentInvoice({
         key: 'press_tape',
         label: 'شريط كبس',
         unit: 'متر',
-        qty: roundMoney(pressTapeMeters),
+        qty: ceilMeters(pressTapeMeters).toDouble(),
         unitPrice: prices['press_tape'] ?? 15,
       ),
     );
@@ -459,7 +550,7 @@ ApartmentInvoice calculateApartmentInvoice({
     accLines.add(
       InvoiceLine(
         key: 'sew_light',
-        label: 'خياطة قماش خفيف',
+        label: 'خياطة خفيف',
         unit: 'متر',
         qty: finalLinen,
         unitPrice: prices['sew_light'] ?? 25,
@@ -470,7 +561,7 @@ ApartmentInvoice calculateApartmentInvoice({
     accLines.add(
       InvoiceLine(
         key: 'sew_heavy',
-        label: 'خياطة قماش ثقيل',
+        label: 'خياطة تقيل',
         unit: 'متر',
         qty: finalVelvet,
         unitPrice: prices['sew_heavy'] ?? 30,
@@ -490,30 +581,34 @@ ApartmentInvoice calculateApartmentInvoice({
     );
   }
 
-  // البنود اليدوية لا تختفي حتى لو كميتها أو سعرها صفر.
+  // بنود يدوية
   accLines.add(
     InvoiceLine(
       key: 'kobsha',
       label: 'كوبشة',
-      unit: 'بند',
+      unit: 'قطعة',
       qty: 1,
       unitPrice: prices['kobsha'] ?? 0,
-      note: 'السعر يدوي (100 / 200 / 300)',
+      note: 'السعر يدوي',
+      manual: true,
     ),
   );
   accLines.add(
     InvoiceLine(
       key: 'transport',
       label: 'موصلات ونقل',
-      unit: 'بند',
+      unit: 'مرة',
       qty: 1,
       unitPrice: prices['transport'] ?? 0,
       note: 'حسب الاتفاق',
+      manual: true,
     ),
   );
 
   return ApartmentInvoice(fabricLines: fabricLines, accessoryLines: accLines);
 }
+
+// ============================ محرك حسابات فاتورة البلكونة ============================
 
 BalconyInvoice calculateBalconyInvoice({
   required List<BalconySpec> balconies,
@@ -525,12 +620,26 @@ BalconyInvoice calculateBalconyInvoice({
 
   final active = balconies.where((b) => b.enabled && b.width > 0).toList();
 
-  final totalWidth = active.fold(0.0, (s, b) => s + b.width);
-  final totalAvez = active.fold<int>(
-    0,
-    (s, b) => s + (b.avezCount > 0 ? b.avezCount : (b.width > 3 ? 3 : 2)),
-  );
+  double totalWidth = 0;
+  int totalAvez = 0;
 
+  for (final b in active) {
+    totalWidth += b.width;
+    if (b.avezCount > 0) {
+      totalAvez += b.avezCount;
+    } else if (b.parts.isNotEmpty) {
+      // قاعدة الأفيز لكل ضلع: أقل من 3م = 2 أفيز • أكبر من أو يساوي 3م = 3 أفيز
+      for (final p in b.parts) {
+        if (p > 0) {
+          totalAvez += (p >= 3.0 ? 3 : 2);
+        }
+      }
+    } else {
+      totalAvez += (b.width >= 3.0 ? 3 : 2);
+    }
+  }
+
+  // قماش البلكونة = إجمالي المقاسات × 1.5 بدون تقريب
   final fabricMeters = roundMoney(totalWidth * 1.5);
 
   final fabricLabel = kBalconyFabrics[fabricKey] ?? 'قماش بلكونة';
@@ -605,6 +714,7 @@ BalconyInvoice calculateBalconyInvoice({
         unit: 'قطعة',
         qty: totalAvez.toDouble(),
         unitPrice: prices['balc_avez'] ?? 20,
+        note: 'أقل من 3م: 2 • أكبر: 3',
       ),
     );
   }
@@ -621,15 +731,15 @@ BalconyInvoice calculateBalconyInvoice({
     );
   }
 
-  // بند تركيب البلكونة يظل ظاهرًا حتى يحدد المستخدم سعره.
   accLines.add(
     InvoiceLine(
       key: 'balc_install',
       label: 'تركيب بلكونة',
-      unit: 'بند',
+      unit: 'بلكونة',
       qty: 1,
       unitPrice: prices['balc_install'] ?? 0,
-      note: 'السعر يدوي (100 / 200 / 300)',
+      note: 'السعر يدوي',
+      manual: true,
     ),
   );
 
