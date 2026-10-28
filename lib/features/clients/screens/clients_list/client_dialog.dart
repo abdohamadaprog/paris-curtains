@@ -26,13 +26,10 @@ extension _ClientDialog on _ClientsListPageState {
     );
     DateTime? installationDate = _dateFrom(data['installation_date']);
     DateTime? registrationDate = _dateFrom(data['created_at']);
-    final wasDone = data['installation_done'] == true;
-    var done = wasDone;
-    var doneTouched = false;
+    final oldStage = _stageOf(data);
+    var stage = oldStage;
     final formKey = GlobalKey<FormState>();
     final fmt = DateFormat('yyyy-MM-dd');
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
 
     Future<DateTime?> pick(BuildContext ctx, DateTime? initial) =>
         showDatePicker(
@@ -147,37 +144,82 @@ extension _ClientDialog on _ClientsListPageState {
                       if (picked != null) {
                         setDialogState(() {
                           installationDate = picked;
-                          // عميل قديم تاريخه فات: نعتبره اتركّب إلا لو غيّرت بإيدك
-                          if (!doneTouched) {
-                            done = DateTime(
-                              picked.year,
-                              picked.month,
-                              picked.day,
-                            ).isBefore(today);
-                          }
                         });
                       }
                     },
                   ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    activeThumbColor: _gold,
-                    title: Text(
-                      'تم التركيب',
-                      style: TextStyle(color: _primaryText(context)),
-                    ),
-                    subtitle: Text(
-                      'للعملاء اللي اتركّب لهم قبل كده',
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      'مرحلة الشغل',
                       style: TextStyle(
                         color: _mutedText(context),
-                        fontSize: 11.5,
+                        fontSize: 12.5,
                       ),
                     ),
-                    value: done,
-                    onChanged: (v) => setDialogState(() {
-                      done = v;
-                      doneTouched = true;
-                    }),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      for (final s in const [1, 2, 3, 4])
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 3),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () => setDialogState(() => stage = s),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _stageColors[s]!.withValues(
+                                    alpha: stage == s ? 0.22 : 0.06,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: stage == s
+                                        ? _stageColors[s]!
+                                        : _stageColors[s]!.withValues(
+                                            alpha: 0.3,
+                                          ),
+                                    width: stage == s ? 1.6 : 1,
+                                  ),
+                                  boxShadow: stage == s
+                                      ? [
+                                          BoxShadow(
+                                            color: _stageColors[s]!.withValues(
+                                              alpha: 0.4,
+                                            ),
+                                            blurRadius: 8,
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  _ar(s),
+                                  style: TextStyle(
+                                    color: _stageColors[s],
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${_ar(stage)} • ${_stageLabels[stage]}',
+                    style: TextStyle(
+                      color: _stageColors[stage],
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -261,9 +303,10 @@ extension _ClientDialog on _ClientsListPageState {
             ? null
             : Timestamp.fromDate(installationDate!),
       };
-      if (!isEdit || done != wasDone) {
-        fields['installation_done'] = done;
-        fields['installation_done_at'] = done
+      if (!isEdit || stage != oldStage) {
+        fields['work_stage'] = stage;
+        fields['installation_done'] = stage == 4;
+        fields['installation_done_at'] = stage == 4
             ? (installationDate != null
                   ? Timestamp.fromDate(installationDate!)
                   : FieldValue.serverTimestamp())

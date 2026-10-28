@@ -5,10 +5,10 @@ extension _ClientHelpers on _ClientsListPageState {
       Theme.of(context).brightness == Brightness.dark;
 
   Color _surfaceColor(BuildContext context) =>
-      _isDark(context) ? AppColors.surfaceDark : Colors.white;
+      _isDark(context) ? const Color(0xFF1E293B) : Colors.white;
 
   Color _dialogColor(BuildContext context) =>
-      _isDark(context) ? AppColors.surfaceDark2 : AppColors.background;
+      _isDark(context) ? const Color(0xFF1E293B) : AppColors.background;
 
   Color _primaryText(BuildContext context) =>
       Theme.of(context).colorScheme.onSurface;
@@ -20,7 +20,7 @@ extension _ClientHelpers on _ClientsListPageState {
     hintText: hint,
     hintStyle: TextStyle(color: _mutedText(context)),
     filled: true,
-    fillColor: _isDark(context) ? AppColors.glassWhite : AppColors.bgCreamy,
+    fillColor: _isDark(context) ? const Color(0xFF1E293B) : AppColors.bgCreamy,
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
       borderSide: BorderSide.none,
@@ -81,7 +81,9 @@ extension _ClientHelpers on _ClientsListPageState {
   void _call(String phone) => _launch(Uri(scheme: 'tel', path: phone));
 
   void _whatsapp(String phone, String name) {
-    final text = Uri.encodeComponent('السلام عليكم أ/ $name، معاك باريس للستائر');
+    final text = Uri.encodeComponent(
+      'السلام عليكم أ/ $name، معاك باريس للستائر',
+    );
     _launch(Uri.parse('https://wa.me/${_intlPhone(phone)}?text=$text'));
   }
 
@@ -93,35 +95,22 @@ extension _ClientHelpers on _ClientsListPageState {
     );
   }
 
-  Future<void> _toggleDone(
+  /// تغيير مرحلة الشغل (١ أحمر • ٢ أصفر • ٣ أزرق • ٤ أخضر).
+  /// بنحدّث installation_done كمان عشان الأجندة والتقارير يفضلوا شغالين.
+  Future<void> _setStage(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
-    bool done,
+    int stage,
   ) async {
     try {
       await doc.reference.update({
-        'installation_done': !done,
-        'installation_done_at': !done ? FieldValue.serverTimestamp() : null,
+        'work_stage': stage,
+        'installation_done': stage == 4,
+        'installation_done_at': stage == 4
+            ? FieldValue.serverTimestamp()
+            : null,
       });
-      if (mounted) {
-        _message(!done ? 'تم تسجيل تنفيذ الشغل' : 'تم إلغاء حالة التنفيذ');
-      }
     } catch (e) {
-      if (mounted) _message('تعذر تحديث حالة التنفيذ: $e');
+      if (mounted) _message('تعذر تحديث المرحلة: $e');
     }
-  }
-
-  // لون ونص موعد التركيب: النهارده / بكرة / فات الموعد
-  (String, Color) _dateBadge(DateTime? date, bool done) {
-    if (date == null) return ('موعد التركيب غير محدد', _mutedText(context));
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final day = DateTime(date.year, date.month, date.day);
-    final diff = day.difference(today).inDays;
-    final text = DateFormat('yyyy/MM/dd').format(date);
-    if (done) return ('تم التركيب • $text', const Color(0xFF72C69A));
-    if (diff < 0) return ('فات الموعد • $text', const Color(0xFFEF5350));
-    if (diff == 0) return ('النهارده • $text', const Color(0xFFFFB74D));
-    if (diff == 1) return ('بكرة • $text', const Color(0xFFFFB74D));
-    return (text, _gold);
   }
 }

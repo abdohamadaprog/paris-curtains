@@ -198,6 +198,40 @@ class _Balcony {
   int? customAvez;
   bool enabled = true;
 
+  // حالة الكارت (مفتوح/مطوي) — للعرض فقط ومش بتتحفظ
+  bool isExpanded = true;
+
+  // عدد الأضلاع (من 1 لـ 4) وحقول إدخال كل ضلع
+  int sidesCount = 1;
+  final TextEditingController side1 = TextEditingController(text: '3.00');
+  final TextEditingController side2 = TextEditingController();
+  final TextEditingController side3 = TextEditingController();
+  final TextEditingController side4 = TextEditingController();
+
+  double get side1Val => _Measurement.toDouble(side1.text);
+  double get side2Val => _Measurement.toDouble(side2.text);
+  double get side3Val => _Measurement.toDouble(side3.text);
+  double get side4Val => _Measurement.toDouble(side4.text);
+
+  // يجمع الأضلاع الظاهرة في النص المحفوظ (parts) مثل: 3+2.5+1.2
+  void syncPartsFromSides() {
+    final vals = <double>[side1Val, side2Val, side3Val, side4Val];
+    final visible = vals
+        .take(sidesCount.clamp(1, 4).toInt())
+        .where((v) => v > 0);
+    parts.text = visible.map(_fmt).join('+');
+  }
+
+  // العكس: يملأ حقول الأضلاع من النص المحفوظ (parts) عند التحميل أو النسخ
+  void syncSidesFromParts() {
+    final list = sideList;
+    sidesCount = list.isEmpty ? 1 : list.length.clamp(1, 4).toInt();
+    final controllers = [side1, side2, side3, side4];
+    for (var i = 0; i < controllers.length; i++) {
+      controllers[i].text = i < list.length ? _fmt(list[i]) : '';
+    }
+  }
+
   // استخراج قائمة أطوال الأضلاع كمصفوفة أرقام
   List<double> get sideList {
     final clean = parts.text
@@ -243,6 +277,9 @@ class _Balcony {
   // عدد الأفيز الفعلي (اليدوي إن وُجد وإلا التلقائي الهندسي)
   int get avezCount => customAvez ?? calculatedAvez;
 
+  // الاسم اللي بيستخدمه كارت البلكونة
+  int get totalAvez => avezCount;
+
   // قماش البلكونة = إجمالي المقاسات المفرودة × 1.5
   double get fabricMeters => ((totalWidth * 1.5 * 100).round() / 100);
 
@@ -256,6 +293,10 @@ class _Balcony {
     name.dispose();
     parts.dispose();
     height.dispose();
+    side1.dispose();
+    side2.dispose();
+    side3.dispose();
+    side4.dispose();
   }
 }
 
@@ -408,6 +449,7 @@ class _DeletedCard {
     final b = _Balcony();
     b.name.text = name;
     b.parts.text = parts;
+    b.syncSidesFromParts();
     b.height.text = height;
     b.customAvez = customAvez;
     b.enabled = enabled;

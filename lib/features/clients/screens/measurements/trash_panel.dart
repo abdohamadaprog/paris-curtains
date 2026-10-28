@@ -27,7 +27,7 @@ extension _TrashPanelUi on _ParisClientMeasurementsPageState {
       margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: const Color(0xFF151218),
+        color: _panel,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
       ),

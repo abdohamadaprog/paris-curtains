@@ -6,6 +6,7 @@ extension _MeasurementData on _ParisClientMeasurementsPageState {
   // ============================================================================
   void _triggerAutoSave() {
     if (!_loaded || _loadFailed) return;
+    _userEdited = true;
     _rebuild(() {
       _isAutoSaving = true;
       _savedSuccess = false;
@@ -17,108 +18,108 @@ extension _MeasurementData on _ParisClientMeasurementsPageState {
   }
 
   // ============================================================================
-  // تحميل البيانات من Firestore
+  // تحميل البيانات: الكاش المحلي الأول (فوري) وبعدها تحديث هادي من السيرفر
   // ============================================================================
   Future<void> _loadSavedData() async {
     _loadFailed = false;
+
+    final cached = await ClientDetailsRepository.loadCached(widget.clientId);
+    if (!mounted) return;
+    if (cached != null) _applyDetails(cached);
+
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('clients')
-          .doc(widget.clientId)
-          .get();
-
+      final fresh = await ClientDetailsRepository.loadServer(widget.clientId);
       if (!mounted) return;
-      if (!doc.exists) {
-        _rebuild(() => _loaded = true);
-        return;
+      if (!_loaded) {
+        _applyDetails(fresh);
+      } else if (fresh.signature != _loadedSignature &&
+          !_userEdited &&
+          _expandedId == null) {
+        // السيرفر عنده نسخة أحدث ومفيش تعديل شغال دلوقتي
+        _applyDetails(fresh);
       }
-
-      final data = doc.data() ?? <String, dynamic>{};
-      final loadedMeasurements = <_Measurement>[];
-      final loadedBalconies = <_Balcony>[];
-      final loadedTrash = <_DeletedCard>[];
-
-      for (final raw in (data['measurements'] as List? ?? const [])) {
-        if (raw is! Map) continue;
-        final m = _Measurement();
-        m.name.text = (raw['name'] ?? '').toString();
-        m.width.text = (raw['width'] ?? '').toString();
-        m.height.text = (raw['height'] ?? '').toString();
-        m.method = _WorkMethod.values.firstWhere(
-          (v) => v.name == raw['method'],
-          orElse: () => _WorkMethod.wave,
-        );
-        m.ceiling = _CeilingType.values.firstWhere(
-          (v) => v.name == raw['ceiling'],
-          orElse: () => _CeilingType.kaboli,
-        );
-        m.velvetSides = (raw['velvet_sides'] as num?)?.toInt() ?? 2;
-        m.lightLayers = (raw['light_layers'] as num?)?.toInt() ?? 1;
-        m.lightSides = (raw['light_sides'] as num?)?.toInt() ?? 2;
-        m.wheels.text = (raw['wheels'] ?? '').toString();
-        m.enabled = raw['enabled'] != false;
-        loadedMeasurements.add(m);
-      }
-
-      for (final raw in (data['deleted_cards'] as List? ?? const [])) {
-        if (raw is Map) {
-          loadedTrash.add(_DeletedCard.fromMap(Map<String, dynamic>.from(raw)));
-        }
-      }
-
-      for (final raw in (data['balconies'] as List? ?? const [])) {
-        if (raw is! Map) continue;
-        final b = _Balcony();
-        b.name.text = (raw['name'] ?? '').toString();
-        b.parts.text = (raw['parts'] ?? '').toString();
-        b.enabled = raw['enabled'] != false;
-        loadedBalconies.add(b);
-      }
-
-      if (!mounted) {
-        for (final m in loadedMeasurements) {
-          m.dispose();
-        }
-        for (final b in loadedBalconies) {
-          b.dispose();
-        }
-        return;
-      }
-
-      _rebuild(() {
-        if (loadedMeasurements.isNotEmpty) {
-          for (final m in _measurements) {
-            m.dispose();
-          }
-          _measurements
-            ..clear()
-            ..addAll(loadedMeasurements);
-        }
-        _balconies
-          ..clear()
-          ..addAll(loadedBalconies);
-        _trash
-          ..clear()
-          ..addAll(loadedTrash);
-        _nameController.text = (data['name'] ?? widget.clientName).toString();
-        final date = data['installation_date'];
-        if (date is Timestamp) _installationDate = date.toDate();
-        _loaded = true;
-      });
     } catch (e) {
       debugPrint('Failed to load client data: $e');
       if (!mounted) return;
-      _loadFailed = true;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('تعذر تحميل بيانات العميل. تأكد من الاتصال.'),
-          action: SnackBarAction(
-            label: 'إعادة المحاولة',
-            onPressed: _loadSavedData,
-          ),
-        ),
-      );
+      if (!_loaded) _rebuild(() => _loadFailed = true);
     }
+  }
+
+  void _applyDetails(ClientDetails d) {
+    final loadedMeasurements = <_Measurement>[];
+    final loadedBalconies = <_Balcony>[];
+    final loadedTrash = <_DeletedCard>[];
+
+    for (final raw in d.measurements) {
+      final m = _Measurement();
+      m.name.text = (raw['name'] ?? '').toString();
+      m.width.text = (raw['width'] ?? '').toString();
+      m.height.text = (raw['height'] ?? '').toString();
+      m.method = _WorkMethod.values.firstWhere(
+        (v) => v.name == raw['method'],
+        orElse: () => _WorkMethod.wave,
+      );
+      m.ceiling = _CeilingType.values.firstWhere(
+        (v) => v.name == raw['ceiling'],
+        orElse: () => _CeilingType.kaboli,
+      );
+      m.velvetSides = (raw['velvet_sides'] as num?)?.toInt() ?? 2;
+      m.lightLayers = (raw['light_layers'] as num?)?.toInt() ?? 1;
+      m.lightSides = (raw['light_sides'] as num?)?.toInt() ?? 2;
+      m.wheels.text = (raw['wheels'] ?? '').toString();
+      m.enabled = raw['enabled'] != false;
+      loadedMeasurements.add(m);
+    }
+
+    for (final raw in d.deletedCards) {
+      loadedTrash.add(_DeletedCard.fromMap(raw));
+    }
+
+    for (final raw in d.balconies) {
+      final b = _Balcony();
+      b.name.text = (raw['name'] ?? '').toString();
+      b.parts.text = (raw['parts'] ?? '').toString();
+      b.syncSidesFromParts();
+      final h = raw['height'];
+      if (h != null && h.toString().trim().isNotEmpty) {
+        b.height.text = h.toString();
+      }
+      b.customAvez = (raw['custom_avez'] as num?)?.toInt();
+      b.enabled = raw['enabled'] != false;
+      loadedBalconies.add(b);
+    }
+
+    final oldMeasurements = [..._measurements];
+    final oldBalconies = [..._balconies];
+
+    _loadedSignature = d.signature;
+    _rebuild(() {
+      if (loadedMeasurements.isNotEmpty) {
+        _measurements
+          ..clear()
+          ..addAll(loadedMeasurements);
+      }
+      _balconies
+        ..clear()
+        ..addAll(loadedBalconies);
+      _trash
+        ..clear()
+        ..addAll(loadedTrash);
+      _loaded = true;
+      _loadFailed = false;
+    });
+
+    // نتخلص من الكنترولرز القديمة بعد ما الشاشة تتبني بالجديدة
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (loadedMeasurements.isNotEmpty) {
+        for (final m in oldMeasurements) {
+          m.dispose();
+        }
+      }
+      for (final b in oldBalconies) {
+        b.dispose();
+      }
+    });
   }
 
   // ============================================================================
@@ -137,6 +138,7 @@ extension _MeasurementData on _ParisClientMeasurementsPageState {
           'id': m.id,
           'type': 'measurement',
           'name': m.name.text.trim(),
+          'title': m.name.text.trim(),
           'width': _Measurement.toDouble(m.width.text),
           'height': _Measurement.toDouble(m.height.text),
           'method': m.method.name,
@@ -162,8 +164,12 @@ extension _MeasurementData on _ParisClientMeasurementsPageState {
             (b) => <String, dynamic>{
               'id': b.id,
               'name': b.name.text.trim(),
+              'title': b.name.text.trim(),
               'parts': b.parts.text.trim(),
               'total_width': b.totalWidth,
+              'height': _Measurement.toDouble(b.height.text),
+              'custom_avez': b.customAvez,
+              'avezCount': b.customAvez ?? 0,
               'enabled': b.enabled,
             },
           )
@@ -171,19 +177,20 @@ extension _MeasurementData on _ParisClientMeasurementsPageState {
 
       final trash = _trash.map((t) => t.toMap()).toList();
 
-      await FirebaseFirestore.instance
-          .collection('clients')
-          .doc(widget.clientId)
-          .set({
-            'name': _nameController.text.trim(),
-            'installation_date': _installationDate == null
-                ? null
-                : Timestamp.fromDate(_installationDate!),
-            'measurements': measurements,
-            'balconies': balconies,
-            'deleted_cards': trash,
-            'updated_at': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+      await ClientDetailsRepository.save(
+        clientId: widget.clientId,
+        clientFields: {
+          'name': _nameController.text.trim(),
+          'installation_date': _installationDate == null
+              ? null
+              : Timestamp.fromDate(_installationDate!),
+        },
+        details: ClientDetails(
+          measurements: measurements,
+          balconies: balconies,
+          deletedCards: trash,
+        ),
+      );
 
       if (!mounted) return;
       _rebuild(() {
@@ -216,24 +223,57 @@ extension _MeasurementData on _ParisClientMeasurementsPageState {
   // ============================================================================
   // إضافة وتكرار وحذف الكروت
   // ============================================================================
+  // الإضافة السريعة: المقاس الجديد بياخد نفس نوع الستارة والارتفاع بتوع آخر مقاس
+  // (غالبًا الشبابيك في نفس الشقة شبه بعض)، وبعدها بيفتح للتعديل على طول.
   void _addMeasurement() {
-    _rebuild(() {
-      final item = _Measurement();
-      item.name.text = 'شباك ${_toArabic(_measurements.length + 1)}';
-      item.width.text = '3.00';
-      item.height.text = '2.95';
-      _measurements.add(item);
-    });
+    final last = _measurements.isEmpty ? null : _measurements.last;
+    final item = _Measurement();
+    item.name.text = 'شباك ${_toArabic(_measurements.length + 1)}';
+    item.width.text = '3.00';
+    item.height.text = (last != null && last.height.text.trim().isNotEmpty)
+        ? last.height.text
+        : '2.95';
+    if (last != null) {
+      item.method = last.method;
+      item.ceiling = last.ceiling;
+      item.velvetSides = last.velvetSides;
+      item.lightLayers = last.lightLayers;
+      item.lightSides = last.lightSides;
+    }
+    _rebuild(() => _measurements.add(item));
     _triggerAutoSave();
+    _scrollToEnd(_aptScroll);
+    _openCard(item);
   }
 
+  // البلكونة الجديدة بتفتح مفتوحة، وباقي البلكونات بتتطوي عشان المساحة
   void _addBalcony() {
+    final last = _balconies.isEmpty ? null : _balconies.last;
+    final b = _Balcony();
+    b.name.text = 'بلكونة ${_toArabic(_balconies.length + 1)}';
+    if (last != null && last.height.text.trim().isNotEmpty) {
+      b.height.text = last.height.text;
+    }
     _rebuild(() {
-      final b = _Balcony();
-      b.name.text = 'بلكونة ${_toArabic(_balconies.length + 1)}';
+      for (final other in _balconies) {
+        other.isExpanded = false;
+      }
+      b.isExpanded = true;
       _balconies.add(b);
     });
     _triggerAutoSave();
+    _scrollToEnd(_balcScroll);
+  }
+
+  void _scrollToEnd(ScrollController c) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !c.hasClients) return;
+      c.animateTo(
+        c.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   void _duplicateMeasurement(_Measurement item) {
@@ -265,6 +305,7 @@ extension _MeasurementData on _ParisClientMeasurementsPageState {
       final copy = _Balcony();
       copy.name.text = '${item.name.text} (نسخة)';
       copy.parts.text = item.parts.text;
+      copy.syncSidesFromParts();
       copy.enabled = item.enabled;
       _balconies.add(copy);
     });

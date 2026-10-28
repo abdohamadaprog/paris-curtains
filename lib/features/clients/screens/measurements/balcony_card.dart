@@ -25,7 +25,7 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
       key: key,
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F121C),
+        color: _panel,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: disabled
@@ -498,12 +498,39 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
   }) {
     final avez = _calcAvez(val);
 
+    // + / − بخطوة ٠٫٠٥ (من غير ما تفتح الكيبورد)
+    void bump(double delta) {
+      final cur = _Measurement.toDouble(controller.text);
+      final next = (((cur + delta) * 100).round() / 100)
+          .clamp(0.0, 99.0)
+          .toDouble();
+      controller.text = next.toStringAsFixed(2);
+      _rebuild(() => item.syncPartsFromSides());
+      _triggerAutoSave();
+    }
+
+    Widget stepBtn(IconData icon, double delta) => Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(7),
+        onTap: () => bump(delta),
+        child: Container(
+          height: 30,
+          decoration: BoxDecoration(
+            color: _panel,
+            borderRadius: BorderRadius.circular(7),
+            border: Border.all(color: _line),
+          ),
+          child: Icon(icon, size: 18, color: _gold),
+        ),
+      ),
+    );
+
     return Container(
       padding: const EdgeInsets.all(7),
       decoration: BoxDecoration(
-        color: const Color(0xFF131826),
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: const Color(0xFF334155)),
+        color: _bg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -541,7 +568,7 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                 fontSize: 10,
               ),
               filled: true,
-              fillColor: const Color(0xFF0C0E14),
+              fillColor: _panel,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(6),
                 borderSide: const BorderSide(color: Color(0xFF334155)),
@@ -558,7 +585,15 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
               _triggerAutoSave();
             },
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 5),
+          Row(
+            children: [
+              stepBtn(Icons.add_rounded, 0.05),
+              const SizedBox(width: 4),
+              stepBtn(Icons.remove_rounded, -0.05),
+            ],
+          ),
+          const SizedBox(height: 5),
           Container(
             padding: const EdgeInsets.symmetric(vertical: 2),
             decoration: BoxDecoration(

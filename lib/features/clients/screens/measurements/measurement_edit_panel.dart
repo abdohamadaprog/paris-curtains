@@ -2,445 +2,300 @@ part of '../paris_client_measurements_page.dart';
 
 extension _MeasurementEditPanel on _ParisClientMeasurementsPageState {
   // لوحة التعديل: بتنزل تحت الكارت المكبّر
+  // أزرار + و− للعرض والارتفاع، واختيارات بضغطة واحدة بدل القوايم المنسدلة.
   Widget _editPanel(_Measurement item) {
     final calc = item.calculation;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF07080D),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: _gold.withValues(alpha: 0.35),
-                  width: 1.15,
+
+    void changed(VoidCallback fn) {
+      _rebuild(fn);
+      _triggerAutoSave();
+    }
+
+    InputDecoration fieldDeco({String? label, String? hint, Widget? suffix}) {
+      return InputDecoration(
+        isDense: true,
+        filled: true,
+        fillColor: _bg,
+        labelText: label,
+        hintText: hint,
+        labelStyle: const TextStyle(fontSize: 12, color: _muted),
+        hintStyle: const TextStyle(fontSize: 12, color: _muted),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 12,
+        ),
+        suffixIcon: suffix,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: _line),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: _line),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: _gold, width: 1.4),
+        ),
+      );
+    }
+
+    Widget sectionLabel(String text) => Padding(
+      padding: const EdgeInsets.fromLTRB(2, 12, 2, 6),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: _muted,
+          fontSize: 12.5,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+
+    // + / − بخطوة ٠٫٠٥ والرقم نفسه ينفع تكتبه بالكيبورد
+    Widget stepper(String label, TextEditingController c) {
+      void bump(double delta) {
+        final cur = _Measurement.toDouble(c.text);
+        final next = (((cur + delta) * 100).round() / 100)
+            .clamp(0.0, 99.0)
+            .toDouble();
+        c.text = next.toStringAsFixed(2);
+        changed(() {});
+      }
+
+      Widget btn(IconData icon, double delta) => InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => bump(delta),
+        child: Container(
+          width: 36,
+          height: 46,
+          decoration: BoxDecoration(
+            color: _bg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: _line),
+          ),
+          child: Icon(icon, color: _gold, size: 20),
+        ),
+      );
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          sectionLabel(label),
+          Row(
+            children: [
+              btn(Icons.add_rounded, 0.05),
+              const SizedBox(width: 4),
+              Expanded(
+                child: TextField(
+                  controller: c,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  textAlign: TextAlign.center,
+                  onChanged: (_) => changed(() {}),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                  decoration: fieldDeco(),
                 ),
               ),
-              child: Directionality(
-                textDirection: TextDirection.rtl,
-                child: Column(
-                  children: [
-                    // الصف الأول: اسم الغرفة والعرض والارتفاع
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: TextField(
-                            controller: item.name,
-                            onChanged: (_) {
-                              _rebuild(() {});
-                              _triggerAutoSave();
-                            },
-                            textAlign: TextAlign.right,
-                            style: const TextStyle(
-                              color: _gold,
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 6,
-                              ),
-                              border: OutlineInputBorder(),
-                              labelText: 'اسم الغرفة',
-                              labelStyle: TextStyle(
-                                fontSize: 11,
-                                color: Colors.white60,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          flex: 2,
-                          child: TextField(
-                            controller: item.width,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            onChanged: (_) {
-                              _rebuild(() {});
-                              _triggerAutoSave();
-                            },
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 6,
-                              ),
-                              border: OutlineInputBorder(),
-                              labelText: 'العرض (م)',
-                              labelStyle: TextStyle(
-                                fontSize: 11,
-                                color: Colors.white60,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          flex: 2,
-                          child: TextField(
-                            controller: item.height,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            onChanged: (_) {
-                              _rebuild(() {});
-                              _triggerAutoSave();
-                            },
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 6,
-                              ),
-                              border: OutlineInputBorder(),
-                              labelText: 'الارتفاع (م)',
-                              labelStyle: TextStyle(
-                                fontSize: 11,
-                                color: Colors.white60,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
+              const SizedBox(width: 4),
+              btn(Icons.remove_rounded, -0.05),
+            ],
+          ),
+        ],
+      );
+    }
 
-                    // الصف الثاني: طراز الشغل ونوع السقف بشكل مريح
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<_WorkMethod>(
-                            initialValue: item.method,
-                            isDense: true,
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 6,
-                              ),
-                              border: OutlineInputBorder(),
-                              labelText: 'طراز الشغل',
-                              labelStyle: TextStyle(
-                                fontSize: 11,
-                                color: Colors.white60,
-                              ),
-                            ),
-                            dropdownColor: _panel,
-                            items: _WorkMethod.values
-                                .map(
-                                  (v) => DropdownMenuItem(
-                                    value: v,
-                                    child: Text(
-                                      v.label,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                _rebuild(() => item.method = val);
-                                _triggerAutoSave();
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: DropdownButtonFormField<_CeilingType>(
-                            initialValue: item.ceiling,
-                            isDense: true,
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 6,
-                              ),
-                              border: OutlineInputBorder(),
-                              labelText: 'نوع السقف',
-                              labelStyle: TextStyle(
-                                fontSize: 11,
-                                color: Colors.white60,
-                              ),
-                            ),
-                            dropdownColor: _panel,
-                            items: _CeilingType.values
-                                .map(
-                                  (v) => DropdownMenuItem(
-                                    value: v,
-                                    child: Text(
-                                      v.label,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                _rebuild(() => item.ceiling = val);
-                                _triggerAutoSave();
-                              }
-                            },
-                          ),
-                        ),
-                      ],
+    // اختيار بضغطة واحدة (شرايح بدل القوايم المنسدلة)
+    Widget segmented<T>({
+      required List<T> values,
+      required T selected,
+      required String Function(T) label,
+      required ValueChanged<T> onChanged,
+    }) {
+      return Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: _bg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _line),
+        ),
+        child: Row(
+          children: [
+            for (final v in values)
+              Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(9),
+                  onTap: () => onChanged(v),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: v == selected ? _gold : Colors.transparent,
+                      borderRadius: BorderRadius.circular(9),
                     ),
-                    const SizedBox(height: 8),
-
-                    // عدد العجل: تلقائي من جدول المقاس، أو يدوي لو كتبت رقم
-                    if (item.method != _WorkMethod.press) ...[
-                      TextField(
-                        controller: item.wheels,
-                        keyboardType: TextInputType.number,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        decoration: InputDecoration(
-                          isDense: true,
-                          labelText: 'عدد العجل (فاضي = حساب تلقائي)',
-                          hintText: 'تلقائي: ${calc.heavyWheelsLabel}',
-                          helperText:
-                              'قماش العجل ${_fmtAr(calc.wheelsFabricMeters)} م (العجل × 0.148)',
-                          helperStyle: const TextStyle(
-                            fontSize: 10.5,
-                            color: Color(0xFFFFD45A),
-                          ),
-                          labelStyle: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.white60,
-                          ),
-                          border: const OutlineInputBorder(),
-                          suffixIcon: item.wheels.text.trim().isEmpty
-                              ? null
-                              : IconButton(
-                                  tooltip: 'رجوع للحساب التلقائي',
-                                  icon: const Icon(Icons.refresh, size: 18),
-                                  onPressed: () {
-                                    item.wheels.clear();
-                                    _rebuild(() {});
-                                    _triggerAutoSave();
-                                  },
-                                ),
-                        ),
-                        onChanged: (_) {
-                          _rebuild(() {});
-                          _triggerAutoSave();
-                        },
+                    child: Text(
+                      label(v),
+                      style: TextStyle(
+                        color: v == selected ? _bg : _muted,
+                        fontWeight: v == selected
+                            ? FontWeight.w900
+                            : FontWeight.w600,
+                        fontSize: 13,
                       ),
-                      const SizedBox(height: 8),
-                    ],
-
-                    // الصف الثالث: تحديد الأجناب والستارة الخفيفة بدون أي اختناق أو تجاوز بكسلات
-                    Wrap(
-                      alignment: WrapAlignment.spaceBetween,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.04),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: Colors.white12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text(
-                                'أجناب قطيفة:',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.white70,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              ChoiceChip(
-                                label: const Text(
-                                  '١ جنب',
-                                  style: TextStyle(fontSize: 10.5),
-                                ),
-                                selected: item.velvetSides == 1,
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                ),
-                                onSelected: (_) {
-                                  _rebuild(() => item.velvetSides = 1);
-                                  _triggerAutoSave();
-                                },
-                              ),
-                              const SizedBox(width: 4),
-                              ChoiceChip(
-                                label: const Text(
-                                  '٢ جنب',
-                                  style: TextStyle(fontSize: 10.5),
-                                ),
-                                selected: item.velvetSides == 2,
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                ),
-                                onSelected: (_) {
-                                  _rebuild(() => item.velvetSides = 2);
-                                  _triggerAutoSave();
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        InkWell(
-                          onTap: () {
-                            _rebuild(
-                              () => item.lightLayers = item.lightLayers > 0
-                                  ? 0
-                                  : 1,
-                            );
-                            _triggerAutoSave();
-                          },
-                          borderRadius: BorderRadius.circular(6),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 9,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: item.lightLayers > 0
-                                  ? const Color(0x228AE9C1)
-                                  : Colors.white.withValues(alpha: 0.04),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: item.lightLayers > 0
-                                    ? const Color(0xFF8AE9C1)
-                                    : Colors.white12,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  item.lightLayers > 0
-                                      ? Icons.check_box_rounded
-                                      : Icons.check_box_outline_blank_rounded,
-                                  size: 16,
-                                  color: item.lightLayers > 0
-                                      ? const Color(0xFF8AE9C1)
-                                      : Colors.white38,
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  'ستارة خفيفة (كتان)',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: item.lightLayers > 0
-                                        ? const Color(0xFF8AE9C1)
-                                        : Colors.white60,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        if (item.lightLayers > 0)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.04),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.white12),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Text(
-                                  'أجناب الخفيف:',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                for (final n in const [1, 2]) ...[
-                                  ChoiceChip(
-                                    label: Text(
-                                      '${_toArabic(n)} جنب',
-                                      style: const TextStyle(fontSize: 10.5),
-                                    ),
-                                    selected: item.lightSides == n,
-                                    visualDensity: VisualDensity.compact,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 4,
-                                    ),
-                                    onSelected: (_) {
-                                      _rebuild(() => item.lightSides = n);
-                                      _triggerAutoSave();
-                                    },
-                                  ),
-                                  if (n == 1) const SizedBox(width: 4),
-                                ],
-                              ],
-                            ),
-                          ),
-                        OutlinedButton.icon(
-                          onPressed: () {
-                            _closeCard();
-                            Future.delayed(const Duration(milliseconds: 900), () {
-                              if (mounted) _duplicateMeasurement(item);
-                            });
-                          },
-                          icon: const Icon(Icons.copy_rounded, size: 16),
-                          label: const Text(
-                            'تكرار الكارت',
-                            style: TextStyle(fontSize: 11),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: _neon,
-                            side: const BorderSide(color: Colors.white24),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        ),
-                      ],
                     ),
-                  ],
+                  ),
                 ),
+              ),
+          ],
+        ),
+      );
+    }
+
+    final lightValue = item.lightLayers > 0 ? item.lightSides : 0;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+      decoration: BoxDecoration(
+        color: _panel,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _gold.withValues(alpha: 0.35)),
+      ),
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            sectionLabel('اسم الغرفة'),
+            TextField(
+              controller: item.name,
+              onChanged: (_) => changed(() {}),
+              style: const TextStyle(
+                color: _gold,
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+              ),
+              decoration: fieldDeco(hint: 'مثال: الصالون'),
+            ),
+
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: stepper('العرض (م)', item.width)),
+                const SizedBox(width: 10),
+                Expanded(child: stepper('الارتفاع (م)', item.height)),
+              ],
+            ),
+
+            sectionLabel('طراز الشغل'),
+            segmented<_WorkMethod>(
+              values: _WorkMethod.values,
+              selected: item.method,
+              label: (v) => v.label,
+              onChanged: (v) => changed(() => item.method = v),
+            ),
+
+            sectionLabel('نوع السقف'),
+            segmented<_CeilingType>(
+              values: _CeilingType.values,
+              selected: item.ceiling,
+              label: (v) => v.label,
+              onChanged: (v) => changed(() => item.ceiling = v),
+            ),
+
+            sectionLabel('القطيفة (الستارة التقيلة)'),
+            segmented<int>(
+              values: const [1, 2],
+              selected: item.velvetSides,
+              label: (v) => '${_toArabic(v)} جنب',
+              onChanged: (v) => changed(() => item.velvetSides = v),
+            ),
+
+            sectionLabel('الكتان (الستارة الخفيفة)'),
+            segmented<int>(
+              values: const [0, 1, 2],
+              selected: lightValue,
+              label: (v) => v == 0 ? 'بدون' : '${_toArabic(v)} جنب',
+              onChanged: (v) => changed(() {
+                if (v == 0) {
+                  item.lightLayers = 0;
+                } else {
+                  item.lightLayers = 1;
+                  item.lightSides = v;
+                }
+              }),
+            ),
+
+            // عدد العجل: تلقائي من جدول المقاس، أو يدوي لو كتبت رقم
+            if (item.method != _WorkMethod.press) ...[
+              sectionLabel('عدد العجل (فاضي = حساب تلقائي)'),
+              TextField(
+                controller: item.wheels,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                onChanged: (_) => changed(() {}),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+                decoration: fieldDeco(
+                  hint: 'تلقائي: ${calc.heavyWheelsLabel}',
+                  suffix: item.wheels.text.trim().isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'رجوع للحساب التلقائي',
+                          icon: const Icon(
+                            Icons.refresh,
+                            size: 18,
+                            color: _gold,
+                          ),
+                          onPressed: () {
+                            item.wheels.clear();
+                            changed(() {});
+                          },
+                        ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 5, right: 2),
+                child: Text(
+                  'قماش العجل ${_fmtAr(calc.wheelsFabricMeters)} م (العجل × 0.148)',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFFFFD45A),
+                  ),
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () {
+                _closeCard();
+                Future.delayed(const Duration(milliseconds: 900), () {
+                  if (mounted) _duplicateMeasurement(item);
+                });
+              },
+              icon: const Icon(Icons.copy_rounded, size: 17),
+              label: const Text(
+                'تكرار المقاس',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _gold,
+                side: BorderSide(color: _gold.withValues(alpha: 0.5)),
+                minimumSize: const Size(0, 44),
               ),
             ),
-      ],
+          ],
+        ),
+      ),
     );
   }
 

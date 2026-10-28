@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/constants/app_colors.dart';
 import 'package:paris_curtian_app/features/clients/screens/invoice/invoice_page.dart';
+import '../data/client_details_repository.dart';
 
 part 'measurements/balcony_card.dart';
 part 'measurements/measurement_card_hero.dart';
@@ -45,8 +46,12 @@ class ParisClientMeasurementsPage extends StatefulWidget {
 }
 
 class _ParisClientMeasurementsPageState
-    extends State<ParisClientMeasurementsPage> {
+    extends State<ParisClientMeasurementsPage>
+    with SingleTickerProviderStateMixin {
   late final TextEditingController _nameController;
+  late final TabController _tabs;
+  final ScrollController _aptScroll = ScrollController();
+  final ScrollController _balcScroll = ScrollController();
   DateTime? _installationDate;
 
   final List<_Measurement> _measurements = [_Measurement()];
@@ -60,6 +65,10 @@ class _ParisClientMeasurementsPageState
   bool _loaded = false;
   bool _loadFailed = false;
 
+  // لو العميل عدّل حاجة، منبدّلش بياناته ببيانات جاية من السيرفر
+  bool _userEdited = false;
+  String? _loadedSignature;
+
   // مؤقت الحفظ التلقائي (Debounce Auto-Save)
   Timer? _autoSaveTimer;
 
@@ -68,12 +77,19 @@ class _ParisClientMeasurementsPageState
     super.initState();
     _nameController = TextEditingController(text: widget.clientName);
     _installationDate = widget.installationDate;
+    _tabs = TabController(length: 2, vsync: this)
+      ..addListener(() {
+        if (mounted) setState(() {});
+      });
     _loadSavedData();
   }
 
   @override
   void dispose() {
     _autoSaveTimer?.cancel();
+    _tabs.dispose();
+    _aptScroll.dispose();
+    _balcScroll.dispose();
     _nameController.dispose();
     for (final item in _measurements) {
       item.dispose();
@@ -91,12 +107,13 @@ class _ParisClientMeasurementsPageState
         );
 
   // ============================================================================
-  // واجهة التطبيق الرئيسية
+  // فتح الفاتورة (بيفتح على نفس التبويب اللي واقف عليه: شقة / بلكونة)
   // ============================================================================
-  // بيحفظ المقاسات الأول عشان الفاتورة تقراها محدّثة، وبعدين يفتحها
-  Future<void> _openInvoice({required bool balcony}) async {
-    await _performSave(isAuto: true);
-    if (!mounted) return;
+  // الحفظ بيتبعت في الخلفية: الكاش المحلي بيتحدّث فورًا والفاتورة بتقرا منه،
+  // فمفيش انتظار للسيرفر.
+  Future<void> _openInvoice() async {
+    _autoSaveTimer?.cancel();
+    if (_userEdited) unawaited(_performSave(isAuto: true));
     final typed = _nameController.text.trim();
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -105,6 +122,7 @@ class _ParisClientMeasurementsPageState
           clientName: typed.isEmpty ? widget.clientName : typed,
           phone: widget.phone,
           address: widget.address,
+          startOnBalcony: _tabs.index == 1,
         ),
       ),
     );
@@ -115,19 +133,6 @@ class _ParisClientMeasurementsPageState
 
   @override
   Widget build(BuildContext context) {
-    final activeCount = _measurements.where((m) => m.enabled).length;
-    double totalHeavy = 0;
-    double totalLight = 0;
-    int totalWheels = 0;
-
-    for (final m in _measurements) {
-      if (!m.enabled) continue;
-      final c = m.calculation;
-      totalHeavy += c.heavyMeters;
-      totalLight += c.lightMeters;
-      totalWheels += (c.heavyWheels + c.lightWheels);
-    }
-
     return PopScope(
       canPop: _expandedId == null,
       onPopInvokedWithResult: (didPop, result) {
@@ -138,155 +143,277 @@ class _ParisClientMeasurementsPageState
       child: Scaffold(
         backgroundColor: _bg,
         resizeToAvoidBottomInset: true,
-        appBar: AppBar(
-          backgroundColor: _panel,
-          elevation: 0,
-          title: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'مقاسات: ${widget.clientName}',
-                  style: const TextStyle(
-                    color: _gold,
-                    fontFamily: 'Aref Ruqaa',
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              // مؤشر الحفظ التلقائي
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: _isAutoSaving
-                      ? Colors.amber.withValues(alpha: 0.15)
-                      : (_savedSuccess
-                            ? Colors.green.withValues(alpha: 0.15)
-                            : Colors.transparent),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _isAutoSaving
-                        ? Colors.amber
-                        : (_savedSuccess ? Colors.green : Colors.transparent),
-                    width: 0.8,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_isAutoSaving) ...[
-                      const SizedBox(
-                        width: 10,
-                        height: 10,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 1.5,
-                          color: Colors.amber,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Text(
-                        'جاري الحفظ...',
-                        style: TextStyle(color: Colors.amber, fontSize: 10),
-                      ),
-                    ] else if (_savedSuccess) ...[
-                      const Icon(
-                        Icons.check,
-                        color: Colors.greenAccent,
-                        size: 12,
-                      ),
-                      const SizedBox(width: 3),
-                      const Text(
-                        'محفوظ تلقائياً',
-                        style: TextStyle(
-                          color: Colors.greenAccent,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            IconButton(
-              tooltip: 'فاتورة الشقة',
-              icon: const Icon(Icons.receipt_long_rounded, color: _gold),
-              onPressed: () => _openInvoice(balcony: false),
-            ),
-            IconButton(
-              tooltip: 'فاتورة البلكونة',
-              icon: const Icon(Icons.balcony_rounded, color: _gold),
-              onPressed: () => _openInvoice(balcony: true),
-            ),
-            IconButton(
-              tooltip: 'حفظ يدوي',
-              icon: _saving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: _gold,
-                      ),
-                    )
-                  : const Icon(Icons.save_rounded, color: _gold),
-              onPressed: () => _performSave(isAuto: false),
-            ),
-          ],
-        ),
+        appBar: _buildAppBar(),
         body: SafeArea(
           child: Stack(
             children: [
               Column(
                 children: [
                   _clientInfoBar(),
-                  _sectionHeaderBar(),
-                  if (_showTrash) _trashPanel(),
+                  _measureTabsBar(),
+                  if (_showTrash)
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height * 0.35,
+                      ),
+                      child: SingleChildScrollView(child: _trashPanel()),
+                    ),
                   Expanded(
-                    child: ReorderableListView.builder(
-                      padding: const EdgeInsets.fromLTRB(10, 2, 10, 16),
-                      itemCount: _measurements.length + _balconies.length,
-                      onReorderItem: (oldIndex, newIndex) {
-                        // onReorderItem يمرر فهرس الوجهة النهائي بعد النقل،
-                        // لذلك لا نحتاج إلى إنقاص newIndex كما في onReorder.
-                        if (oldIndex >= _measurements.length ||
-                            newIndex < 0 ||
-                            newIndex >= _measurements.length) {
-                          return;
-                        }
-                        setState(() {
-                          final item = _measurements.removeAt(oldIndex);
-                          _measurements.insert(newIndex, item);
-                        });
-                        _triggerAutoSave();
-                      },
-                      itemBuilder: (context, index) {
-                        if (index < _measurements.length) {
-                          return _measurementCard(_measurements[index], index);
-                        }
-                        final bIndex = index - _measurements.length;
-                        return _balconyCard(
-                          _balconies[bIndex],
-                          bIndex,
-                          key: ValueKey('balcony-${_balconies[bIndex].id}'),
-                        );
-                      },
+                    child: Stack(
+                      children: [
+                        _buildBody(),
+                        if (_loaded && _expandedId == null)
+                          PositionedDirectional(
+                            start: 14,
+                            bottom: 14,
+                            child: _addButton(),
+                          ),
+                      ],
                     ),
                   ),
-                  _totalsBottomBar(
-                    totalHeavy,
-                    totalLight,
-                    totalWheels,
-                    activeCount,
-                  ),
+                  if (_loaded) _bottomBar(),
                 ],
               ),
               if (_expandedId != null) _expandedOverlay(),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: _panel,
+      elevation: 0,
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              widget.clientName,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          // مؤشر الحفظ التلقائي
+          if (_isAutoSaving || _savedSuccess)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: _isAutoSaving
+                    ? Colors.amber.withValues(alpha: 0.15)
+                    : Colors.green.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _isAutoSaving ? Colors.amber : Colors.green,
+                  width: 0.8,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_isAutoSaving) ...[
+                    const SizedBox(
+                      width: 10,
+                      height: 10,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.5,
+                        color: Colors.amber,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'جاري الحفظ...',
+                      style: TextStyle(color: Colors.amber, fontSize: 10),
+                    ),
+                  ] else ...[
+                    const Icon(
+                      Icons.check,
+                      color: Colors.greenAccent,
+                      size: 12,
+                    ),
+                    const SizedBox(width: 3),
+                    const Text(
+                      'محفوظ',
+                      style: TextStyle(color: Colors.greenAccent, fontSize: 10),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+        ],
+      ),
+      actions: [
+        IconButton(
+          tooltip: 'المحذوفات',
+          onPressed: () => _rebuild(() => _showTrash = !_showTrash),
+          icon: Badge(
+            isLabelVisible: _trash.isNotEmpty,
+            label: Text(_toArabic(_trash.length)),
+            child: Icon(
+              _showTrash ? Icons.close : Icons.delete_outline_rounded,
+              color: _trash.isNotEmpty ? Colors.amberAccent : Colors.white54,
+            ),
+          ),
+        ),
+        IconButton(
+          tooltip: 'حفظ يدوي',
+          icon: _saving
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: _gold,
+                  ),
+                )
+              : const Icon(Icons.save_rounded, color: _gold),
+          onPressed: () => _performSave(isAuto: false),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBody() {
+    if (!_loaded) {
+      if (_loadFailed) {
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.cloud_off_rounded,
+                color: Colors.white38,
+                size: 46,
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'تعذر تحميل المقاسات. تأكد من الاتصال.',
+                style: TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () {
+                  setState(() => _loadFailed = false);
+                  _loadSavedData();
+                },
+                style: OutlinedButton.styleFrom(foregroundColor: _gold),
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('إعادة المحاولة'),
+              ),
+            ],
+          ),
+        );
+      }
+      return const Center(child: CircularProgressIndicator(color: _gold));
+    }
+    return TabBarView(
+      controller: _tabs,
+      children: [_apartmentTab(), _balconyTab()],
+    );
+  }
+
+  // ============================== تبويب الشقة ==============================
+  Widget _apartmentTab() {
+    return Column(
+      children: [
+        Expanded(
+          child: _measurements.isEmpty
+              ? _emptyTab(
+                  Icons.window_outlined,
+                  'مفيش مقاسات لسه',
+                  'اضغط "إضافة مقاس" وابدأ',
+                )
+              : ReorderableListView.builder(
+                  key: const PageStorageKey<String>('apartment-list'),
+                  scrollController: _aptScroll,
+                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 90),
+                  itemCount: _measurements.length,
+                  onReorderItem: (oldIndex, newIndex) {
+                    // onReorderItem بيمرر فهرس الوجهة النهائي بعد النقل
+                    if (newIndex < 0 || newIndex >= _measurements.length) {
+                      return;
+                    }
+                    setState(() {
+                      final item = _measurements.removeAt(oldIndex);
+                      _measurements.insert(newIndex, item);
+                    });
+                    _triggerAutoSave();
+                  },
+                  itemBuilder: (context, index) =>
+                      _measurementCard(_measurements[index], index),
+                ),
+        ),
+      ],
+    );
+  }
+
+  // ============================== تبويب البلكونات ==============================
+  Widget _balconyTab() {
+    return Column(
+      children: [
+        Expanded(
+          child: _balconies.isEmpty
+              ? _emptyTab(
+                  Icons.balcony_rounded,
+                  'مفيش بلكونات لسه',
+                  'اضغط "إضافة بلكونة" وابدأ',
+                )
+              : ListView.builder(
+                  key: const PageStorageKey<String>('balcony-list'),
+                  controller: _balcScroll,
+                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 90),
+                  itemCount: _balconies.length,
+                  itemBuilder: (context, index) => _balconyCard(
+                    _balconies[index],
+                    index,
+                    key: ValueKey('balcony-${_balconies[index].id}'),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _emptyTab(IconData icon, String text, String hint) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: _line, size: 52),
+          const SizedBox(height: 10),
+          Text(
+            text,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(hint, style: const TextStyle(color: _muted, fontSize: 13)),
+        ],
+      ),
+    );
+  }
+
+  /// زرار الإضافة العائم: بيضيف مقاس (تبويب الشقة) أو بلكونة (تبويب البلكونات)
+  Widget _addButton() {
+    final isBalcony = _tabs.index == 1;
+    return FloatingActionButton.extended(
+      heroTag: 'add-measurement-fab',
+      onPressed: isBalcony ? _addBalcony : _addMeasurement,
+      backgroundColor: _gold,
+      foregroundColor: Colors.black,
+      elevation: 4,
+      icon: const Icon(Icons.add_rounded, size: 24),
+      label: Text(
+        isBalcony ? 'إضافة بلكونة' : 'إضافة مقاس',
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
       ),
     );
   }
