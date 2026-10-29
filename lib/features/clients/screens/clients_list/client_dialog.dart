@@ -304,13 +304,10 @@ extension _ClientDialog on _ClientsListPageState {
             : Timestamp.fromDate(installationDate!),
       };
       if (!isEdit || stage != oldStage) {
-        fields['work_stage'] = stage;
-        fields['installation_done'] = stage == 4;
-        fields['installation_done_at'] = stage == 4
-            ? (installationDate != null
-                  ? Timestamp.fromDate(installationDate!)
-                  : FieldValue.serverTimestamp())
-            : null;
+        fields.addAll(WorkStage.updateFields(stage));
+        if (stage == WorkStage.done && installationDate != null) {
+          fields['installation_done_at'] = Timestamp.fromDate(installationDate!);
+        }
       }
       if (isEdit) {
         if (registrationDate != null) {
@@ -340,7 +337,7 @@ extension _ClientDialog on _ClientsListPageState {
           style: TextStyle(color: _primaryText(context)),
         ),
         content: Text(
-          'هل تريد حذف "$name"؟',
+          'هل تريد حذف "$name"؟ هيتم حذف كل مقاساته وفاتورته نهائيًا ومش هينفع ترجعهم.',
           style: TextStyle(color: _mutedText(context)),
         ),
         actions: [
@@ -357,7 +354,13 @@ extension _ClientDialog on _ClientsListPageState {
     );
     if (confirmed != true) return;
     try {
-      await FirebaseFirestore.instance.collection('clients').doc(id).delete();
+      // حذف مستند Firestore مبيحذفش الـ subcollections، فبنحذف المقاسات
+      // (clients/{id}/details/main) مع العميل في عملية واحدة.
+      final clientRef = FirebaseFirestore.instance.collection('clients').doc(id);
+      final batch = FirebaseFirestore.instance.batch();
+      batch.delete(clientRef.collection('details').doc('main'));
+      batch.delete(clientRef);
+      await batch.commit();
       if (mounted) _message('تم حذف العميل');
     } catch (e) {
       if (mounted) _message('تعذر حذف العميل: $e');

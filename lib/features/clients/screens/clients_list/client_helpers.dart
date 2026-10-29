@@ -20,7 +20,9 @@ extension _ClientHelpers on _ClientsListPageState {
     hintText: hint,
     hintStyle: TextStyle(color: _mutedText(context)),
     filled: true,
-    fillColor: _isDark(context) ? const Color(0xFF1E293B) : AppColors.bgCreamy,
+    fillColor: _isDark(context)
+        ? const Color(0xFF1E293B)
+        : AppColors.bgCreamy,
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
       borderSide: BorderSide.none,
@@ -81,9 +83,7 @@ extension _ClientHelpers on _ClientsListPageState {
   void _call(String phone) => _launch(Uri(scheme: 'tel', path: phone));
 
   void _whatsapp(String phone, String name) {
-    final text = Uri.encodeComponent(
-      'السلام عليكم أ/ $name، معاك باريس للستائر',
-    );
+    final text = Uri.encodeComponent('السلام عليكم أ/ $name، معاك باريس للستائر');
     _launch(Uri.parse('https://wa.me/${_intlPhone(phone)}?text=$text'));
   }
 
@@ -102,13 +102,17 @@ extension _ClientHelpers on _ClientsListPageState {
     int stage,
   ) async {
     try {
-      await doc.reference.update({
-        'work_stage': stage,
-        'installation_done': stage == 4,
-        'installation_done_at': stage == 4
-            ? FieldValue.serverTimestamp()
-            : null,
-      });
+      await doc.reference.update(WorkStage.updateFields(stage));
+    } on FirebaseException catch (e) {
+      if (!mounted) return;
+      if (e.code == 'permission-denied') {
+        final email = FirebaseAuth.instance.currentUser?.email;
+        _message(
+          'مفيش صلاحية للتعديل. الحساب الحالي: ${email ?? "مش مسجّل دخول"}',
+        );
+      } else {
+        _message('تعذر تحديث المرحلة (${e.code})');
+      }
     } catch (e) {
       if (mounted) _message('تعذر تحديث المرحلة: $e');
     }

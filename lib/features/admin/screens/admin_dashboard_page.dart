@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../clients/screens/clients_list_page.dart';
+import '../../../core/constants/work_stage.dart';
+import '../../clients/list/clients_list_page.dart';
+import '../../auth/login_page.dart';
 import '../../home/home_screen.dart';
-import '../../home/screens/gallery_reorder_page.dart';
+import 'gallery_reorder_page.dart';
 
+import '../../auth/admin_auth_service.dart';
 import 'admin_analytics_page.dart';
 import 'upload_image_page.dart';
 import 'gallery_management_page.dart';
@@ -43,6 +46,30 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   static const Color _muted = Color(0xFF94A3B8);
 
   @override
+  void initState() {
+    super.initState();
+    // لوحة الإدارة مبتتفتحش من غير جلسة أدمن سليمة (حتى لو اتفتحت بالبصمة)
+    WidgetsBinding.instance.addPostFrameCallback((_) => _verifySession());
+  }
+
+  Future<void> _verifySession() async {
+    final status = await AdminAuthService.check();
+    if (!mounted || AdminAuthService.canEnter(status)) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => const LoginPage()),
+    );
+  }
+
+  Future<void> _signOut() async {
+    await AdminAuthService.signOut();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      (route) => false,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _bg,
@@ -58,10 +85,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 delegate: SliverChildListDelegate([
                   _buildWelcome(),
                   const SizedBox(height: 22),
-                  _sectionTitle(
-                    'حالة الشغل',
-                    Icons.local_fire_department_rounded,
-                  ),
+                  _sectionTitle('حالة الشغل', Icons.local_fire_department_rounded),
                   const SizedBox(height: 12),
                   _StageStrip(
                     onTapStage: (stage) =>
@@ -128,7 +152,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     },
                   ),
                   const SizedBox(height: 26),
-                  _sectionTitle('المعرض والمحتوى', Icons.photo_library_rounded),
+                  _sectionTitle(
+                    'المعرض والمحتوى',
+                    Icons.photo_library_rounded,
+                  ),
                   const SizedBox(height: 12),
                   _buildGroup([
                     _GroupRow(
@@ -177,6 +204,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       icon: Icons.fingerprint_rounded,
                       color: _gold,
                       onTap: _showSecurityDialog,
+                    ),
+                    _GroupRow(
+                      title: 'تسجيل الخروج',
+                      subtitle: 'إنهاء الجلسة وقفل لوحة الإدارة',
+                      icon: Icons.logout_rounded,
+                      color: AppColors.danger,
+                      onTap: _signOut,
                     ),
                   ]),
                   const SizedBox(height: 22),
@@ -456,6 +490,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Future<bool> _toggleBiometrics(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     if (value) {
+      final user = AdminAuthService.currentUser;
+      if (user == null) {
+        _showSnack('سجّل دخول بالبريد الأول', AppColors.danger);
+        return false;
+      }
       try {
         final canCheck = await auth.canCheckBiometrics;
         final isSupported = await auth.isDeviceSupported();
@@ -469,7 +508,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           options: const AuthenticationOptions(biometricOnly: true),
         );
         if (!authenticated) return false;
+        // نربط البصمة بالحساب المسجّل دخول دلوقتي (بتفتح قفل جلسته بس)
         await prefs.setBool('biometric_enabled', true);
+        await prefs.setString('biometric_uid', user.uid);
         if (mounted) {
           _showSnack('تم تفعيل البصمة بنجاح', _green);
         }
@@ -482,6 +523,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       }
     } else {
       await prefs.setBool('biometric_enabled', false);
+      await prefs.remove('biometric_uid');
       if (mounted) {
         _showSnack('تم إلغاء تفعيل البصمة', _gold);
       }
@@ -508,18 +550,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 }
 
+
 /// شريط مراحل الشغل: عدد العملاء في كل مرحلة بلون نيون، واضغط تفتح العملاء مفلترين
 class _StageStrip extends StatelessWidget {
   const _StageStrip({required this.onTapStage});
 
   final ValueChanged<int> onTapStage;
 
-  static const Map<int, Color> _colors = {
-    1: Color(0xFFFF4D5E),
-    2: Color(0xFFFFD43B),
-    3: Color(0xFF38BDF8),
-    4: Color(0xFF22E58B),
-  };
+  static const Map<int, Color> _colors = WorkStage.colors;
   static const Map<int, String> _labels = {
     1: 'بدأنا الشغل',
     2: 'تحضير',
@@ -527,11 +565,8 @@ class _StageStrip extends StatelessWidget {
     4: 'تمت',
   };
 
-  static int _stageOf(Map<String, dynamic> data) {
-    final raw = data['work_stage'];
-    if (raw is num) return raw.toInt().clamp(1, 4);
-    return data['installation_done'] == true ? 4 : 1;
-  }
+  static int _stageOf(Map<String, dynamic> data) =>
+      WorkStage.fromData(data);
 
   @override
   Widget build(BuildContext context) {
@@ -660,10 +695,7 @@ class _QuickAction extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: const TextStyle(
-                  color: Color(0xFF94A3B8),
-                  fontSize: 11.5,
-                ),
+                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5),
               ),
             ],
           ),

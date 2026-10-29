@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/work_stage.dart';
 
 // نفس ألوان الفاتورة والمقاسات والعملاء
 const Color _bg = Color(0xFF0F172A);
@@ -12,25 +13,11 @@ const Color _line = Color(0xFF334155);
 const Color _gold = AppColors.primaryGold;
 const Color _muted = Color(0xFF94A3B8);
 
-// مراحل الشغل (نفس ألوان صفحة العملاء)
-const Map<int, Color> _stageColors = {
-  1: Color(0xFFFF4D5E),
-  2: Color(0xFFFFD43B),
-  3: Color(0xFF38BDF8),
-  4: Color(0xFF22E58B),
-};
-const Map<int, String> _stageLabels = {
-  1: 'بدأنا الشغل',
-  2: 'جاري التحضير',
-  3: 'تم التخريم وجاهز للتركيب',
-  4: 'تمت وتم التركيب',
-};
+// مراحل الشغل: المصدر الوحيد في core/constants/work_stage.dart
+const Map<int, Color> _stageColors = WorkStage.colors;
+const Map<int, String> _stageLabels = WorkStage.labels;
 
-int _stageOf(Map<String, dynamic> data) {
-  final raw = data['work_stage'];
-  if (raw is num) return raw.toInt().clamp(1, 4);
-  return data['installation_done'] == true ? 4 : 1;
-}
+int _stageOf(Map<String, dynamic> data) => WorkStage.fromData(data);
 
 String _ar(Object? n) => (n ?? '').toString().replaceAllMapped(
   RegExp(r'[0-9]'),
@@ -63,13 +50,7 @@ class _InstallationAgendaPageState extends State<InstallationAgendaPage> {
   /// تغيير مرحلة الشغل — بنحدّث installation_done كمان عشان التقارير تفضل شغالة
   Future<void> _setStage(_ClientDoc doc, int stage) async {
     try {
-      await doc.reference.update({
-        'work_stage': stage,
-        'installation_done': stage == 4,
-        'installation_done_at': stage == 4
-            ? FieldValue.serverTimestamp()
-            : null,
-      });
+      await doc.reference.update(WorkStage.updateFields(stage));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -213,10 +194,7 @@ class _InstallationAgendaPageState extends State<InstallationAgendaPage> {
             fontWeight: FontWeight.w900,
             color: _gold,
           ),
-          leftChevronIcon: Icon(
-            Icons.chevron_left_rounded,
-            color: Colors.white,
-          ),
+          leftChevronIcon: Icon(Icons.chevron_left_rounded, color: Colors.white),
           rightChevronIcon: Icon(
             Icons.chevron_right_rounded,
             color: Colors.white,

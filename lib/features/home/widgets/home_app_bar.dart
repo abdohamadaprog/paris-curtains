@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
-import '../auth/screens/login_page.dart';
+import '../../auth/login_page.dart';
 
 class HomeAppBar extends StatelessWidget {
   final bool isDarkMode;
-  final VoidCallback onSearch;
   final VoidCallback onThemeToggle;
 
   const HomeAppBar({
     super.key,
     required this.isDarkMode,
-    required this.onSearch,
     required this.onThemeToggle,
   });
 
@@ -127,12 +125,6 @@ class HomeAppBar extends StatelessWidget {
                   ],
                 ),
               ),
-              _HeaderIconButton(
-                tooltip: 'البحث',
-                icon: Icons.search_rounded,
-                onPressed: onSearch,
-              ),
-              const SizedBox(width: 8),
               _HeaderIconButton(
                 tooltip: isDarkMode ? 'الوضع الفاتح' : 'الوضع الداكن',
                 icon: isDarkMode

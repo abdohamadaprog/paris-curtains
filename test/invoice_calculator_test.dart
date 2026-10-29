@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:paris_curtian_app/features/clients/screens/invoice/invoice_calculator.dart';
+import 'package:paris_curtian_app/features/clients/invoice/invoice_calculator.dart';
 
 double _sum(List<InvoiceLine> lines) =>
     lines.fold(0.0, (total, line) => total + line.total);

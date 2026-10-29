@@ -1,15 +1,19 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/services/cloudinary_service.dart';
+
 /// Upload queue shared by the upload page, dashboard and tracker.
-/// Queue metadata is persisted locally. The original picker file itself may
-/// be temporary, so a resumed job reports a clear error if its file is gone.
+/// Queue metadata is persisted locally. Each picked image is also copied into
+/// the app's own storage folder (the picker's file is often temporary), and the
+/// copy is deleted once the upload succeeds.
 class UploadQueueService extends ChangeNotifier {
   UploadQueueService._() {
     _ready = _loadPersistedQueue();
@@ -20,10 +24,6 @@ class UploadQueueService extends ChangeNotifier {
 
   static final UploadQueueService instance = UploadQueueService._();
 
-  static const String cloudinaryUrl =
-      'https://api.cloudinary.com/v1_1/dlmx10dic/image/upload';
-
-  static const String uploadPreset = 'curtains_upload';
   static const String _prefsKey = 'persisted_upload_queue';
 
   final List<UploadQueueItem> _items = <UploadQueueItem>[];
@@ -133,16 +133,18 @@ class UploadQueueService extends ChangeNotifier {
       final specificAccessoryType =
           fileAccessoryTypes?[file.path] ?? accessoryType;
 
+      final documentId = FirebaseFirestore.instance
+          .collection('gallery_images')
+          .doc()
+          .id;
+
       jobItems.add(
         UploadQueueItem(
-          file: file,
+          file: await _keepLocalCopy(file, documentId),
           filename: file.name.isNotEmpty
               ? file.name
               : 'image_${DateTime.now().microsecondsSinceEpoch}',
-          documentId: FirebaseFirestore.instance
-              .collection('gallery_images')
-              .doc()
-              .id,
+          documentId: documentId,
           category: category,
           rating: rating,
           isAccessory: isAccessory,
@@ -269,6 +271,7 @@ class UploadQueueService extends ChangeNotifier {
           //
           item.status = UploadItemStatus.success;
           item.error = null;
+          unawaited(_deleteLocalCopy(item.file.path));
         } catch (error, stackTrace) {
           item.status = UploadItemStatus.failed;
 
@@ -297,39 +300,12 @@ class UploadQueueService extends ChangeNotifier {
     UploadQueueItem item,
     Uint8List bytes,
   ) async {
-    final request = http.MultipartRequest('POST', Uri.parse(cloudinaryUrl));
-
-    request.fields['upload_preset'] = uploadPreset;
-
-    request.files.add(
-      http.MultipartFile.fromBytes('file', bytes, filename: item.filename),
+    // رفع موقّع من السيرفر (مفيش preset مكشوف في التطبيق)
+    final secureUrl = await CloudinaryService.uploadImage(
+      bytes,
+      filename: item.filename,
+      folder: 'gallery',
     );
-
-    final response = await request.send().timeout(const Duration(minutes: 3));
-
-    final body = await response.stream.bytesToString().timeout(
-      const Duration(minutes: 1),
-    );
-
-    debugPrint('[CLOUDINARY DEBUG] HTTP status: ${response.statusCode}');
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      debugPrint('[CLOUDINARY DEBUG] Response body: $body');
-
-      throw Exception('Cloudinary HTTP ${response.statusCode}: $body');
-    }
-
-    final decoded = jsonDecode(body);
-
-    if (decoded is! Map<String, dynamic>) {
-      throw const FormatException('استجابة Cloudinary غير مفهومة.');
-    }
-
-    final secureUrl = decoded['secure_url'];
-
-    if (secureUrl is! String || secureUrl.isEmpty) {
-      throw const FormatException('Cloudinary لم يرجع رابط الصورة.');
-    }
 
     final extension = _extension(item.filename);
 
@@ -365,6 +341,36 @@ class UploadQueueService extends ChangeNotifier {
         .collection('gallery_images')
         .doc(item.documentId)
         .set(data, SetOptions(merge: true));
+  }
+
+  /// بنحفظ نسخة من الصورة في فولدر التطبيق نفسه (الملف اللي بيرجعه الـ picker
+  /// غالبًا مؤقت وبيتمسح)، فالطابور يكمّل حتى بعد قفل التطبيق وفتحه.
+  Future<XFile> _keepLocalCopy(XFile source, String documentId) async {
+    if (kIsWeb) return source;
+    try {
+      final base = await getApplicationSupportDirectory();
+      final dir = Directory('${base.path}${Platform.pathSeparator}upload_queue');
+      if (!await dir.exists()) await dir.create(recursive: true);
+
+      final safeName = source.name.replaceAll(RegExp(r'[^\w.\-]'), '_');
+      final destination =
+          '${dir.path}${Platform.pathSeparator}${documentId}_$safeName';
+      await File(source.path).copy(destination);
+      return XFile(destination, name: source.name);
+    } catch (e) {
+      debugPrint('[UPLOAD QUEUE] Could not keep a local copy: $e');
+      return source;
+    }
+  }
+
+  Future<void> _deleteLocalCopy(String path) async {
+    if (kIsWeb || !path.contains('upload_queue')) return;
+    try {
+      final file = File(path);
+      if (await file.exists()) await file.delete();
+    } catch (_) {
+      // مش مشكلة لو النسخة ما اتمسحتش؛ مجرد ملف مؤقت.
+    }
   }
 
   static String _extension(String filename) {

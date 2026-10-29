@@ -1,12 +1,10 @@
-import 'dart:convert';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/cloudinary_service.dart';
 import '../../../core/utils/image_url.dart';
 import 'promo_reorder_page.dart';
 
@@ -21,28 +19,13 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
   bool _isUploading = false;
   final ImagePicker _picker = ImagePicker();
 
-  final String cloudName = 'dlmx10dic';
-  final String uploadPreset = 'curtains_upload';
-
   Future<String> _uploadFile(XFile image) async {
-    final request = http.MultipartRequest(
-      'POST',
-      Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/upload'),
-    );
     final bytes = await image.readAsBytes().timeout(const Duration(minutes: 2));
-    request.files.add(
-      http.MultipartFile.fromBytes('file', bytes, filename: image.name),
+    return CloudinaryService.uploadImage(
+      bytes,
+      filename: image.name,
+      folder: 'promo',
     );
-    request.fields['upload_preset'] = uploadPreset;
-    final response = await request.send().timeout(const Duration(minutes: 3));
-    final responseBody = await response.stream.bytesToString().timeout(
-      const Duration(minutes: 1),
-    );
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Cloudinary HTTP ${response.statusCode}: $responseBody');
-    }
-    final jsonResponse = jsonDecode(responseBody);
-    return jsonResponse['secure_url'] as String;
   }
 
   Future<void> _pickAndUpload() async {

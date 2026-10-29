@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_colors.dart';
-import '../utils/theme_manger.dart';
+import '../theme/theme_manager.dart';
 
 class ParisFooter extends StatelessWidget {
   const ParisFooter({
@@ -83,9 +83,9 @@ class ParisFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: themeManger,
+      listenable: themeManager,
       builder: (context, _) {
-        final isDark = themeManger.isDarkMode;
+        final isDark = themeManager.isDarkMode;
         final gold = isDark ? AppColors.lightGold : AppColors.primaryGold;
         final bg = isDark ? const Color(0xFF0B0C12) : const Color(0xFFF4EFE6);
         final textColor = isDark

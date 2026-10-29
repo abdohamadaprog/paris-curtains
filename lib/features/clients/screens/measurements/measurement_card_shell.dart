@@ -36,7 +36,11 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
           decoration: bare
               ? null
               : BoxDecoration(
-                  color: _panel,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0xFF26354B), _panel],
+                  ),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                     color: disabled ? _line : _gold.withValues(alpha: 0.5),
@@ -260,15 +264,12 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                                 const SizedBox(width: 6),
 
                                 // كتابة (٦ متر ثقيل + ٤ متر خفيف) بالخط الواضح الصريح
-                                Text(
+                                _meterPill(
                                   '${_fmtAr(calc.heavyMeters)} متر ثقيل',
-                                  style: TextStyle(
-                                    color: const Color(0xFFFFD45A),
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 14,
-                                    decoration: cardDecoration,
-                                    decorationColor: cardDecorColor,
-                                  ),
+                                  const Color(0xFFFFD45A),
+                                  pb,
+                                  cardDecoration,
+                                  cardDecorColor,
                                 ),
                                 const Padding(
                                   padding: EdgeInsets.symmetric(horizontal: 5),
@@ -281,15 +282,12 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                                     ),
                                   ),
                                 ),
-                                Text(
+                                _meterPill(
                                   '${_fmtAr(calc.lightMeters)} متر خفيف',
-                                  style: TextStyle(
-                                    color: const Color(0xFF70D6FF),
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 14,
-                                    decoration: cardDecoration,
-                                    decorationColor: cardDecorColor,
-                                  ),
+                                  const Color(0xFF70D6FF),
+                                  pb,
+                                  cardDecoration,
+                                  cardDecorColor,
                                 ),
                               ],
                             ),
@@ -313,9 +311,9 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                                     vertical: pb,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.black45,
-                                    borderRadius: BorderRadius.circular(5),
-                                    border: Border.all(color: Colors.white12),
+                                    color: _bg,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: _line),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
@@ -373,7 +371,12 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                             ),
                           ),
 
-                          SizedBox(height: gap),
+                          SizedBox(height: gap + 1),
+                          Container(
+                            height: 1,
+                            color: _line.withValues(alpha: 0.7),
+                          ),
+                          SizedBox(height: gap + 1),
 
                           // ========================================================
                           // السطر 4: خياطة ثقيل كذا م • خياطة خفيف كذا م (بالتفصيل والتنسيق العربي السليم)
@@ -512,6 +515,34 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
               // ====================================================================
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// حبّة ملوّنة لعدد الأمتار (ثقيل / خفيف)
+  Widget _meterPill(
+    String text,
+    Color color,
+    double pb,
+    TextDecoration? decoration,
+    Color? decorationColor,
+  ) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 7, vertical: 1 + pb),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w900,
+          fontSize: 14,
+          decoration: decoration,
+          decorationColor: decorationColor,
         ),
       ),
     );

@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // الأدمن = عنده custom claim اسمه admin، أو له مستند في admins/{uid}.
+    // مفيش أي إيميل مكتوب هنا. الصلاحية بتتمنح من Firebase Console أو Admin SDK بس.
+    function isAdmin() {
+      return signedIn() && (
+        request.auth.token.get('admin', false) == true ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // قائمة الأدمن: التطبيق ممنوع يكتب فيها نهائيًا.
+    // والمستخدم يقدر يقرا مستنده هو بس (عشان التطبيق يعرف هو أدمن ولا لأ).
+    match /admins/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list, create, update, delete: if false;
+    }
+
+    // المعرض والإكسسوارات والصور الترويجية:
+    // قراءة عامة لكل مستخدمي التطبيق، والتعديل للأدمن فقط
+    match /gallery_images/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /promo_images/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /accessories/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // حقل نصي اختياري: غايب أو null أو نص بطول معقول
+    // (بيقبل null عشان العملاء القدام اللي ممكن يكون عندهم حقول فاضية)
+    function optString(d, key, maxLen) {
+      return !(key in d) || d[key] == null ||
+        (d[key] is string && d[key].size() <= maxLen);
+    }
+
+    // فحص بسيط لشكل بيانات العميل (بيمنع بيانات غريبة أو ضخمة)
+    function validClient(d) {
+      return optString(d, 'name', 120)
+        && optString(d, 'phone', 40)
+        && optString(d, 'address', 300)
+        && optString(d, 'notes', 2000)
+        && (!('work_stage' in d) ||
+            (d.work_stage is int && d.work_stage >= 1 && d.work_stage <= 4));
+    }
+
+    // بيانات العملاء والفواتير والأجندة: للأدمن فقط (قراءة وكتابة)
+    // الفاتورة محفوظة جوه مستند العميل (حقل invoice) فبتتغطى بنفس القاعدة.
+    match /clients/{clientId} {
+      allow read, delete: if isAdmin();
+      allow create, update: if isAdmin() && validClient(request.resource.data);
+
+      // مقاسات العميل: clients/{clientId}/details/main
+      match /details/{docId} {
+        allow read, write: if isAdmin();
+      }
+    }
+
+    // أي مسار تاني غير مذكور فوق ممنوع تلقائيًا
+  }
+}

@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
-import '../../core/utils/theme_manger.dart';
+import '../../core/theme/theme_manager.dart';
 import 'screens/gallery_screen.dart';
-import 'screens/search_screen.dart';
 import 'widgets/home_app_bar.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -12,9 +11,9 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: themeManger,
+      listenable: themeManager,
       builder: (context, child) {
-        final isDarkMode = themeManger.isDarkMode;
+        final isDarkMode = themeManager.isDarkMode;
 
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -33,15 +32,8 @@ class HomeScreen extends StatelessWidget {
                 children: [
                   HomeAppBar(
                     isDarkMode: isDarkMode,
-                    onSearch: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const SearchScreen(),
-                        ),
-                      );
-                    },
                     onThemeToggle: () {
-                      themeManger.toggleTheme();
+                      themeManager.toggleTheme();
                     },
                   ),
                   const Expanded(child: GalleryScreen()),

@@ -60,9 +60,14 @@ class ClientDetailsRepository {
 
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  /// لو قواعد Firestore مش بتسمح بالمسار الجديد، بنرجع للتخزين القديم
-  /// جوه مستند العميل عشان التطبيق يفضل شغال.
-  static bool _detailsDenied = false;
+  /// لو قواعد Firestore رفضت المسار الجديد، بنرجع للتخزين القديم جوه مستند
+  /// العميل لفترة قصيرة (دقيقتين) وبعدها بنجرّب تاني. الرفض ممكن يكون مؤقت
+  /// (مثلاً الجلسة لسه ما اتفتحتش) فمنثبّتوش لحد ما التطبيق يتقفل.
+  static DateTime? _detailsDeniedAt;
+
+  static bool get _detailsDenied =>
+      _detailsDeniedAt != null &&
+      DateTime.now().difference(_detailsDeniedAt!) < const Duration(minutes: 2);
 
   static DocumentReference<Map<String, dynamic>> _clientRef(String id) =>
       _db.collection('clients').doc(id);
@@ -101,7 +106,7 @@ class ClientDetailsRepository {
         if (d.exists) return ClientDetails.fromMap(d.data() ?? {});
       } catch (e) {
         if (!_isDenied(e)) rethrow;
-        _detailsDenied = true;
+        _detailsDeniedAt = DateTime.now();
       }
     }
     final c = await _clientRef(clientId).get();
@@ -157,7 +162,7 @@ class ClientDetailsRepository {
         return;
       } catch (e) {
         if (!_isDenied(e)) rethrow;
-        _detailsDenied = true;
+        _detailsDeniedAt = DateTime.now();
       }
     }
 

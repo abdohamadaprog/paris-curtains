@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../admin/screens/admin_dashboard_page.dart';
+import '../../../admin/services/admin_auth_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -14,7 +15,6 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  static const String _adminEmail = 'abdohamadagpt@gmail.com';
   final LocalAuthentication auth = LocalAuthentication();
 
   final _formKey = GlobalKey<FormState>();
@@ -41,6 +41,21 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!isBiometricEnabled) {
         _showMessage('يجب تفعيل الدخول بالبصمة أولاً من لوحة الإدارة.');
+        return;
+      }
+
+      // البصمة بتفتح قفل محلي بس: لازم تكون فيه جلسة Firebase سليمة لنفس الحساب.
+      final user = AdminAuthService.currentUser;
+      if (user == null || prefs.getString('biometric_uid') != user.uid) {
+        _showMessage(
+          'سجّل دخول بالبريد وكلمة المرور الأول، وبعدها فعّل البصمة من لوحة الإدارة.',
+        );
+        return;
+      }
+      final status = await AdminAuthService.check(refresh: true);
+      if (!mounted) return;
+      if (!AdminAuthService.canEnter(status)) {
+        _showMessage('الجلسة انتهت. سجّل دخول بالبريد وكلمة المرور.');
         return;
       }
 
@@ -83,23 +98,23 @@ class _LoginPageState extends State<LoginPage> {
     final email = _emailController.text.trim().toLowerCase();
     final password = _passwordController.text;
 
-    if (email != _adminEmail) {
-      _showMessage('هذا الحساب غير مصرح له بدخول لوحة الإدارة.');
-      return;
-    }
-
     setState(() => _isLoading = true);
 
     try {
-      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
       if (!mounted) return;
 
-      if (credential.user?.email?.toLowerCase() != _adminEmail) {
-        await FirebaseAuth.instance.signOut();
+      // الصلاحية من السيرفر (custom claim أو admins/{uid}) مش من إيميل في الكود
+      final status = await AdminAuthService.check(refresh: true);
+
+      if (!mounted) return;
+
+      if (!AdminAuthService.canEnter(status)) {
+        await AdminAuthService.signOut();
 
         if (!mounted) return;
 

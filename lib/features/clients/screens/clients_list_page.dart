@@ -1,11 +1,14 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/work_stage.dart';
 import '../../../core/utils/theme_manger.dart';
+import '../../home/auth/screens/login_page.dart';
 import 'paris_client_measurements_page.dart';
 
 part 'clients_list/client_card.dart';
@@ -75,6 +78,7 @@ class _ClientsListPageState extends State<ClientsListPage>
   int _sortMode = 0; // 0 موعد التركيب • 1 الأحدث تسجيلاً • 2 الاسم
   int _stageFilter = 0; // 0 = كل المراحل
   bool _loaded = false;
+  bool _accessDenied = false; // Firestore رفض القراءة (مفيش جلسة أدمن)
 
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _allDocs = const [];
   List<_ClientItem> _items = const [];
@@ -123,9 +127,16 @@ class _ClientsListPageState extends State<ClientsListPage>
           (snap) {
             if (mounted) _applyDocs(snap.docs);
           },
-          onError: (_) {
-            // مفيش شاشة خطأ: لو حصلت مشكلة بنكمّل بآخر بيانات معروضة.
-            if (mounted && !_loaded) setState(() => _loaded = true);
+          onError: (Object error) {
+            if (!mounted) return;
+            // رفض الصلاحية بنوضّحه بدل ما القايمة تفضل فاضية من غير تفسير.
+            // أي خطأ تاني (مثلاً النت) بنكمّل بآخر بيانات معروضة.
+            final denied =
+                error is FirebaseException && error.code == 'permission-denied';
+            setState(() {
+              _loaded = true;
+              if (denied) _accessDenied = true;
+            });
           },
         );
   }
@@ -135,6 +146,7 @@ class _ClientsListPageState extends State<ClientsListPage>
     _items = docs.map(_toItem).toList();
     setState(() {
       _loaded = true;
+      _accessDenied = false;
       _refilter();
     });
   }
@@ -224,6 +236,8 @@ class _ClientsListPageState extends State<ClientsListPage>
             Expanded(
               child: !_loaded
                   ? const Center(child: CircularProgressIndicator(color: _gold))
+                  : _accessDenied
+                  ? _buildAccessDenied(context)
                   : TabBarView(
                       controller: _tabs,
                       children: [
@@ -409,10 +423,7 @@ class _ClientsListPageState extends State<ClientsListPage>
         ),
         labelColor: Colors.black,
         unselectedLabelColor: _mutedText(context),
-        labelStyle: const TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 13.5,
-        ),
+        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
         unselectedLabelStyle: const TextStyle(fontSize: 13.5),
         splashBorderRadius: BorderRadius.circular(10),
         tabs: [
@@ -506,6 +517,55 @@ class _ClientsListPageState extends State<ClientsListPage>
               }),
             ),
         ],
+      ),
+    );
+  }
+
+  /// الجلسة انتهت أو الحساب مش أدمن: رسالة واضحة وزرار للدخول
+  Widget _buildAccessDenied(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.lock_outline_rounded,
+              size: 52,
+              color: _mutedText(context),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'مفيش صلاحية لعرض العملاء',
+              style: TextStyle(
+                color: _primaryText(context),
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'الجلسة انتهت أو الحساب مش أدمن. سجّل دخول بحساب الأدمن.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _mutedText(context), fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(context).pushReplacement(
+                MaterialPageRoute<void>(builder: (_) => const LoginPage()),
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: _gold,
+                foregroundColor: Colors.black,
+              ),
+              icon: const Icon(Icons.login_rounded),
+              label: const Text(
+                'تسجيل الدخول',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

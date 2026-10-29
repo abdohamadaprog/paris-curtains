@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 import 'core/theme/app_theme.dart';
-import 'core/utils/theme_manger.dart';
+import 'core/theme/theme_manager.dart';
 import 'features/splash/splash_screen.dart';
 
 class ParisCurtainsApp extends StatelessWidget {
@@ -11,7 +11,7 @@ class ParisCurtainsApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: themeManger,
+      listenable: themeManager,
       builder: (context, child) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
@@ -21,7 +21,7 @@ class ParisCurtainsApp extends StatelessWidget {
           locale: context.locale,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
-          themeMode: themeManger.themeMode,
+          themeMode: themeManager.themeMode,
           home: const SplashScreen(),
         );
       },

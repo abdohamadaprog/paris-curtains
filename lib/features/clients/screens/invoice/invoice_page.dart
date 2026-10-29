@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../../core/constants/work_stage.dart';
 import '../../data/client_details_repository.dart';
 import 'invoice_calculator.dart';
 
@@ -14,19 +15,9 @@ const Color _kGold = Color(0xFFC5A059);
 const Color _kMuted = Color(0xFF94A3B8);
 const Color _kGreen = Color(0xFF10B981);
 
-// مراحل الشغل (نفس ألوان صفحة العملاء)
-const Map<int, Color> _kStageColors = {
-  1: Color(0xFFFF4D5E),
-  2: Color(0xFFFFD43B),
-  3: Color(0xFF38BDF8),
-  4: Color(0xFF22E58B),
-};
-const Map<int, String> _kStageLabels = {
-  1: 'بدأنا الشغل',
-  2: 'جاري التحضير',
-  3: 'تم التخريم وجاهز للتركيب',
-  4: 'تمت وتم التركيب',
-};
+// مراحل الشغل: المصدر الوحيد في core/constants/work_stage.dart
+const Map<int, Color> _kStageColors = WorkStage.colors;
+const Map<int, String> _kStageLabels = WorkStage.labels;
 
 /// دالة مساعدة لتحويل أي نص أو رقم إلى أرقام عربية مشرقية (٠١٢٣٤٥٦٧٨٩)
 String _arNum(dynamic value) {
@@ -224,10 +215,7 @@ class _InvoicePageState extends State<InvoicePage>
         ClientDetailsRepository.loadFast(widget.clientId),
       ]);
       final data = results[0] as Map<String, dynamic>;
-      final rawStage = data['work_stage'];
-      _stage = rawStage is num
-          ? rawStage.toInt().clamp(1, 4)
-          : (data['installation_done'] == true ? 4 : 1);
+      _stage = WorkStage.fromData(data);
       final details = results[1] as ClientDetails;
 
       _windows = details.measurements
@@ -664,13 +652,7 @@ class _InvoicePageState extends State<InvoicePage>
       await FirebaseFirestore.instance
           .collection('clients')
           .doc(widget.clientId)
-          .update({
-            'work_stage': stage,
-            'installation_done': stage == 4,
-            'installation_done_at': stage == 4
-                ? FieldValue.serverTimestamp()
-                : null,
-          });
+          .update(WorkStage.updateFields(stage));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -687,7 +669,11 @@ class _InvoicePageState extends State<InvoicePage>
       height: 40,
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: [Icon(icon, size: 17), const SizedBox(width: 6), Text(text)],
+        children: [
+          Icon(icon, size: 17),
+          const SizedBox(width: 6),
+          Text(text),
+        ],
       ),
     );
 
@@ -970,12 +956,7 @@ class _InvoicePageState extends State<InvoicePage>
     _scheduleAutoSave();
   }
 
-  void _editQty(
-    String key,
-    double current, {
-    required bool isBalcony,
-    required bool isFabric,
-  }) {
+  void _editQty(String key, double current, {required bool isBalcony, required bool isFabric}) {
     _openQuickEdit(
       title: isFabric ? 'تعديل أمتار القماش' : 'تعديل الكمية',
       current: current,
@@ -989,12 +970,7 @@ class _InvoicePageState extends State<InvoicePage>
     );
   }
 
-  void _editPrice(
-    String key,
-    double current, {
-    required bool isBalcony,
-    required bool isFabric,
-  }) {
+  void _editPrice(String key, double current, {required bool isBalcony, required bool isFabric}) {
     _openQuickEdit(
       title: isFabric ? 'تعديل سعر المتر' : 'تعديل سعر الوحدة',
       current: current,
@@ -1087,10 +1063,7 @@ class _InvoicePageState extends State<InvoicePage>
                         children: [
                           Text(
                             allIn ? 'الكل' : (noneIn ? 'بدون' : 'جزء'),
-                            style: const TextStyle(
-                              color: _kMuted,
-                              fontSize: 12,
-                            ),
+                            style: const TextStyle(color: _kMuted, fontSize: 12),
                           ),
                           const SizedBox(width: 5),
                           Icon(
@@ -1113,16 +1086,12 @@ class _InvoicePageState extends State<InvoicePage>
 
           for (var i = 0; i < visible.length; i++) ...[
             if (i > 0)
-              const Divider(
-                color: _kLine,
-                height: 1,
-                indent: 14,
-                endIndent: 14,
-              ),
+              const Divider(color: _kLine, height: 1, indent: 14, endIndent: 14),
             _buildLineRow(
               visible[i],
               included: !excluded.contains(visible[i].key),
-              onToggle: () => _toggleLine(visible[i].key, isBalcony: isBalcony),
+              onToggle: () =>
+                  _toggleLine(visible[i].key, isBalcony: isBalcony),
               onQty: () => _editQty(
                 visible[i].key,
                 visible[i].qty,
@@ -1154,11 +1123,7 @@ class _InvoicePageState extends State<InvoicePage>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      Icons.add_circle_outline_rounded,
-                      size: 18,
-                      color: _kGold,
-                    ),
+                    Icon(Icons.add_circle_outline_rounded, size: 18, color: _kGold),
                     SizedBox(width: 6),
                     Text(
                       'إضافة بند',
@@ -1303,9 +1268,7 @@ class _InvoicePageState extends State<InvoicePage>
                         color: _kGold,
                         fontWeight: FontWeight.w900,
                         fontSize: 14.5,
-                        decoration: included
-                            ? null
-                            : TextDecoration.lineThrough,
+                        decoration: included ? null : TextDecoration.lineThrough,
                       ),
                     ),
                   ),
@@ -1437,7 +1400,6 @@ class _InvoicePageState extends State<InvoicePage>
           _sumIncluded(inv.fabricLines, _balcExcluded),
     );
   }
-
   double get _combinedTotal => roundMoney(_aptTotal + _balcTotal);
 
   Widget _buildBottomSummaryBar() {
@@ -1511,11 +1473,7 @@ class _InvoicePageState extends State<InvoicePage>
         color: _kPanel,
         border: Border(top: BorderSide(color: _kLine, width: 1.5)),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black38,
-            offset: Offset(0, -3),
-            blurRadius: 8,
-          ),
+          BoxShadow(color: Colors.black38, offset: Offset(0, -3), blurRadius: 8),
         ],
       ),
       child: SafeArea(

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:fl_chart/fl_chart.dart'; // ✅ مكتبة الرسوم
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/work_stage.dart';
 
 // نفس ألوان الفاتورة والمقاسات والعملاء
 const Color _bg = Color(0xFF0F172A);
@@ -11,12 +12,7 @@ const Color _line = Color(0xFF334155);
 const Color _gold = AppColors.primaryGold;
 const Color _muted = Color(0xFF94A3B8);
 
-const Map<int, Color> _stageColors = {
-  1: Color(0xFFFF4D5E),
-  2: Color(0xFFFFD43B),
-  3: Color(0xFF38BDF8),
-  4: Color(0xFF22E58B),
-};
+const Map<int, Color> _stageColors = WorkStage.colors;
 const Map<int, String> _stageLabels = {
   1: 'بدأنا الشغل',
   2: 'جاري التحضير',
@@ -76,10 +72,7 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
       for (var doc in clientSnap.docs) {
         var data = doc.data();
 
-        final rawStage = data['work_stage'];
-        final stage = rawStage is num
-            ? rawStage.toInt().clamp(1, 4)
-            : (data['installation_done'] == true ? 4 : 1);
+        final stage = WorkStage.fromData(data);
         _stageCounts[stage] = (_stageCounts[stage] ?? 0) + 1;
 
         final done = data['installation_done'] == true;
@@ -175,10 +168,7 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
                   const SizedBox(height: 26),
 
                   // 2. مراحل الشغل
-                  _sectionTitle(
-                    "مراحل الشغل",
-                    Icons.local_fire_department_rounded,
-                  ),
+                  _sectionTitle("مراحل الشغل", Icons.local_fire_department_rounded),
                   const SizedBox(height: 12),
                   _buildStageBar(),
                   const SizedBox(height: 12),
@@ -299,7 +289,10 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
               ),
             ),
             const SizedBox(height: 2),
-            Text(title, style: const TextStyle(fontSize: 11, color: _muted)),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 11, color: _muted),
+            ),
           ],
         ),
       ),
@@ -377,10 +370,7 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 6),
-        Text(
-          title,
-          style: const TextStyle(color: Colors.white, fontSize: 12.5),
-        ),
+        Text(title, style: const TextStyle(color: Colors.white, fontSize: 12.5)),
       ],
     );
   }

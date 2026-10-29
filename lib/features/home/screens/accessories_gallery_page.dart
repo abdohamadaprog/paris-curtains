@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
-import '../../../core/utils/theme_manger.dart';
+import '../../../core/theme/theme_manager.dart';
 import '../widgets/gallery_grid.dart';
 import '../widgets/gallery_widgets.dart';
 
@@ -32,9 +32,9 @@ class _AccessoriesGalleryPageState extends State<AccessoriesGalleryPage> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: themeManger,
+      listenable: themeManager,
       builder: (context, child) {
-        final isDarkMode = themeManger.isDarkMode;
+        final isDarkMode = themeManager.isDarkMode;
 
         return DecoratedBox(
           decoration: BoxDecoration(
@@ -81,7 +81,7 @@ class _AccessoriesGalleryPageState extends State<AccessoriesGalleryPage> {
                     icon: isDarkMode
                         ? Icons.light_mode_rounded
                         : Icons.dark_mode_rounded,
-                    onPressed: () => themeManger.toggleTheme(),
+                    onPressed: () => themeManager.toggleTheme(),
                   ),
                 ),
               ],
