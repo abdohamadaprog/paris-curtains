@@ -1064,7 +1064,10 @@ class _UploadImagePageState extends State<UploadImagePage> {
     if (_isUploading) return;
 
     try {
-      final images = await _picker.pickMultiImage();
+      final images = await _picker.pickMultiImage(
+        imageQuality: 80,
+        maxWidth: 2000,
+      );
 
       if (!mounted || images.isEmpty) return;
 
@@ -1101,7 +1104,10 @@ class _UploadImagePageState extends State<UploadImagePage> {
     if (_isUploading) return;
 
     try {
-      final images = await _picker.pickMultiImage();
+      final images = await _picker.pickMultiImage(
+        imageQuality: 80,
+        maxWidth: 2000,
+      );
 
       if (!mounted || images.isEmpty) return;
 

@@ -31,6 +31,7 @@ class AdminDashboardPage extends StatefulWidget {
 }
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
+  int _stageRefresh = 0;
   final LocalAuthentication auth = LocalAuthentication();
 
   // نفس ألوان الفاتورة والمقاسات
@@ -88,6 +89,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   _sectionTitle('حالة الشغل', Icons.local_fire_department_rounded),
                   const SizedBox(height: 12),
                   _StageStrip(
+                    refreshToken: _stageRefresh,
                     onTapStage: (stage) =>
                         _navTo(ClientsListPage(initialStage: stage)),
                   ),
@@ -426,8 +428,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  void _navTo(Widget page) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+  /// بيفتح الصفحة، ولما نرجع منها بنحدّث عدّاد المراحل
+  /// (لأن العدّاد بقى count() مش stream حي على كل العملاء).
+  Future<void> _navTo(Widget page) async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+    if (mounted) setState(() => _stageRefresh++);
   }
 
   void _showSecurityDialog() {
@@ -552,11 +557,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
 
 /// شريط مراحل الشغل: عدد العملاء في كل مرحلة بلون نيون، واضغط تفتح العملاء مفلترين
-class _StageStrip extends StatelessWidget {
-  const _StageStrip({required this.onTapStage});
+class _StageStrip extends StatefulWidget {
+  const _StageStrip({required this.onTapStage, required this.refreshToken});
 
   final ValueChanged<int> onTapStage;
+  final int refreshToken;
 
+  @override
+  State<_StageStrip> createState() => _StageStripState();
+}
+
+class _StageStripState extends State<_StageStrip> {
   static const Map<int, Color> _colors = WorkStage.colors;
   static const Map<int, String> _labels = {
     1: 'بدأنا الشغل',
@@ -565,82 +576,117 @@ class _StageStrip extends StatelessWidget {
     4: 'تمت',
   };
 
-  static int _stageOf(Map<String, dynamic> data) =>
-      WorkStage.fromData(data);
+  Map<int, int>? _counts;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _StageStrip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) _load();
+  }
+
+  /// بدل ما نحمّل كل العملاء (قراءة لكل مستند)، بنستخدم count() (قراءة واحدة
+  /// تقريبًا لكل ١٠٠٠ مستند). العملاء القدام من غير work_stage بيتحسبوا:
+  /// تمت = installation_done، والباقي = مرحلة ١ (نفس WorkStage.fromData).
+  Future<void> _load() async {
+    try {
+      final col = FirebaseFirestore.instance.collection('clients');
+      final results = await Future.wait([
+        col.count().get(),
+        col.where('work_stage', isEqualTo: WorkStage.preparing).count().get(),
+        col.where('work_stage', isEqualTo: WorkStage.drilled).count().get(),
+        col.where('installation_done', isEqualTo: true).count().get(),
+      ]);
+      final total = results[0].count ?? 0;
+      final preparing = results[1].count ?? 0;
+      final drilled = results[2].count ?? 0;
+      final done = results[3].count ?? 0;
+      final started = total - preparing - drilled - done;
+      if (!mounted) return;
+      setState(() {
+        _counts = {
+          1: started < 0 ? 0 : started,
+          2: preparing,
+          3: drilled,
+          4: done,
+        };
+      });
+    } catch (_) {
+      // لو فشل (مفيش نت) بنسيب القيم القديمة أو "…"
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance.collection('clients').snapshots(),
-      builder: (context, snapshot) {
-        final counts = {1: 0, 2: 0, 3: 0, 4: 0};
-        for (final d in snapshot.data?.docs ?? const []) {
-          final s = _stageOf(d.data());
-          counts[s] = (counts[s] ?? 0) + 1;
-        }
-        final loaded = snapshot.hasData;
+    final counts = _counts ?? const <int, int>{};
+    final loaded = _counts != null;
+    final onTapStage = widget.onTapStage;
 
-        return Row(
-          children: [
-            for (final stage in const [1, 2, 3, 4])
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(left: stage == 4 ? 0 : 8),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: () => onTapStage(stage),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Color.alphaBlend(
-                          _colors[stage]!.withValues(alpha: 0.10),
-                          const Color(0xFF1E293B),
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: _colors[stage]!.withValues(alpha: 0.65),
-                          width: 1.3,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _colors[stage]!.withValues(alpha: 0.28),
-                            blurRadius: 12,
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            loaded ? _ar(counts[stage]) : '…',
-                            style: TextStyle(
-                              color: _colors[stage],
-                              fontSize: 25,
-                              fontWeight: FontWeight.w900,
-                              height: 1.1,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _labels[stage]!,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Color(0xFFCBD5E1),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
+    return Row(
+      children: [
+        for (final stage in const [1, 2, 3, 4])
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(left: stage == 4 ? 0 : 8),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => onTapStage(stage),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Color.alphaBlend(
+                      _colors[stage]!.withValues(alpha: 0.10),
+                      const Color(0xFF1E293B),
                     ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: _colors[stage]!.withValues(alpha: 0.65),
+                      width: 1.3,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _colors[stage]!.withValues(alpha: 0.28),
+                        blurRadius: 12,
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        loaded ? _ar(counts[stage]) : '…',
+                        style: TextStyle(
+                          color: _colors[stage],
+                          fontSize: 25,
+                          fontWeight: FontWeight.w900,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _labels[stage]!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Color(0xFFCBD5E1),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-          ],
-        );
-      },
+            ),
+          ),
+      ],
     );
   }
 }
+
 
 class _QuickAction extends StatelessWidget {
   final String title;

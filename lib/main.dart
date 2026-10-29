@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:easy_localization/easy_localization.dart';
 
 import 'firebase_options.dart';
 import 'app.dart';
@@ -13,20 +12,11 @@ import 'core/theme/theme_manager.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   _setupErrorHandling();
-  await EasyLocalization.ensureInitialized();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await _activateAppCheck();
   await themeManager.loadTheme();
-  runApp(
-    EasyLocalization(
-      supportedLocales: const [Locale('ar'), Locale('en')],
-      path: 'assets/translations',
-      fallbackLocale: const Locale('ar'),
-      startLocale: const Locale('ar'),
-      child: const ParisCurtainsApp(),
-    ),
-  );
+  runApp(const ParisCurtainsApp());
 }
 
 /// Firebase App Check: بيثبت إن الطلبات جاية من تطبيقك الأصلي مش من سكربت.

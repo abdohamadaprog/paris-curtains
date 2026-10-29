@@ -4,7 +4,7 @@
 
 ## 0) تجهيز
 ```bash
-flutter pub add firebase_app_check cloud_functions
+flutter pub get          # firebase_app_check وcloud_functions متضافين في pubspec.yaml أصلًا
 npm install -g firebase-tools
 firebase login
 ```
@@ -41,14 +41,17 @@ cd functions
 npm install
 firebase functions:secrets:set CLOUDINARY_API_SECRET
 ```
-وفي ملف `functions/.env`:
+وانسخ `functions/.env.example` إلى `functions/.env` واكتب فيه:
 ```
 CLOUDINARY_API_KEY=ضع_الـAPI_key_هنا
+CLOUDINARY_CLOUD_NAME=ضع_اسم_الـcloud_هنا
 ```
-(الاتنين من Cloudinary ← Settings ← API Keys.)
+(الـ API key والـ secret من Cloudinary ← Settings ← API Keys، واسم الـ cloud من لوحة Cloudinary الرئيسية.)
 ```bash
 firebase deploy --only functions
 ```
+النشر بيرفع دالتين: `getCloudinarySignature` (توقيع الرفع) و`deleteCloudinaryAsset` (حذف الصورة من Cloudinary عند حذفها من التطبيق). الاتنين للأدمن فقط ومعاهم `enforceAppCheck: true`، والـ region لازم يفضل `europe-west1` (مطابق لـ `lib/core/services/cloudinary_service.dart`).
+
 ملحوظة: الدالة `enforceAppCheck: true`، فلازم الخطوة 3 تكون خلصت (وتوكن الـ debug متضاف) قبل ما الرفع يشتغل من التطبيق.
 
 ## 5) قفل Cloudinary

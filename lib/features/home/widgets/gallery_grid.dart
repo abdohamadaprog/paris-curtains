@@ -6,7 +6,7 @@ import '../../../core/utils/image_url.dart';
 import 'app_image_viewer.dart';
 import 'gallery_widgets.dart';
 
-class GalleryGrid extends StatelessWidget {
+class GalleryGrid extends StatefulWidget {
   final String category;
   final String? accessoryType;
   final int crossAxisCount;
@@ -17,6 +17,17 @@ class GalleryGrid extends StatelessWidget {
     this.accessoryType,
     this.crossAxisCount = 2,
   });
+
+  @override
+  State<GalleryGrid> createState() => _GalleryGridState();
+}
+
+class _GalleryGridState extends State<GalleryGrid> {
+  // الـ stream بيتعمل مرة واحدة هنا. لو اتعمل جوه build، كل rebuild كان
+  // بيعمل اشتراك جديد على Firestore.
+  // من غير orderBy عشان السجلات القديمة اللي من غير created_at متختفيش.
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _stream =
+      FirebaseFirestore.instance.collection('gallery_images').snapshots();
 
   void _showImageViewer(
     BuildContext context,
@@ -35,13 +46,12 @@ class GalleryGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final category = widget.category;
+    final accessoryType = widget.accessoryType;
+    final crossAxisCount = widget.crossAxisCount;
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      // Fetch without orderBy so legacy records missing created_at are not
-      // silently omitted by Firestore.
-      stream: FirebaseFirestore.instance
-          .collection('gallery_images')
-          .snapshots(),
+      stream: _stream,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return const GalleryMessageView(

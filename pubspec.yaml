@@ -20,9 +20,9 @@ dependencies:
   cached_network_image: ^3.4.1
 
   # أنيميشن تكبير الكارت داخل نفس الصفحة (مثبّتة على إصدار محدد لأن المكتبة جديدة وبتتغير بسرعة)
-  hero_here: 2.3.5
   http: ^1.6.0
-  easy_localization: ^3.0.7
+  flutter_localizations:
+    sdk: flutter
 
   # Utilities
   intl: 0.20.3
@@ -54,7 +54,6 @@ flutter:
     - assets/images/paris1.png
     - assets/images/abdo.jpg
     - assets/images/logo.png
-    - assets/translations/
 
   fonts:
     - family: Cairo
@@ -76,7 +75,7 @@ flutter:
         - asset: assets/fonts/ArefRuqaa-Regular.ttf
 
 flutter_launcher_icons:
-  android: "launcher_icon"
+  android: true
   ios: true
   min_sdk_android: 21
   remove_alpha_ios: true

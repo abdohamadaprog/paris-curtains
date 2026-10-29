@@ -15,6 +15,10 @@ class FullGalleryPage extends StatefulWidget {
 }
 
 class _FullGalleryPageState extends State<FullGalleryPage> {
+  // اشتراك واحد ثابت بدل إعادة الاشتراك مع كل rebuild
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _galleryStream =
+      FirebaseFirestore.instance.collection('gallery_images').snapshots();
+
   static const Color _gold = AppColors.primaryGold;
 
   // نفس تصنيفات المعرض الخارجي
@@ -108,9 +112,7 @@ class _FullGalleryPageState extends State<FullGalleryPage> {
         ),
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance
-            .collection('gallery_images')
-            .snapshots(),
+        stream: _galleryStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting &&
               !snapshot.hasData) {

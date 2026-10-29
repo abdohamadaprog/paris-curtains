@@ -91,19 +91,20 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
         }
       }
 
-      // 2. حساب أنواع الصور (عشان نعرف أكتر نوع مطلوب)
-      var gallerySnap = await FirebaseFirestore.instance
-          .collection('gallery_images')
-          .get();
-      for (var doc in gallerySnap.docs) {
-        String cat = doc.data()['category'] ?? "عام";
-        // توحيد المسميات لو فيه قديم
-        if (cat == "بلتكانات") cat = "بلتكانة";
-
-        if (_categoryCounts.containsKey(cat)) {
-          _categoryCounts[cat] = _categoryCounts[cat]! + 1;
-        }
+      // 2. حساب أنواع الصور: count() لكل نوع (قراءة رخيصة) بدل تحميل كل المعرض
+      final gallery = FirebaseFirestore.instance.collection('gallery_images');
+      final categories = _categoryCounts.keys.toList();
+      final counts = await Future.wait([
+        for (final cat in categories)
+          gallery.where('category', isEqualTo: cat).count().get(),
+        // تسمية قديمة كانت بتتوحّد مع "بلتكانة"
+        gallery.where('category', isEqualTo: 'بلتكانات').count().get(),
+      ]);
+      for (var i = 0; i < categories.length; i++) {
+        _categoryCounts[categories[i]] = counts[i].count ?? 0;
       }
+      _categoryCounts['بلتكانة'] =
+          (_categoryCounts['بلتكانة'] ?? 0) + (counts.last.count ?? 0);
 
       if (!mounted) return;
       setState(() => _isLoading = false);

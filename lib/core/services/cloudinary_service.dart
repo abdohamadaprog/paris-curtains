@@ -65,4 +65,48 @@ class CloudinaryService {
     }
     return secureUrl;
   }
+
+  /// بيستخرج public_id من رابط Cloudinary الأصلي (secure_url).
+  /// مثال: .../image/upload/v123/paris_curtains/gallery/abc.jpg
+  ///   ←   paris_curtains/gallery/abc
+  /// بيرجّع null لو الرابط مش Cloudinary.
+  static String? publicIdFromUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.host.endsWith('cloudinary.com')) return null;
+
+    final segments = uri.pathSegments;
+    final uploadIndex = segments.indexOf('upload');
+    if (uploadIndex == -1 || uploadIndex + 1 >= segments.length) return null;
+
+    var rest = segments.sublist(uploadIndex + 1);
+
+    // نشيل أي transformations ونوقف عند رقم النسخة (v123456)
+    final versionIndex = rest.indexWhere((s) => RegExp(r'^v\d+$').hasMatch(s));
+    if (versionIndex != -1) {
+      rest = rest.sublist(versionIndex + 1);
+    }
+    if (rest.isEmpty) return null;
+
+    final joined = Uri.decodeComponent(rest.join('/'));
+    final dot = joined.lastIndexOf('.');
+    final withoutExt = dot > 0 ? joined.substring(0, dot) : joined;
+    return withoutExt.isEmpty ? null : withoutExt;
+  }
+
+  /// حذف الصورة من Cloudinary (الأدمن فقط من السيرفر).
+  ///
+  /// "best effort": لو فشل (مفيش نت مثلًا) مبنوقفش الحذف من Firestore،
+  /// بنرجّع false بس، والصورة اليتيمة تتشال يدويًا من لوحة Cloudinary.
+  static Future<bool> deleteByUrl(String url) async {
+    final publicId = publicIdFromUrl(url);
+    if (publicId == null) return false;
+    try {
+      await _functions.httpsCallable('deleteCloudinaryAsset').call(
+        <String, dynamic>{'publicId': publicId},
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 }

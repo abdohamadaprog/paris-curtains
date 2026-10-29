@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/constants/work_stage.dart';
 import '../data/client_details_repository.dart';
 import 'invoice_calculator.dart';
+import 'invoice_meta.dart';
 
 // ألوان الفاتورة (لون مميز واحد = الذهبي، عشان الشكل يبقى هادي وواضح)
 const Color _kBg = Color(0xFF0F172A);
@@ -133,8 +134,11 @@ class _InvoicePageState extends State<InvoicePage>
   // نوع قماش البلكونة
   String _balconyFabricKey = 'fabric_dak';
 
-  // العربون المدفوع
+  // المدفوع (مجموع سجل الدفعات) + هوية الفاتورة
   double _depositPaid = 0;
+  final List<InvoicePayment> _payments = [];
+  String? _invoiceNumber;
+  DateTime? _issuedAt;
 
   // حالة الحفظ
   Timer? _autoSaveTimer;
@@ -278,6 +282,30 @@ class _InvoicePageState extends State<InvoicePage>
         if (inv['deposit_paid'] != null) {
           _depositPaid = _safeNum(inv['deposit_paid']);
         }
+
+        // هوية الفاتورة وسجل الدفعات
+        final savedNumber = inv['number'];
+        if (savedNumber is String && savedNumber.isNotEmpty) {
+          _invoiceNumber = savedNumber;
+        }
+        final issued = inv['issued_at'];
+        if (issued is Timestamp) _issuedAt = issued.toDate();
+        for (final raw in (inv['payments'] as List? ?? const [])) {
+          final p = InvoicePayment.fromMap(raw);
+          if (p != null) _payments.add(p);
+        }
+        if (_payments.isEmpty && _depositPaid > 0) {
+          // فاتورة قديمة: العربون كان رقم واحد، نحوّله لدفعة في السجل
+          final savedAt = inv['saved_at'];
+          _payments.add(
+            InvoicePayment(
+              amount: _depositPaid,
+              date: savedAt is Timestamp ? savedAt.toDate() : DateTime.now(),
+              note: 'عربون',
+            ),
+          );
+        }
+        if (_payments.isNotEmpty) _depositPaid = sumPayments(_payments);
       }
 
       if (mounted) {
@@ -300,8 +328,21 @@ class _InvoicePageState extends State<InvoicePage>
         .collection('clients')
         .doc(widget.clientId);
 
+    // أول حفظ = تاريخ ورقم الفاتورة (بيفضلوا ثابتين بعد كده)
+    _invoiceNumber ??= newInvoiceNumber(DateTime.now(), widget.clientId);
+    _issuedAt ??= DateTime.now();
+    final total = _combinedTotal;
+
     final payload = {
-      'prices': _customPrices,
+      'number': _invoiceNumber,
+      'issued_at': Timestamp.fromDate(_issuedAt!),
+      'status': invoiceStatusFor(total: total, paid: _depositPaid).name,
+      'total': total,
+      'apt_total': _aptTotal,
+      'balc_total': _balcTotal,
+      'payments': _payments.map((p) => p.toMap()).toList(),
+      // لقطة كاملة للأسعار: تغيير الأسعار الافتراضية بعدين ميغيّرش الفاتورة دي
+      'prices': frozenPrices(_customPrices),
       'apt_qty_override': _aptQtyOverride,
       'apt_price_override': _aptPriceOverride,
       'balc_qty_override': _balcQtyOverride,
@@ -528,8 +569,9 @@ class _InvoicePageState extends State<InvoicePage>
   }
 
   Widget _buildClientBanner() {
-    final now = DateTime.now();
-    final today = _arNum('${now.day}/${now.month}/${now.year}');
+    final shown = _issuedAt ?? DateTime.now();
+    final today = _arNum('${shown.day}/${shown.month}/${shown.year}');
+    final status = invoiceStatusFor(total: _combinedTotal, paid: _depositPaid);
     final hasPhone = widget.phone != null && widget.phone!.isNotEmpty;
     final hasAddress = widget.address != null && widget.address!.isNotEmpty;
 
@@ -576,7 +618,32 @@ class _InvoicePageState extends State<InvoicePage>
             ),
           ),
           const SizedBox(width: 10),
-          Text(today, style: const TextStyle(color: _kMuted, fontSize: 12.5)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_invoiceNumber != null)
+                Text(
+                  _invoiceNumber!,
+                  style: const TextStyle(
+                    color: _kGold,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              Text(
+                today,
+                style: const TextStyle(color: _kMuted, fontSize: 12.5),
+              ),
+              Text(
+                invoiceStatusLabel(status),
+                style: TextStyle(
+                  color: status == InvoiceStatus.paid ? _kGreen : _kMuted,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -1492,7 +1559,7 @@ class _InvoicePageState extends State<InvoicePage>
                   ),
                   const SizedBox(width: 8),
                   block(
-                    label: 'العربون',
+                    label: 'المدفوع',
                     value: _money(_depositPaid),
                     color: _kGreen,
                     onTap: _openDepositDialog,
@@ -1777,98 +1844,246 @@ class _InvoicePageState extends State<InvoicePage>
     );
   }
 
-  // ============================ ديالوج العربون ============================
+  // ============================ سجل الدفعات ============================
+
+  String _fmtDate(DateTime d) => _arNum('${d.day}/${d.month}/${d.year}');
 
   void _openDepositDialog() {
-    final controller = TextEditingController(
-      text: _depositPaid == 0
-          ? ''
-          : (_depositPaid == _depositPaid.roundToDouble()
-                ? _depositPaid.toInt().toString()
-                : _depositPaid.toString()),
-    );
+    final amountCtrl = TextEditingController();
+    final noteCtrl = TextEditingController();
 
     showDialog<void>(
       context: context,
       builder: (ctx) {
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: AlertDialog(
-            backgroundColor: const Color(0xFF1E293B),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Row(
-              children: const [
-                Icon(Icons.payments_rounded, color: Color(0xFF10B981)),
-                SizedBox(width: 8),
-                Text(
-                  'تسجيل العربون المدفوع',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final total = _combinedTotal;
+            final remaining = roundMoney(total - _depositPaid);
+            final status = invoiceStatusFor(total: total, paid: _depositPaid);
+
+            void addPayment() {
+              final v = _safeNum(amountCtrl.text);
+              if (v <= 0) return;
+              setState(() {
+                _payments.add(
+                  InvoicePayment(
+                    amount: v,
+                    date: DateTime.now(),
+                    note: noteCtrl.text.trim(),
+                  ),
+                );
+                _depositPaid = sumPayments(_payments);
+              });
+              _scheduleAutoSave();
+              amountCtrl.clear();
+              noteCtrl.clear();
+              setDialogState(() {});
+            }
+
+            Future<void> removePayment(int index) async {
+              final ok = await showDialog<bool>(
+                context: ctx,
+                builder: (c) => Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: AlertDialog(
+                    backgroundColor: _kPanel,
+                    title: const Text(
+                      'حذف الدفعة؟',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(c, false),
+                        child: const Text(
+                          'إلغاء',
+                          style: TextStyle(color: _kMuted),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(c, true),
+                        child: const Text(
+                          'حذف',
+                          style: TextStyle(color: Color(0xFFEF4444)),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-            content: TextField(
-              controller: controller,
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
+              );
+              if (ok != true) return;
+              setState(() {
+                _payments.removeAt(index);
+                _depositPaid = sumPayments(_payments);
+              });
+              _scheduleAutoSave();
+              setDialogState(() {});
+            }
+
+            return Directionality(
+              textDirection: TextDirection.rtl,
+              child: AlertDialog(
+                backgroundColor: _kPanel,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                title: Row(
+                  children: const [
+                    Icon(Icons.payments_rounded, color: _kGreen),
+                    SizedBox(width: 8),
+                    Text(
+                      'سجل الدفعات',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                content: SizedBox(
+                  width: double.maxFinite,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'الإجمالي ${_money(total)} • المدفوع ${_money(_depositPaid)}'
+                          ' • ${remaining > 0 ? 'المتبقي ${_money(remaining)}' : 'خالص'}',
+                          style: const TextStyle(color: _kMuted, fontSize: 12.5),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          invoiceStatusLabel(status),
+                          style: TextStyle(
+                            color: status == InvoiceStatus.paid
+                                ? _kGreen
+                                : _kGold,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        if (_payments.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Text(
+                              'لسه مفيش دفعات مسجّلة.',
+                              style: TextStyle(color: _kMuted, fontSize: 13),
+                            ),
+                          ),
+                        for (var i = 0; i < _payments.length; i++)
+                          ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              '${_money(_payments[i].amount)} ج.م',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text(
+                              [
+                                _fmtDate(_payments[i].date),
+                                if (_payments[i].note.isNotEmpty)
+                                  _payments[i].note,
+                              ].join('  •  '),
+                              style: const TextStyle(
+                                color: _kMuted,
+                                fontSize: 12,
+                              ),
+                            ),
+                            trailing: IconButton(
+                              tooltip: 'حذف الدفعة',
+                              icon: const Icon(
+                                Icons.delete_outline_rounded,
+                                color: Color(0xFFEF4444),
+                              ),
+                              onPressed: () => removePayment(i),
+                            ),
+                          ),
+                        const Divider(color: _kLine),
+                        TextField(
+                          controller: amountCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 17,
+                          ),
+                          textAlign: TextAlign.center,
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: _kBg,
+                            hintText: 'مبلغ الدفعة الجديدة',
+                            hintStyle: const TextStyle(
+                              color: Color(0xFF64748B),
+                              fontSize: 13,
+                            ),
+                            suffixText: 'ج.م',
+                            suffixStyle: const TextStyle(
+                              color: _kGreen,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: _kLine),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: noteCtrl,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: _kBg,
+                            hintText: 'ملاحظة (اختياري) مثال: عربون',
+                            hintStyle: const TextStyle(
+                              color: Color(0xFF64748B),
+                              fontSize: 13,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: _kLine),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: addPayment,
+                            icon: const Icon(Icons.add_rounded),
+                            label: const Text(
+                              'إضافة دفعة',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _kGreen,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text(
+                      'تم',
+                      style: TextStyle(color: _kMuted),
+                    ),
+                  ),
+                ],
               ),
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
-              textAlign: TextAlign.center,
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: const Color(0xFF0F172A),
-                hintText: 'مثال: ٥٠٠٠',
-                hintStyle: const TextStyle(
-                  color: Color(0xFF64748B),
-                  fontSize: 13,
-                ),
-                suffixText: 'ج.م',
-                suffixStyle: const TextStyle(
-                  color: Color(0xFF10B981),
-                  fontWeight: FontWeight.bold,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF334155)),
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text(
-                  'إلغاء',
-                  style: TextStyle(color: Color(0xFF94A3B8)),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  final v = _safeNum(controller.text);
-                  setState(() => _depositPaid = v);
-                  _scheduleAutoSave();
-                  Navigator.pop(ctx);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF10B981),
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text(
-                  'حفظ العربون',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -2184,6 +2399,13 @@ class _InvoicePageState extends State<InvoicePage>
     b.writeln('━━━━━━━━━━━━━━━━━━━━');
     b.writeln('✨ ستائر باريس — PARIS CURTAINS ✨');
     b.writeln('━━━━━━━━━━━━━━━━━━━━');
+    if (_invoiceNumber != null) {
+      b.writeln('🧾 رقم الفاتورة: $_invoiceNumber');
+    }
+    if (_issuedAt != null) {
+      final d = _issuedAt!;
+      b.writeln('📅 التاريخ: ${_arNum('${d.day}/${d.month}/${d.year}')}');
+    }
     b.writeln('👤 العميل: ${widget.clientName}');
     if (widget.phone != null && widget.phone!.isNotEmpty) {
       b.writeln('📱 الهاتف: ${_arNum(widget.phone!)}');
@@ -2216,7 +2438,7 @@ class _InvoicePageState extends State<InvoicePage>
 
     b.writeln('━━━━━━━━━━━━━━━━━━━━');
     b.writeln('💰 الحساب الإجمالي: ${_money(combined)} ج.م');
-    b.writeln('💵 العربون المدفوع: ${_money(_depositPaid)} ج.م');
+    b.writeln('💵 المدفوع: ${_money(_depositPaid)} ج.م');
     b.writeln('⚖️ المتبقي الصافي: ${_money(remaining)} ج.م');
     b.writeln('━━━━━━━━━━━━━━━━━━━━');
     b.writeln('شكراً لثقتكم بنا ✨ ستائر باريس ترحب بكم دائماً');

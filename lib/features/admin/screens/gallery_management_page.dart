@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/cloudinary_service.dart';
 import '../../../core/utils/image_url.dart';
 
 class GalleryManagementPage extends StatefulWidget {
@@ -111,10 +112,18 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
 
     if (!mounted) return;
     if (confirm) {
-      await FirebaseFirestore.instance
+      final ref = FirebaseFirestore.instance
           .collection('gallery_images')
-          .doc(docId)
-          .delete();
+          .doc(docId);
+      // نجيب الرابط قبل الحذف عشان نمسح الصورة من Cloudinary كمان
+      String? url;
+      try {
+        url = (await ref.get()).data()?['url']?.toString();
+      } catch (_) {}
+      await ref.delete();
+      if (url != null && url.isNotEmpty) {
+        await CloudinaryService.deleteByUrl(url);
+      }
       if (mounted) _snack("تم الحذف بنجاح 🗑️", AppColors.neonRed);
     }
   }

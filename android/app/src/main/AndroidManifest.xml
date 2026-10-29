@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
 
     <application
-        android:label="باريس للستاير"
+        android:label="باريس للستائر"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -32,6 +32,7 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
     final image = await _picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 80,
+      maxWidth: 2000,
     );
     if (image == null || !mounted) return;
 
@@ -60,16 +61,22 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
     final image = await _picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 80,
+      maxWidth: 2000,
     );
     if (image == null || !mounted) return;
 
     setState(() => _isUploading = true);
     try {
+      final oldUrl = (doc.data() as Map<String, dynamic>?)?['url']?.toString();
       final url = await _uploadFile(image);
       await doc.reference.update({
         'url': url,
         'updated_at': FieldValue.serverTimestamp(),
       });
+      // الصورة القديمة مبقتش مستخدمة: نمسحها من Cloudinary
+      if (oldUrl != null && oldUrl.isNotEmpty && oldUrl != url) {
+        await CloudinaryService.deleteByUrl(oldUrl);
+      }
       if (mounted) _showSnack('تم تغيير صورة العرض', AppColors.success);
     } catch (error) {
       if (mounted) _showSnack('خطأ: $error', AppColors.danger);
@@ -111,7 +118,11 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
     );
 
     if (confirm != true) return;
+    final url = (doc.data() as Map<String, dynamic>?)?['url']?.toString();
     await doc.reference.delete();
+    if (url != null && url.isNotEmpty) {
+      await CloudinaryService.deleteByUrl(url);
+    }
     if (mounted) _showSnack('تم حذف العرض', AppColors.primaryGold);
   }
 

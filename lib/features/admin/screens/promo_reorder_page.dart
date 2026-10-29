@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/cloudinary_service.dart';
 import '../../../core/utils/image_url.dart';
 
 class PromoReorderPage extends StatefulWidget {
@@ -134,7 +135,12 @@ class _PromoReorderPageState extends State<PromoReorderPage> {
     if (!mounted) return;
     if (confirm) {
       setState(() => _isLoading = true);
+      final url = (_images[index].data() as Map<String, dynamic>?)?['url']
+          ?.toString();
       await _images[index].reference.delete(); // حذف من الفايربيس
+      if (url != null && url.isNotEmpty) {
+        await CloudinaryService.deleteByUrl(url); // وحذف الملف من Cloudinary
+      }
       if (!mounted) return;
       setState(() {
         _images.removeAt(index); // حذف من الشاشة

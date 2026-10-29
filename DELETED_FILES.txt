@@ -1,0 +1,11 @@
+android/build
+assets/translations
+lib/core/utils/theme_manger.dart
+lib/core/widgets/shimmer_loader.dart
+lib/features/admin/services/admin_auth_service.dart
+lib/features/clients/screens
+lib/features/home/auth
+lib/features/home/screens/gallery_reorder_page.dart
+lib/features/home/screens/search_screen.dart
+lib/features/home/widgets/category_card.dart
+test/widget_test.dart

@@ -93,9 +93,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
     super.dispose();
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> _galleryStream() {
-    return FirebaseFirestore.instance.collection('gallery_images').snapshots();
-  }
+  // اشتراك واحد ثابت (لو اتعمل جوه build، كل setState كان بيعيد الاشتراك)
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _galleryStream =
+      FirebaseFirestore.instance.collection('gallery_images').snapshots();
 
   int _compareGalleryDocs(
     QueryDocumentSnapshot<Map<String, dynamic>> a,
@@ -182,7 +182,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _galleryStream(),
+      stream: _galleryStream,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return GalleryMessageView(
