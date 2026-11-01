@@ -124,3 +124,9 @@ exports.deleteCloudinaryAsset = onCall(BASE_OPTIONS, async (request) => {
     throw new HttpsError('internal', 'تعذّر حذف الصورة من Cloudinary.');
   }
 });
+
+// ---------- النسخ الاحتياطي (dailyBackup + runBackupNow) ----------
+Object.assign(exports, require('./backup'));
+
+// ---------- تنبيهات الأجندة (agendaEvening + agendaMorning + sendAgendaNow) ----------
+Object.assign(exports, require('./agenda'));

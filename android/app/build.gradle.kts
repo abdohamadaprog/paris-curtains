@@ -23,7 +23,7 @@ if (hasReleaseKeystore) {
 }
 
 android {
-    namespace = "com.example.paris_curtian_app"
+    namespace = "com.pariscurtains.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
     
@@ -40,8 +40,9 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.paris_curtian_app"
+        // معرّف التطبيق النهائي على Google Play. مبيتغيرش بعد أول نشر أبدًا.
+        // لازم يطابق package_name في google-services.json (docs/APP_ID_CHANGE.md).
+        applicationId = "com.pariscurtains.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

@@ -47,6 +47,54 @@ class InvoicePayment {
   }
 }
 
+/// نوع الخصم: مبلغ ثابت أو نسبة مئوية.
+enum DiscountType { amount, percent }
+
+/// خصم على الفاتورة (بيتحط يدويًا لبعض العملاء).
+/// الخصم بيتحسب على إجمالي الفاتورة قبل الخصم، ومبيعدّيش الإجمالي نفسه.
+class InvoiceDiscount {
+  const InvoiceDiscount({
+    this.type = DiscountType.amount,
+    this.value = 0,
+    this.note = '',
+  });
+
+  final DiscountType type;
+  final double value;
+  final String note;
+
+  bool get isEmpty => value <= 0 || value.isNaN || value.isInfinite;
+
+  /// قيمة الخصم بالجنيه على [subtotal] (من صفر لحد الإجمالي).
+  double amountFor(double subtotal) {
+    if (isEmpty || subtotal <= 0) return 0;
+    final raw = type == DiscountType.percent ? subtotal * value / 100 : value;
+    final capped = raw < 0 ? 0.0 : (raw > subtotal ? subtotal : raw);
+    return roundMoney(capped);
+  }
+
+  Map<String, dynamic> toMap() => {
+    'type': type.name,
+    'value': value,
+    'note': note,
+  };
+
+  /// بيرجّع "مفيش خصم" لو البيانات ناقصة أو تالفة.
+  static InvoiceDiscount fromMap(dynamic raw) {
+    if (raw is! Map) return const InvoiceDiscount();
+    final v = raw['value'];
+    final value = v is num ? v.toDouble() : 0.0;
+    if (value <= 0 || value.isNaN || value.isInfinite) {
+      return const InvoiceDiscount();
+    }
+    return InvoiceDiscount(
+      type: raw['type'] == 'percent' ? DiscountType.percent : DiscountType.amount,
+      value: value,
+      note: (raw['note'] ?? '').toString(),
+    );
+  }
+}
+
 /// حالة الدفع.
 enum InvoiceStatus { unpaid, partial, paid, overpaid }
 
@@ -73,7 +121,7 @@ InvoiceStatus invoiceStatusFor({required double total, required double paid}) {
 }
 
 double sumPayments(List<InvoicePayment> payments) =>
-    roundMoney(payments.fold<double>(0, (sum, p) => sum + p.amount));
+    roundMoney(payments.fold<double>(0, (acc, p) => acc + p.amount));
 
 /// رقم الفاتورة: PC-يومالشهرالسنة-آخر 4 حروف من معرّف العميل.
 /// مثال: PC-261030-A7K2. (فاتورة واحدة لكل عميل، فالرقم ثابت بعد أول حفظ.)

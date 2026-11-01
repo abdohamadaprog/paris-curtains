@@ -10,6 +10,11 @@ import '../../home/home_screen.dart';
 import 'gallery_reorder_page.dart';
 
 import '../../auth/admin_auth_service.dart';
+import '../../clients/invoice/price_settings_page.dart';
+import '../../../core/config/app_features.dart';
+import '../../../core/services/notification_service.dart';
+import '../services/local_backup_service.dart';
+import 'backup_page.dart';
 import 'admin_analytics_page.dart';
 import 'upload_image_page.dart';
 import 'gallery_management_page.dart';
@@ -17,6 +22,9 @@ import 'installation_agenda_page.dart';
 import 'promo_management_page.dart';
 import 'upload_queue_page.dart';
 import 'featured_works_page.dart';
+
+part 'dashboard_stage_strip.dart';
+part 'dashboard_widgets.dart';
 
 String _ar(Object? n) => (n ?? '').toString().replaceAllMapped(
   RegExp(r'[0-9]'),
@@ -53,9 +61,41 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _verifySession());
   }
 
+  /// الوضع المجاني: لو عدّى أسبوع من آخر نسخة يدوية، نفكّر الأدمن.
+  Future<void> _maybeRemindBackup() async {
+    final last = await LocalBackupService.lastBackupAt();
+    final stale =
+        last == null || DateTime.now().difference(last) > const Duration(days: 7);
+    if (!stale || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 10),
+        content: Text(
+          last == null
+              ? 'لسه معملتش نسخة احتياطية لبياناتك. اعمل واحدة دلوقتي.'
+              : 'عدّى أكتر من أسبوع على آخر نسخة احتياطية.',
+          textAlign: TextAlign.center,
+        ),
+        action: SnackBarAction(
+          label: 'نسخة الآن',
+          onPressed: () => _navTo(const BackupPage()),
+        ),
+      ),
+    );
+  }
+
   Future<void> _verifySession() async {
     final status = await AdminAuthService.check();
-    if (!mounted || AdminAuthService.canEnter(status)) return;
+    if (!mounted) return;
+    if (AdminAuthService.canEnter(status)) {
+      if (AppFeatures.cloudFunctionsEnabled) {
+        // تسجيل جهاز الأدمن لتنبيهات الأجندة (بيطلب إذن الإشعارات أول مرة)
+        NotificationService.registerAdminDevice();
+      } else {
+        _maybeRemindBackup();
+      }
+      return;
+    }
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(builder: (_) => const LoginPage()),
     );
@@ -149,6 +189,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             _green,
                             const AdminAnalyticsPage(),
                           ),
+                          tile(
+                            'ثوابت الحساب',
+                            'أسعار الفواتير',
+                            Icons.price_change_rounded,
+                            _gold,
+                            const PriceSettingsPage(),
+                          ),
                         ],
                       );
                     },
@@ -200,6 +247,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   _sectionTitle('الأمان', Icons.admin_panel_settings_rounded),
                   const SizedBox(height: 12),
                   _buildGroup([
+                    _GroupRow(
+                      title: 'النسخ الاحتياطي والأرشيف',
+                      subtitle: AppFeatures.cloudFunctionsEnabled
+                          ? 'نسخة تلقائية يوميًا واسترجاع العملاء المحذوفين'
+                          : 'نسخة احتياطية يدوية واسترجاع العملاء المحذوفين',
+                      icon: Icons.cloud_done_rounded,
+                      color: _green,
+                      onTap: () => _navTo(const BackupPage()),
+                    ),
                     _GroupRow(
                       title: 'أمان التطبيق',
                       subtitle: 'البصمة لحماية لوحة الإدارة',
@@ -549,270 +605,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         content: Text(
           message,
           style: const TextStyle(fontFamily: 'Cairo', color: _white),
-        ),
-      ),
-    );
-  }
-}
-
-
-/// شريط مراحل الشغل: عدد العملاء في كل مرحلة بلون نيون، واضغط تفتح العملاء مفلترين
-class _StageStrip extends StatefulWidget {
-  const _StageStrip({required this.onTapStage, required this.refreshToken});
-
-  final ValueChanged<int> onTapStage;
-  final int refreshToken;
-
-  @override
-  State<_StageStrip> createState() => _StageStripState();
-}
-
-class _StageStripState extends State<_StageStrip> {
-  static const Map<int, Color> _colors = WorkStage.colors;
-  static const Map<int, String> _labels = {
-    1: 'بدأنا الشغل',
-    2: 'تحضير',
-    3: 'جاهز للتركيب',
-    4: 'تمت',
-  };
-
-  Map<int, int>? _counts;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  @override
-  void didUpdateWidget(covariant _StageStrip oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.refreshToken != widget.refreshToken) _load();
-  }
-
-  /// بدل ما نحمّل كل العملاء (قراءة لكل مستند)، بنستخدم count() (قراءة واحدة
-  /// تقريبًا لكل ١٠٠٠ مستند). العملاء القدام من غير work_stage بيتحسبوا:
-  /// تمت = installation_done، والباقي = مرحلة ١ (نفس WorkStage.fromData).
-  Future<void> _load() async {
-    try {
-      final col = FirebaseFirestore.instance.collection('clients');
-      final results = await Future.wait([
-        col.count().get(),
-        col.where('work_stage', isEqualTo: WorkStage.preparing).count().get(),
-        col.where('work_stage', isEqualTo: WorkStage.drilled).count().get(),
-        col.where('installation_done', isEqualTo: true).count().get(),
-      ]);
-      final total = results[0].count ?? 0;
-      final preparing = results[1].count ?? 0;
-      final drilled = results[2].count ?? 0;
-      final done = results[3].count ?? 0;
-      final started = total - preparing - drilled - done;
-      if (!mounted) return;
-      setState(() {
-        _counts = {
-          1: started < 0 ? 0 : started,
-          2: preparing,
-          3: drilled,
-          4: done,
-        };
-      });
-    } catch (_) {
-      // لو فشل (مفيش نت) بنسيب القيم القديمة أو "…"
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final counts = _counts ?? const <int, int>{};
-    final loaded = _counts != null;
-    final onTapStage = widget.onTapStage;
-
-    return Row(
-      children: [
-        for (final stage in const [1, 2, 3, 4])
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(left: stage == 4 ? 0 : 8),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () => onTapStage(stage),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Color.alphaBlend(
-                      _colors[stage]!.withValues(alpha: 0.10),
-                      const Color(0xFF1E293B),
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _colors[stage]!.withValues(alpha: 0.65),
-                      width: 1.3,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _colors[stage]!.withValues(alpha: 0.28),
-                        blurRadius: 12,
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        loaded ? _ar(counts[stage]) : '…',
-                        style: TextStyle(
-                          color: _colors[stage],
-                          fontSize: 25,
-                          fontWeight: FontWeight.w900,
-                          height: 1.1,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _labels[stage]!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Color(0xFFCBD5E1),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-
-class _QuickAction extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _QuickAction({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0xFF1E293B),
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: color.withValues(alpha: 0.3)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: Icon(icon, color: color, size: 25),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Color(0xFFF1F5F9),
-                  fontWeight: FontWeight.w900,
-                  fontSize: 15,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _GroupRow extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _GroupRow({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 22),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Color(0xFFF1F5F9),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 11.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(
-              Icons.chevron_left_rounded,
-              size: 22,
-              color: Color(0xFF64748B),
-            ),
-          ],
         ),
       ),
     );

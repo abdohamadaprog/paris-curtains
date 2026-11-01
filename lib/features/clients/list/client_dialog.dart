@@ -337,7 +337,8 @@ extension _ClientDialog on _ClientsListPageState {
           style: TextStyle(color: _primaryText(context)),
         ),
         content: Text(
-          'هل تريد حذف "$name"؟ هيتم حذف كل مقاساته وفاتورته نهائيًا ومش هينفع ترجعهم.',
+          'هل تريد حذف \"$name\"؟ مش هيتمسح نهائيًا: هينتقل بمقاساته وفاتورته '
+          'للأرشيف (لوحة الإدارة ← النسخ الاحتياطي والأرشيف) وتقدر ترجّعه.',
           style: TextStyle(color: _mutedText(context)),
         ),
         actions: [
@@ -347,23 +348,49 @@ extension _ClientDialog on _ClientsListPageState {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('حذف', style: TextStyle(color: Colors.redAccent)),
+            child: const Text(
+              'نقل للأرشيف',
+              style: TextStyle(color: Colors.redAccent),
+            ),
           ),
         ],
       ),
     );
     if (confirmed != true) return;
     try {
-      // حذف مستند Firestore مبيحذفش الـ subcollections، فبنحذف المقاسات
-      // (clients/{id}/details/main) مع العميل في عملية واحدة.
-      final clientRef = FirebaseFirestore.instance.collection('clients').doc(id);
-      final batch = FirebaseFirestore.instance.batch();
-      batch.delete(clientRef.collection('details').doc('main'));
+      // مفيش حذف نهائي: بننسخ العميل ومقاساته لـ clients_archive الأول،
+      // وبعدين نشيله من القائمة، كله في عملية واحدة (batch). القواعد
+      // (firestore.rules) بترفض حذف أي عميل من غير نسخة أرشيف معاه.
+      final db = FirebaseFirestore.instance;
+      final clientRef = db.collection('clients').doc(id);
+      final detailsRef = clientRef.collection('details').doc('main');
+      final archiveRef = db.collection('clients_archive').doc(id);
+
+      final clientSnap = await clientRef.get();
+      final detailsSnap = await detailsRef.get();
+      final clientData = clientSnap.data();
+      if (!clientSnap.exists || clientData == null) {
+        if (mounted) _message('العميل مش موجود');
+        return;
+      }
+
+      final batch = db.batch();
+      batch.set(archiveRef, {
+        'name': name,
+        'original_id': id,
+        'data': clientData,
+        'deleted_at': FieldValue.serverTimestamp(),
+      });
+      batch.set(archiveRef.collection('details').doc('main'), {
+        ...?detailsSnap.data(),
+        'archived_at': FieldValue.serverTimestamp(),
+      });
+      batch.delete(detailsRef);
       batch.delete(clientRef);
       await batch.commit();
-      if (mounted) _message('تم حذف العميل');
+      if (mounted) _message('تم نقل العميل للأرشيف');
     } catch (e) {
-      if (mounted) _message('تعذر حذف العميل: $e');
+      if (mounted) _message('تعذر نقل العميل للأرشيف: $e');
     }
   }
 }

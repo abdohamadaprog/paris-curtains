@@ -114,8 +114,25 @@ const List<PriceDef> kPriceDefs = [
   PriceDef('balc_install', 'تركيب بلكونة', 'بلكونة', 0),
 ];
 
+/// الأسعار العامة اللي اتعدّلت من صفحة "ثوابت الحساب" (بتتحمّل من Firestore).
+/// أي سعر مش موجود هنا بيرجع لقيمته الأصلية في kPriceDefs.
+class PriceOverrides {
+  PriceOverrides._();
+
+  static Map<String, double> _values = {};
+
+  static Map<String, double> get values => Map.unmodifiable(_values);
+
+  static void set(Map<String, double> overrides) {
+    _values = Map<String, double>.from(overrides);
+  }
+
+  static void clear() => _values = {};
+}
+
+/// الأسعار الافتراضية = الأصلية + أي تعديل عام من صفحة ثوابت الحساب.
 Map<String, double> defaultPrices() => {
-  for (final d in kPriceDefs) d.key: d.value,
+  for (final d in kPriceDefs) d.key: PriceOverrides._values[d.key] ?? d.value,
 };
 
 /// أنواع قماش البلكونة (المفتاح = مفتاح السعر)

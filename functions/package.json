@@ -1,6 +1,6 @@
 {
   "name": "paris-curtains-functions",
-  "description": "Cloud Functions لتطبيق ستائر باريس: توقيع رفع Cloudinary وحذف الصور",
+  "description": "Cloud Functions لتطبيق ستائر باريس: توقيع رفع Cloudinary وحذف الصور والنسخ الاحتياطي وتنبيهات الأجندة",
   "private": true,
   "main": "index.js",
   "engines": {
@@ -10,7 +10,9 @@
     "serve": "firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "set-admin": "node scripts/set-admin-claim.js"
+    "set-admin": "node scripts/set-admin-claim.js",
+    "restore": "node scripts/restore-backup.js",
+    "test": "node scripts/test-backup-lib.js && node scripts/test-agenda-lib.js"
   },
   "dependencies": {
     "cloudinary": "^2.5.1",

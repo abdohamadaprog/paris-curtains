@@ -78,7 +78,7 @@ storeFile=D:\\keys\\paris-release.jks
 - هات بصمة SHA-256: `keytool -list -v -keystore D:\keys\paris-release.jks -alias paris` وضيفها في Firebase ← Project settings ← Your apps (دي اللي App Check والـ Play Integrity بيعتمدوا عليها).
 - أول مرة هتغيّر التوقيع، لازم تمسح النسخة القديمة من الموبايل وتثبّت الجديدة (أندرويد مبيقبلش تحديث بتوقيع مختلف).
 - لو هترفع على Google Play، البصمة اللي لازم تتضاف هي بصمة **App signing key** من Play Console.
-- التطبيق لسه مسجّل بالاسم `com.example.paris_curtian_app` (اسم تجريبي). غيّره قبل النشر الرسمي، بس ده محتاج تسجيل التطبيق من جديد في Firebase وتحميل `google-services.json` الجديد.
+- الـ Application ID النهائي `com.pariscurtains.app`. خطوات التغيير (تسجيل التطبيق في Firebase والبصمات وApp Check) في `docs/APP_ID_CHANGE.md`.
 
 ## الفهارس
 `firestore.indexes.json` فاضي لأن الاستعلامات الحالية كلها على حقل واحد (فهرسه تلقائي). لما تضيف استعلام فيه `where` مع `orderBy` على حقلين مختلفين، Firestore هيطلّع في اللوج رابط لعمل الفهرس، وتضيفه هنا بعدها.
