@@ -1,0 +1,20 @@
+{
+  "app_title": "Paris Curtains",
+  "home": "Home",
+  "admin_dashboard": "Admin Dashboard",
+  "clients": "Clients",
+  "gallery": "Gallery",
+  "settings": "Settings",
+  "language": "Language",
+  "welcome_admin": "Welcome, Eng. Abdelrahman",
+  "installation_agenda": "Agenda",
+  "reports": "Reports",
+  "add_client": "Add Client",
+  "edit_client": "Edit Client",
+  "delete_client": "Delete Client",
+  "phone": "Phone",
+  "address": "Address",
+  "notes": "Notes",
+  "save": "Save",
+  "cancel": "Cancel"
+}

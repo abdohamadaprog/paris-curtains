@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/config/app_features.dart';
@@ -66,8 +66,8 @@ class _BackupPageState extends State<BackupPage> {
     if (_backingUp) return;
     setState(() => _backingUp = true);
     try {
-      final callable =
-          FirebaseFunctions.instanceFor(region: 'europe-west1').httpsCallable(
+      final callable = FirebaseFunctions.instanceFor(region: 'europe-west1')
+          .httpsCallable(
             'runBackupNow',
             options: HttpsCallableOptions(timeout: const Duration(minutes: 9)),
           );
@@ -342,48 +342,55 @@ class _BackupPageState extends State<BackupPage> {
               const SizedBox(height: 26),
             ],
             if (AppFeatures.cloudFunctionsEnabled) ...[
-            _sectionTitle('النسخ الاحتياطي', Icons.cloud_done_rounded),
-            const SizedBox(height: 10),
-            _backupCard(),
-            const SizedBox(height: 26),
-            _sectionTitle('تنبيهات الأجندة', Icons.notifications_active_rounded),
-            const SizedBox(height: 10),
-            _box(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'بيجيلك إشعار الساعة ٧ مساءً بتركيبات بكرة، والساعة ٨ '
-                    'صباحًا بتركيبات النهاردة (من غير اللي خلصت).',
-                    style: TextStyle(color: _kMuted, fontSize: 12, height: 1.6),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _testingAgenda ? null : _testAgendaAlert,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: _kGold,
-                        side: const BorderSide(color: _kGold),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      icon: _testingAgenda
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: _kGold,
-                              ),
-                            )
-                          : const Icon(Icons.send_rounded, size: 18),
-                      label: const Text('جرّب التنبيه الآن'),
-                    ),
-                  ),
-                ],
+              _sectionTitle('النسخ الاحتياطي', Icons.cloud_done_rounded),
+              const SizedBox(height: 10),
+              _backupCard(),
+              const SizedBox(height: 26),
+              _sectionTitle(
+                'تنبيهات الأجندة',
+                Icons.notifications_active_rounded,
               ),
-            ),
-            const SizedBox(height: 26),
+              const SizedBox(height: 10),
+              _box(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'بيجيلك إشعار الساعة ٧ مساءً بتركيبات بكرة، والساعة ٨ '
+                      'صباحًا بتركيبات النهاردة (من غير اللي خلصت).',
+                      style: TextStyle(
+                        color: _kMuted,
+                        fontSize: 12,
+                        height: 1.6,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _testingAgenda ? null : _testAgendaAlert,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _kGold,
+                          side: const BorderSide(color: _kGold),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        icon: _testingAgenda
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: _kGold,
+                                ),
+                              )
+                            : const Icon(Icons.send_rounded, size: 18),
+                        label: const Text('جرّب التنبيه الآن'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 26),
             ],
             _sectionTitle('أرشيف العملاء المحذوفين', Icons.inventory_2_rounded),
             const SizedBox(height: 6),
@@ -562,7 +569,10 @@ class _BackupPageState extends State<BackupPage> {
         children: [
           SizedBox(
             width: 96,
-            child: Text(k, style: const TextStyle(color: _kMuted, fontSize: 12)),
+            child: Text(
+              k,
+              style: const TextStyle(color: _kMuted, fontSize: 12),
+            ),
           ),
           Expanded(
             child: Text(

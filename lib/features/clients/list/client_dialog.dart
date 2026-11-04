@@ -306,7 +306,9 @@ extension _ClientDialog on _ClientsListPageState {
       if (!isEdit || stage != oldStage) {
         fields.addAll(WorkStage.updateFields(stage));
         if (stage == WorkStage.done && installationDate != null) {
-          fields['installation_done_at'] = Timestamp.fromDate(installationDate!);
+          fields['installation_done_at'] = Timestamp.fromDate(
+            installationDate!,
+          );
         }
       }
       if (isEdit) {
@@ -337,7 +339,7 @@ extension _ClientDialog on _ClientsListPageState {
           style: TextStyle(color: _primaryText(context)),
         ),
         content: Text(
-          'هل تريد حذف \"$name\"؟ مش هيتمسح نهائيًا: هينتقل بمقاساته وفاتورته '
+          'هل تريد حذف "$name"؟ مش هيتمسح نهائيًا: هينتقل بمقاساته وفاتورته '
           'للأرشيف (لوحة الإدارة ← النسخ الاحتياطي والأرشيف) وتقدر ترجّعه.',
           style: TextStyle(color: _mutedText(context)),
         ),

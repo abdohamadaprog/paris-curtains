@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:paris_curtian_app/features/clients/data/client_details_repository.dart';
+import 'package:paris_curtains/features/clients/data/client_details_repository.dart';
 
 void main() {
   group('ClientDetails.fromMap', () {

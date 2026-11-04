@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:paris_curtian_app/core/constants/work_stage.dart';
+import 'package:paris_curtains/core/constants/work_stage.dart';
 
 void main() {
   group('WorkStage.fromData', () {

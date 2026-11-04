@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/constants/app_colors.dart';
-import 'package:paris_curtian_app/features/clients/invoice/invoice_page.dart';
+import 'package:paris_curtains/features/clients/invoice/invoice_page.dart';
 import '../data/client_details_repository.dart';
 
 part 'balcony_card.dart';
