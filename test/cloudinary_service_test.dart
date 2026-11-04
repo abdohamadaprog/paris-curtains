@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:paris_curtian_app/core/services/cloudinary_service.dart';
+import 'package:paris_curtains/core/services/cloudinary_service.dart';
 
 void main() {
   group('CloudinaryService.publicIdFromUrl', () {
@@ -31,7 +31,10 @@ void main() {
     });
 
     test('روابط مش Cloudinary أو ناقصة بترجع null', () {
-      expect(CloudinaryService.publicIdFromUrl('https://example.com/a.jpg'), isNull);
+      expect(
+        CloudinaryService.publicIdFromUrl('https://example.com/a.jpg'),
+        isNull,
+      );
       expect(CloudinaryService.publicIdFromUrl('مش رابط'), isNull);
       expect(
         CloudinaryService.publicIdFromUrl(

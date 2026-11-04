@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:paris_curtian_app/features/clients/invoice/invoice_calculator.dart';
-import 'package:paris_curtian_app/features/clients/invoice/invoice_meta.dart';
+import 'package:paris_curtains/features/clients/invoice/invoice_calculator.dart';
+import 'package:paris_curtains/features/clients/invoice/invoice_meta.dart';
 
 void main() {
   group('invoiceStatusFor', () {
@@ -48,7 +48,10 @@ void main() {
 
     test('بيانات تالفة بترجع null', () {
       expect(InvoicePayment.fromMap(null), isNull);
-      expect(InvoicePayment.fromMap({'amount': -5, 'date': Timestamp.now()}), isNull);
+      expect(
+        InvoicePayment.fromMap({'amount': -5, 'date': Timestamp.now()}),
+        isNull,
+      );
       expect(InvoicePayment.fromMap({'amount': 100}), isNull);
     });
   });

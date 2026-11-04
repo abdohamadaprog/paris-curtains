@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:paris_curtian_app/features/clients/invoice/invoice_meta.dart';
+import 'package:paris_curtains/features/clients/invoice/invoice_meta.dart';
 
 void main() {
   group('InvoiceDiscount', () {
