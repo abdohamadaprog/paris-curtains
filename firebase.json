@@ -4,7 +4,7 @@
         "android": {
           "default": {
             "projectId": "parisapp-7c377",
-            "appId": "1:881801623559:android:35e7bc3c9d946104b612a2",
+            "appId": "1:881801623559:android:8b1b49dbd7874279b612a2",
             "fileOutput": "android/app/google-services.json"
           }
         },
@@ -12,7 +12,7 @@
           "lib/firebase_options.dart": {
             "projectId": "parisapp-7c377",
             "configurations": {
-              "android": "1:881801623559:android:35e7bc3c9d946104b612a2",
+              "android": "1:881801623559:android:8b1b49dbd7874279b612a2",
               "ios": "1:881801623559:ios:98168643497e0e98b612a2",
               "macos": "1:881801623559:ios:98168643497e0e98b612a2",
               "web": "1:881801623559:web:e5c3c3ae80b1c3c1b612a2",

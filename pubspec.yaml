@@ -61,3 +61,30 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+
+  # الأصول اللي الكود بيستخدمها فعلًا بس (باقي الملفات في assets/images
+  # مش متحمّلة جوه التطبيق وملهاش تأثير على حجمه)
+  assets:
+    - assets/images/paris1.png
+    - assets/images/abdo.jpg
+    - assets/images/logo.png
+    - assets/translations/
+
+  fonts:
+    - family: Cairo
+      fonts:
+        - asset: assets/fonts/Cairo-Regular.ttf
+        - asset: assets/fonts/Cairo-Bold.ttf
+          weight: 700
+
+    - family: Tajawal
+      fonts:
+        - asset: assets/fonts/Tajawal-Regular.ttf
+        - asset: assets/fonts/Tajawal-Bold.ttf
+          weight: 700
+
+    - family: Aref Ruqaa
+      fonts:
+        - asset: assets/fonts/ArefRuqaa-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/ArefRuqaa-Regular.ttf
