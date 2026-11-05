@@ -116,7 +116,6 @@ class ParisFooter extends StatelessWidget {
                     height: 46,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: gold, width: 1.5),
                       boxShadow: [
                         BoxShadow(
                           color: gold.withValues(alpha: 0.25),
