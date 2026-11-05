@@ -5,7 +5,7 @@
 |---|---|---|
 | اسم التطبيق | **باريس للستائر** (و"Paris Curtains" في الوصف) | لازم الكتابة "للستائر" في كل مكان (اللوجو القديم مكتوب "للستار") |
 | Application ID | `com.pariscurtains.app` | **مبيتغيرش أبدًا بعد النشر**. الحالي `com.example.paris_curtian_app` مش مقبول على المتجر |
-| الأيقونة | `assets/images/app_icon.png` (بدون كتابة) | `dart run flutter_launcher_icons` |
+| الأيقونة | `assets/images/app_icon.png` (الأيقونة الجديدة: إطار ذهبي + اسم باريس) | جاهزة بكل المقاسات. لو غيّرتها شغّل `dart run flutter_launcher_icons` |
 
 ## 2) تغيير الـ Application ID
 الكود اتغيّر لـ `com.pariscurtains.app`. الخطوات الكاملة بالترتيب (تسجيل التطبيق في Firebase، `google-services.json`، البصمات، App Check) في **`docs/APP_ID_CHANGE.md`**. نفّذها قبل أي نشر.
