@@ -251,10 +251,17 @@ extension _ClientDialog on _ClientsListPageState {
     final phone = phoneController.text.trim();
     final address = addressController.text.trim();
     final notes = notesController.text.trim();
-    nameController.dispose();
-    phoneController.dispose();
-    addressController.dispose();
-    notesController.dispose();
+
+    // مهم: بنأجّل التخلص من الكونترولرز لحد ما نافذة الحفظ تخلّص حركة
+    // الخروج. لو اتشالوا فورًا، الـ TextField لسه بيتعرض في الأنيميشن
+    // وبيحاول يقرأ منهم → "used after being disposed" → شاشة حمرا.
+    Future<void>.delayed(const Duration(milliseconds: 500), () {
+      nameController.dispose();
+      phoneController.dispose();
+      addressController.dispose();
+      notesController.dispose();
+    });
+
     if (save != true || !mounted) return;
 
     // تنبيه لو الرقم مسجّل لعميل تاني

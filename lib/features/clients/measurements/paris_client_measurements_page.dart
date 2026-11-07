@@ -1,7 +1,16 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:gal/gal.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/telegram_backup_service.dart';
 import 'package:paris_curtains/features/clients/invoice/invoice_page.dart';
 import '../data/client_details_repository.dart';
 
@@ -11,6 +20,7 @@ part 'measurement_card_shell.dart';
 part 'measurement_data.dart';
 part 'measurement_edit_panel.dart';
 part 'measurement_header.dart';
+part 'measurement_image_page.dart';
 part 'measurement_models.dart';
 
 /// ============================================================================
@@ -129,6 +139,81 @@ class _ParisClientMeasurementsPageState
   // بتتنادى من ملفات الـ extensions بدل setState مباشرة
   void _rebuild(VoidCallback fn) => setState(fn);
 
+  // ============================================================================
+  // صورة المقاسات (مشاركة / حفظ / نسخة على تليجرام)
+  // ============================================================================
+  void _openMeasurementsImage() {
+    final rows = <_MeasurementSheetRow>[];
+
+    for (final m in _measurements) {
+      if (!m.enabled) continue;
+      final w = _Measurement.toDouble(m.width.text);
+      final h = _Measurement.toDouble(m.height.text);
+      if (w <= 0 && h <= 0) continue;
+      final c = m.calculation;
+      final name = m.name.text.trim();
+      rows.add(
+        _MeasurementSheetRow(
+          title: name.isEmpty ? 'شباك' : name,
+          lines: [
+            'المقاس: ${_fmtAr(w)} × ${_fmtAr(h)} م',
+            'الطريقة: ${m.method.label} • السقف: ${m.ceiling.label}',
+            'قماش ثقيل: ${_fmtAr(c.heavyMeters)} م'
+                '${m.lightLayers > 0 ? ' • خفيف: ${_fmtAr(c.lightMeters)} م' : ''}',
+            'عجل: ${c.heavyWheelsLabel}'
+                '${m.lightLayers > 0 ? ' • خفيف: ${_toArabic(c.lightWheels)}' : ''}'
+                ' • شريط: ${_fmtAr(c.heavyTapeMeters)} م',
+            'ارتفاع القص: ${_fmtAr(c.heavyHeight)} م'
+                '${m.lightLayers > 0 ? ' • خفيف: ${_fmtAr(c.lightHeight)} م' : ''}',
+          ],
+        ),
+      );
+    }
+
+    for (final b in _balconies) {
+      if (!b.enabled) continue;
+      final name = b.name.text.trim();
+      rows.add(
+        _MeasurementSheetRow(
+          title: name.isEmpty ? 'بلكونة' : name,
+          lines: [
+            'الأضلاع: ${b.sideList.map(_fmtAr).join(' + ')} م',
+            'الارتفاع: ${_fmtAr(_Measurement.toDouble(b.height.text))} م',
+            'قماش: ${_fmtAr(b.fabricMeters)} م • كبس: ${_fmtAr(b.tapeMeters)} م',
+            'أفيز: ${_toArabic(b.avezCount)} • حلقات: ${_toArabic(b.ringsCount)}',
+          ],
+        ),
+      );
+    }
+
+    if (rows.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('مفيش مقاسات لسه — ضيف مقاس الأول'),
+        ),
+      );
+      return;
+    }
+
+    final now = DateTime.now();
+    final typed = _nameController.text.trim();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _MeasurementImagePage(
+          data: _MeasurementSheetData(
+            clientName: typed.isEmpty ? widget.clientName : typed,
+            phone: widget.phone,
+            date: _toArabic(
+              '${now.day.toString().padLeft(2, '0')}/'
+              '${now.month.toString().padLeft(2, '0')}/${now.year}',
+            ),
+            rows: rows,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -242,6 +327,11 @@ class _ParisClientMeasurementsPageState
         ],
       ),
       actions: [
+        IconButton(
+          tooltip: 'صورة المقاسات',
+          onPressed: _openMeasurementsImage,
+          icon: const Icon(Icons.image_rounded, color: Colors.white70),
+        ),
         IconButton(
           tooltip: 'المحذوفات',
           onPressed: () => _rebuild(() => _showTrash = !_showTrash),

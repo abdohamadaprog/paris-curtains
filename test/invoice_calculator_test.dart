@@ -34,10 +34,10 @@ void main() {
     expect(_line(invoice, 'fabric_linen').qty, 21);
     expect(_line(invoice, 'fabric_velvet').qty, 32);
     expect(_line(invoice, 'track').qty, 21);
-    expect(_line(invoice, 'holder_wave').qty, 42);
+    expect(_line(invoice, 'holder_wave').qty, 18);
     expect(_line(invoice, 'install_window').qty, 6);
-    expect(_sum(invoice.accessoryLines), 7230);
-    expect(invoice.grandTotal, 14760);
+    expect(_sum(invoice.accessoryLines), 7095);
+    expect(invoice.grandTotal, 14625);
   });
 
   test('شقة مختلطة: ويفي + دابل ويفي + كبس', () {
@@ -81,12 +81,12 @@ void main() {
     expect(_sum(invoice.fabricLines), 5770);
     expect(_line(invoice, 'fabric_linen').qty, 19);
     expect(_line(invoice, 'fabric_velvet').qty, 22);
-    expect(_line(invoice, 'holder_wave').qty, 12);
-    expect(_line(invoice, 'holder_double').qty, 8);
-    expect(_line(invoice, 'ring_unit').qty, 42);
-    expect(_line(invoice, 'cantilever_forgia').qty, 6);
-    expect(_sum(invoice.accessoryLines), 5395);
-    expect(invoice.grandTotal, 11165);
+    expect(_line(invoice, 'holder_wave').qty, 4);
+    expect(_line(invoice, 'holder_double').qty, 3);
+    expect(_line(invoice, 'ring_unit').qty, 93);
+    expect(_line(invoice, 'cantilever_forgia').qty, 4);
+    expect(_sum(invoice.accessoryLines), 5840);
+    expect(invoice.grandTotal, 11610);
   });
 
   test('بلكونة: عرض إجمالي 5م وقماش دك', () {
@@ -111,5 +111,18 @@ void main() {
     expect(ceilMeters(3 * 1.1), 4);
     expect(ceilMeters(10.5 * 2), 21);
     expect(parseNumber('٢٫٥'), 2.5);
+  });
+
+  // قاعدة الحوامل المعتمدة: 1م = 2 • حتى 2.5م = 3 • 3م = 4 • 4م = 5
+  test('عدد حوامل الويفي لكل شباك', () {
+    expect(calcWaveHoldersForWindow(0.5), 2);
+    expect(calcWaveHoldersForWindow(1), 2);
+    expect(calcWaveHoldersForWindow(1.75), 3);
+    expect(calcWaveHoldersForWindow(2), 3);
+    expect(calcWaveHoldersForWindow(2.5), 3);
+    expect(calcWaveHoldersForWindow(3), 4);
+    expect(calcWaveHoldersForWindow(3.5), 4);
+    expect(calcWaveHoldersForWindow(4), 5);
+    expect(calcWaveHoldersForWindow(5), 6);
   });
 }

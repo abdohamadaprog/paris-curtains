@@ -48,6 +48,11 @@ class _GalleryScreenState extends State<GalleryScreen> {
   Timer? _bannerTimer;
   int _bannerIndex = 0;
 
+  /// عدد صور الصفحة الرئيسية — بيتظبط من لوحة الإدارة
+  /// (Firestore: public_config/home → featured_count).
+  int _homeCount = 25;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _homeConfigSub;
+
   @override
   void initState() {
     super.initState();
@@ -69,6 +74,18 @@ class _GalleryScreenState extends State<GalleryScreen> {
           setState(() => _bannerImages = urls);
           _restartBannerTimer();
         });
+
+    // عدد الصور المطلوبة في الرئيسية (إعداد عام يقرأه كل الزوار).
+    _homeConfigSub = FirebaseFirestore.instance
+        .collection('public_config')
+        .doc('home')
+        .snapshots()
+        .listen((snap) {
+          final raw = snap.data()?['featured_count'];
+          final count = raw is num ? raw.toInt() : 25;
+          if (!mounted) return;
+          setState(() => _homeCount = count.clamp(4, 60));
+        });
   }
 
   void _restartBannerTimer() {
@@ -88,6 +105,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
   @override
   void dispose() {
     _promoSub?.cancel();
+    _homeConfigSub?.cancel();
     _bannerTimer?.cancel();
     _bannerController.dispose();
     super.dispose();
@@ -141,16 +159,16 @@ class _GalleryScreenState extends State<GalleryScreen> {
       return category == _selectedCategory;
     }).toList();
 
-    // 2. تطبيق فكرة الـ 25 صورة:
-    // إذا كان هناك صور محددة كـ is_featured نعرضها، وإلا نأخذ أول 25 صورة من المعرض
+    // 2. عرض صور الرئيسية: لو فيه صور محددة كـ is_featured نعرضها،
+    //    وإلا ناخد أول [_homeCount] صورة. العدد بيتظبط من لوحة الإدارة.
     final featuredDocs = validDocs
         .where((d) => d.data()['is_featured'] == true)
         .toList();
     if (featuredDocs.isNotEmpty) {
-      return featuredDocs.take(25).toList();
+      return featuredDocs.take(_homeCount).toList();
     }
 
-    return validDocs.take(25).toList();
+    return validDocs.take(_homeCount).toList();
   }
 
   void _openImage(

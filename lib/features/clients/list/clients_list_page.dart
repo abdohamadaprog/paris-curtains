@@ -84,6 +84,13 @@ class _ClientsListPageState extends State<ClientsListPage>
   List<_ClientItem> _current = const [];
   List<_ClientItem> _archive = const [];
 
+  /// عدد العملاء في كل دفعة تحميل. الصفحة بتفتح بأول دفعة بس،
+  /// وزر "تحميل المزيد" بيجيب اللي بعدها.
+  static const int kClientsPageSize = 200;
+  int _limit = kClientsPageSize;
+  bool _loadingMore = false;
+  bool get _hasMore => _allDocs.length >= _limit;
+
   @override
   void initState() {
     super.initState();
@@ -110,6 +117,7 @@ class _ClientsListPageState extends State<ClientsListPage>
     try {
       final snap = await FirebaseFirestore.instance
           .collection('clients')
+          .limit(_limit)
           .get(const GetOptions(source: Source.cache));
       if (!mounted || _loaded || snap.docs.isEmpty) return;
       _applyDocs(snap.docs);
@@ -118,9 +126,40 @@ class _ClientsListPageState extends State<ClientsListPage>
     }
   }
 
+  /// تحميل دفعة إضافية: بنزوّد الحد ونعيد الاشتراك.
+  void _loadMore() {
+    if (_loadingMore || !_hasMore) return;
+    setState(() => _loadingMore = true);
+    _limit += kClientsPageSize;
+    _sub?.cancel();
+    _listen();
+  }
+
+  /// تحميل كل العملاء للبحث فيهم (الصفحة بتحمّل 200 بس في البداية).
+  /// بنستخدمها لما بحث المستخدم ميرجّعش نتيجة، عشان ميفضلش فيه عميل
+  /// مش ظاهر لمجرد إنه في صفحة تانية.
+  Future<void> _searchAllClients() async {
+    if (_loadingMore) return;
+    setState(() => _loadingMore = true);
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('clients')
+          .limit(3000)
+          .get();
+      if (!mounted) return;
+      _limit = 3000;
+      _applyDocs(snap.docs);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingMore = false);
+      _message('تعذّر تحميل كل العملاء: $e');
+    }
+  }
+
   void _listen() {
     _sub = FirebaseFirestore.instance
         .collection('clients')
+        .limit(_limit)
         .snapshots()
         .listen(
           (snap) {
@@ -145,6 +184,7 @@ class _ClientsListPageState extends State<ClientsListPage>
     _items = docs.map(_toItem).toList();
     setState(() {
       _loaded = true;
+      _loadingMore = false;
       _accessDenied = false;
       _refilter();
     });
@@ -278,7 +318,7 @@ class _ClientsListPageState extends State<ClientsListPage>
             ),
             child: ClipOval(
               child: Image.asset(
-                'assets/images/paris1.png',
+                'assets/images/logo.png',
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) =>
                     const Icon(Icons.curtains, color: _gold, size: 22),

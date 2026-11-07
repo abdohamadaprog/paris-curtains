@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/config/app_features.dart';
 import '../services/local_backup_service.dart';
+import 'telegram_backup_page.dart';
 
 const Color _kBg = Color(0xFF0F172A);
 const Color _kPanel = Color(0xFF1E293B);
@@ -392,6 +393,40 @@ class _BackupPageState extends State<BackupPage> {
               ),
               const SizedBox(height: 26),
             ],
+            _sectionTitle('نسخة صور المعرض على تليجرام', Icons.cloud_upload_rounded),
+            const SizedBox(height: 10),
+            _box(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'كل صورة بتترفع على المعرض بيتبعت نسخة منها على قناتك '
+                    'الخاصة على تليجرام. ده شغال على الخطة المجانية ومش '
+                    'محتاج سيرفر.',
+                    style: TextStyle(color: _kMuted, fontSize: 12, height: 1.7),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const TelegramBackupPage(),
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _kGold,
+                        side: const BorderSide(color: _kGold),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      icon: const Icon(Icons.settings_rounded, size: 18),
+                      label: const Text('إعداد ومزامنة تليجرام'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 26),
             _sectionTitle('أرشيف العملاء المحذوفين', Icons.inventory_2_rounded),
             const SizedBox(height: 6),
             const Text(

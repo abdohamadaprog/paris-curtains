@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -8,6 +9,7 @@ import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/services/telegram_backup_service.dart';
 import 'invoice_share_card.dart';
 
 const Color _kBg = Color(0xFF0F172A);
@@ -49,6 +51,23 @@ class _InvoiceImagePageState extends State<InvoiceImagePage> {
     return n == null || n.isEmpty ? 'paris_invoice' : 'paris_$n';
   }
 
+  String get _telegramCaption {
+    final number = widget.data.number;
+    final suffix = number == null || number.isEmpty ? '' : ' — فاتورة $number';
+    return 'فاتورة ${widget.data.clientName}$suffix';
+  }
+
+  /// بيبعت نسخة في الخلفية من غير ما يعطّل المشاركة أو الحفظ.
+  void _backupToTelegram(Uint8List bytes) {
+    unawaited(
+      TelegramBackupService.backupGeneratedImage(
+        bytes: bytes,
+        filename: '$_fileBase.png',
+        caption: _telegramCaption,
+      ),
+    );
+  }
+
   void _toast(String msg, {Color color = _kPanel}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -64,6 +83,7 @@ class _InvoiceImagePageState extends State<InvoiceImagePage> {
     setState(() => _busy = true);
     try {
       final bytes = await _capture();
+      _backupToTelegram(bytes);
       final dir = await getTemporaryDirectory();
       final file = File('${dir.path}/$_fileBase.png');
       await file.writeAsBytes(bytes, flush: true);
@@ -85,6 +105,7 @@ class _InvoiceImagePageState extends State<InvoiceImagePage> {
     setState(() => _busy = true);
     try {
       final bytes = await _capture();
+      _backupToTelegram(bytes);
       if (!await Gal.hasAccess()) {
         final granted = await Gal.requestAccess();
         if (!granted) {
@@ -98,6 +119,24 @@ class _InvoiceImagePageState extends State<InvoiceImagePage> {
       _toast('تم حفظ الفاتورة في المعرض ✨', color: _kGreen);
     } catch (e) {
       _toast('تعذّر الحفظ: $e', color: _kRed);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _sendToTelegram() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final bytes = await _capture();
+      await TelegramBackupService.sendPhotoBytes(
+        bytes: bytes,
+        filename: '$_fileBase.png',
+        caption: _telegramCaption,
+      );
+      _toast('اتبعتت نسخة على تليجرام ✨', color: _kGreen);
+    } catch (e) {
+      _toast('مقدرتش أبعت على تليجرام: $e', color: _kRed);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -122,6 +161,13 @@ class _InvoiceImagePageState extends State<InvoiceImagePage> {
               color: Colors.white,
             ),
           ),
+          actions: [
+            IconButton(
+              tooltip: 'نسخة على تليجرام',
+              onPressed: _busy ? null : _sendToTelegram,
+              icon: const Icon(Icons.send_rounded, color: _kGold),
+            ),
+          ],
         ),
         body: Column(
           children: [

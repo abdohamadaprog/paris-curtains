@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/services/cloudinary_service.dart';
+import '../../../core/services/telegram_backup_service.dart';
 
 /// Upload queue shared by the upload page, dashboard and tracker.
 /// Queue metadata is persisted locally. Each picked image is also copied into
@@ -341,6 +342,16 @@ class UploadQueueService extends ChangeNotifier {
         .collection('gallery_images')
         .doc(item.documentId)
         .set(data, SetOptions(merge: true));
+
+    // نسخة احتياطية على تليجرام (best effort: لو مش متظبط أو فشل،
+    // الرفع على المعرض بيكمّل عادي). النتيجة بتتسجل في المستند نفسه.
+    unawaited(
+      TelegramBackupService.backupGalleryImage(
+        documentId: item.documentId,
+        imageUrl: url,
+        caption: item.category,
+      ),
+    );
   }
 
   /// بنحفظ نسخة من الصورة في فولدر التطبيق نفسه (الملف اللي بيرجعه الـ picker

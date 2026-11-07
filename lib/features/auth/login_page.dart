@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -114,11 +115,18 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       if (!AdminAuthService.canEnter(status)) {
+        // بنحتفظ بالـ UID قبل الخروج عشان نعرضه للمستخدم:
+        // أشهر سبب للرسالة دي إن الحساب مش متضاف في admins/{uid} في Firestore.
+        final uid = AdminAuthService.currentUser?.uid;
         await AdminAuthService.signOut();
 
         if (!mounted) return;
 
-        _showMessage('هذا الحساب غير مصرح له بدخول لوحة الإدارة.');
+        if (status == AdminStatus.notAdmin && uid != null) {
+          await _showNotAdminDialog(uid);
+        } else {
+          _showMessage('تعذّر التحقق من صلاحية الحساب. تأكد من الإنترنت وحاول تاني.');
+        }
         return;
       }
 
@@ -167,6 +175,138 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  /// إعادة تعيين كلمة المرور: Firebase بيبعت لينك على إيميل الأدمن،
+  /// واللينك بيفتح صفحة آمنة يكتب فيها باسورد جديد. (بدون سيرفر ولا فلوس)
+  Future<void> _showForgotPasswordDialog() async {
+    final controller = TextEditingController(
+      text: _emailController.text.trim(),
+    );
+    final dialogFormKey = GlobalKey<FormState>();
+    var sending = false;
+    String? error;
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text('استعادة كلمة المرور'),
+            content: Form(
+              key: dialogFormKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'اكتب إيميل الأدمن، وهنبعتلك لينك تعمل بيه كلمة مرور '
+                    'جديدة. اللينك بيوصل على الإيميل بس.',
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: controller,
+                    keyboardType: TextInputType.emailAddress,
+                    textDirection: TextDirection.ltr,
+                    textAlign: TextAlign.left,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'البريد الإلكتروني',
+                      hintText: 'name@example.com',
+                    ),
+                    validator: (value) {
+                      final email = value?.trim() ?? '';
+                      if (email.isEmpty) return 'اكتب الإيميل';
+                      if (!email.contains('@') || !email.contains('.')) {
+                        return 'الإيميل مش صحيح';
+                      }
+                      return null;
+                    },
+                  ),
+                  if (error != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      error!,
+                      style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: sending
+                    ? null
+                    : () => Navigator.of(dialogContext).pop(),
+                child: const Text('إلغاء'),
+              ),
+              FilledButton(
+                onPressed: sending
+                    ? null
+                    : () async {
+                        if (dialogFormKey.currentState?.validate() != true) {
+                          return;
+                        }
+                        setDialogState(() {
+                          sending = true;
+                          error = null;
+                        });
+                        try {
+                          await FirebaseAuth.instance.sendPasswordResetEmail(
+                            email: controller.text.trim(),
+                          );
+                          if (dialogContext.mounted) {
+                            Navigator.of(dialogContext).pop('sent');
+                          }
+                        } on FirebaseAuthException catch (e) {
+                          if (!dialogContext.mounted) return;
+                          setDialogState(() {
+                            sending = false;
+                            error = switch (e.code) {
+                              'invalid-email' => 'الإيميل مش صحيح.',
+                              'too-many-requests' =>
+                                'محاولات كتير. حاول بعد شوية.',
+                              'network-request-failed' =>
+                                'اتأكد من اتصال الإنترنت.',
+                              _ => 'مقدرناش نبعت اللينك. حاول تاني.',
+                            };
+                          });
+                        } catch (_) {
+                          if (!dialogContext.mounted) return;
+                          setDialogState(() {
+                            sending = false;
+                            error = 'مقدرناش نبعت اللينك. حاول تاني.';
+                          });
+                        }
+                      },
+                child: sending
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('ابعت اللينك'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    // بنأجّل التخلص منه لحد ما النافذة تخلّص حركة الخروج (نفس سبب
+    // تأجيل الكونترولرز في نافذة إضافة العميل).
+    Future<void>.delayed(const Duration(milliseconds: 500), controller.dispose);
+
+    if (result == 'sent' && mounted) {
+      _showMessage(
+        'بعتنالك لينك إعادة تعيين كلمة المرور. شوف صندوق الوارد '
+        '(ولو مش لاقيه شوف مجلد Spam).',
+      );
+    }
+  }
+
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -176,6 +316,78 @@ class _LoginPageState extends State<LoginPage> {
           behavior: SnackBarBehavior.floating,
         ),
       );
+  }
+
+  /// الحساب اتسجل بنجاح لكن مش أدمن: بنوريه الـ UID عشان يضيفه بنفسه
+  /// في Firestore → admins/{uid} من غير ما يحتاج يشوف الـ Console بحساب تاني.
+  Future<void> _showNotAdminDialog(String uid) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('الحساب مش مسجّل كأدمن'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'البريد وكلمة المرور صح، بس الحساب ده مش موجود في قائمة الأدمن.',
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'في Firebase Console → Firestore → مجموعة admins → '
+                'أنشئ مستند جديد وحط الـ ID ده:',
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGold.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: AppColors.primaryGold.withValues(alpha: 0.5),
+                  ),
+                ),
+                child: SelectableText(
+                  uid,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'لو الحساب متضاف فعلاً: اتأكد إن قواعد Firestore منشورة، '
+                'وإن App Check مش مفعّل بـ Enforce على Firestore.',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: Theme.of(dialogContext).colorScheme.onSurface
+                      .withValues(alpha: 0.65),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: uid));
+                if (!dialogContext.mounted) return;
+                Navigator.of(dialogContext).pop();
+                _showMessage('تم نسخ الـ UID');
+              },
+              child: const Text('نسخ الـ UID'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('تمام'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   InputDecoration _fieldDecoration({
@@ -306,7 +518,7 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                                 child: ClipOval(
                                   child: Image.asset(
-                                    'assets/images/paris1.png',
+                                    'assets/images/logo.png',
                                     fit: BoxFit.cover,
                                     errorBuilder: (_, error, stackTrace) =>
                                         const Icon(
@@ -437,7 +649,22 @@ class _LoginPageState extends State<LoginPage> {
                                   return null;
                                 },
                               ),
-                              const SizedBox(height: 22),
+                              Align(
+                                alignment: AlignmentDirectional.centerEnd,
+                                child: TextButton(
+                                  onPressed: _isLoading
+                                      ? null
+                                      : _showForgotPasswordDialog,
+                                  child: const Text(
+                                    'نسيت كلمة المرور؟',
+                                    style: TextStyle(
+                                      color: gold,
+                                      fontSize: 12.5,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
                               SizedBox(
                                 height: 54,
                                 child: Material(

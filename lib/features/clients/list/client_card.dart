@@ -26,6 +26,18 @@ extension _ClientCard on _ClientsListPageState {
                   : 'مفيش شغل حالي',
               style: TextStyle(color: _mutedText(context), fontSize: 16),
             ),
+            if (searching && _hasMore) ...[
+              const SizedBox(height: 6),
+              TextButton.icon(
+                onPressed: _loadingMore ? null : _searchAllClients,
+                icon: const Icon(Icons.manage_search_rounded),
+                label: Text(
+                  _loadingMore
+                      ? 'بندوّر...'
+                      : 'دوّر في كل العملاء (${_ar(_items.length)} محمّل)',
+                ),
+              ),
+            ],
           ],
         ),
       );
@@ -33,9 +45,46 @@ extension _ClientCard on _ClientsListPageState {
 
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
-      itemCount: items.length,
+      itemCount: items.length + (_hasMore ? 1 : 0),
       itemExtent: 78, // ارتفاع ثابت = تمرير أسرع
-      itemBuilder: (context, index) => _clientTile(items[index]),
+      itemBuilder: (context, index) {
+        if (index >= items.length) return _loadMoreTile();
+        return _clientTile(items[index]);
+      },
+    );
+  }
+
+  /// زر تحميل دفعة إضافية: القايمة بتحمّل أول [kClientsPageSize] عميل بس،
+  /// والباقي بييجي عند الطلب (توفير قراءات Firestore ووقت فتح الصفحة).
+  Widget _loadMoreTile() {
+    final searching = _search.trim().isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Center(
+        child: TextButton.icon(
+          onPressed: _loadingMore
+              ? null
+              : (searching ? _searchAllClients : _loadMore),
+          icon: _loadingMore
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(
+                  searching
+                      ? Icons.manage_search_rounded
+                      : Icons.expand_more_rounded,
+                ),
+          label: Text(
+            _loadingMore
+                ? 'بنجهّز الباقي...'
+                : searching
+                ? 'مش لاقيه؟ دوّر في كل العملاء (${_ar(_items.length)} محمّل)'
+                : 'تحميل المزيد من العملاء (${_ar(_items.length)} ظاهر)',
+          ),
+        ),
+      ),
     );
   }
 

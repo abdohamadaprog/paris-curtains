@@ -15,6 +15,7 @@ import '../../../core/config/app_features.dart';
 import '../../../core/services/notification_service.dart';
 import '../services/local_backup_service.dart';
 import 'backup_page.dart';
+import 'telegram_backup_page.dart';
 import 'admin_analytics_page.dart';
 import 'upload_image_page.dart';
 import 'gallery_management_page.dart';
@@ -257,6 +258,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       onTap: () => _navTo(const BackupPage()),
                     ),
                     _GroupRow(
+                      title: 'نسخة تليجرام',
+                      subtitle: 'صور المعرض والمقاسات والفواتير على قناتك',
+                      icon: Icons.send_rounded,
+                      color: _sky,
+                      onTap: () => _navTo(const TelegramBackupPage()),
+                    ),
+                    _GroupRow(
                       title: 'أمان التطبيق',
                       subtitle: 'البصمة لحماية لوحة الإدارة',
                       icon: Icons.fingerprint_rounded,
@@ -361,19 +369,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               shape: BoxShape.circle,
               border: Border.all(color: _gold, width: 1.5),
             ),
-            child: ClipOval(
-              child: Image.asset(
-                'assets/images/abdo.jpg',
-                width: 46,
-                height: 46,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Container(
-                  width: 46,
-                  height: 46,
-                  color: _gold.withValues(alpha: 0.2),
-                  child: const Icon(Icons.person, color: _gold),
-                ),
-              ),
+            child: Container(
+              width: 46,
+              height: 46,
+              color: _gold.withValues(alpha: 0.2),
+              child: const Icon(Icons.person, color: _gold),
             ),
           ),
           const SizedBox(width: 14),

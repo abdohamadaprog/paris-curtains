@@ -63,7 +63,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    _navigationTimer = Timer(const Duration(milliseconds: 3300), () {
+    _navigationTimer = Timer(const Duration(milliseconds: 1400), () {
       if (!mounted) return;
 
       Navigator.of(context).pushReplacement(
@@ -163,7 +163,7 @@ class _SplashScreenState extends State<SplashScreen>
                                 ),
                                 child: ClipOval(
                                   child: Image.asset(
-                                    'assets/images/paris1.png',
+                                    'assets/images/logo.png',
                                     fit: BoxFit.cover,
                                     errorBuilder: (context, error, stackTrace) {
                                       return const Icon(

@@ -22,6 +22,28 @@ service cloud.firestore {
       allow list, create, update, delete: if false;
     }
 
+    // المعرض والإكسسوارات والصور الترويجية:
+    // قراءة عامة لكل مستخدمي التطبيق، والتعديل للأدمن فقط
+    match /gallery_images/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /promo_images/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /accessories/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // إعدادات عامة يقراها كل زائر (مش بيانات حساسة): زي عدد صور الرئيسية.
+    // الكتابة من لوحة الإدارة بس.
+    match /public_config/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // حقل نصي اختياري: غايب أو null أو نص بطول معقول
     // (بيقبل null عشان العملاء القدام اللي ممكن يكون عندهم حقول فاضية)
     function optString(d, key, maxLen) {
@@ -29,55 +51,38 @@ service cloud.firestore {
         (d[key] is string && d[key].size() <= maxLen);
     }
 
-    // حقل اختياري نوعه رقم / true-false (بيقبل غايب أو null)
-    function optNumber(d, key) {
-      return !(key in d) || d[key] == null || d[key] is number;
-    }
-    function optBool(d, key) {
-      return !(key in d) || d[key] == null || d[key] is bool;
-    }
-
-    // شكل مستند الصورة (معرض / عروض / إكسسوارات). بنتحقق بس من الأنواع والأطوال
-    // ومن إن الرابط https، من غير ما نفرض الحقول (عشان الصور القديمة متتكسرش).
-    function validImage(d) {
-      return (!('url' in d) ||
-              (d.url is string && d.url.size() <= 1000 && d.url.matches('https://.*')))
-        && optString(d, 'category', 100)
-        && optString(d, 'accessory_type', 100)
-        && optString(d, 'heavy_fabric', 100)
-        && optString(d, 'light_fabric', 100)
-        && optNumber(d, 'sort_order')
-        && optBool(d, 'is_featured');
-    }
-
-    // المعرض والإكسسوارات والصور الترويجية:
-    // قراءة عامة لكل مستخدمي التطبيق، والتعديل للأدمن فقط (مع فحص شكل البيانات).
-    // الحذف للأدمن بدون فحص (مفيش بيانات جديدة).
-    match /gallery_images/{docId} {
-      allow read: if true;
-      allow create, update: if isAdmin() && validImage(request.resource.data);
-      allow delete: if isAdmin();
-    }
-    match /promo_images/{docId} {
-      allow read: if true;
-      allow create, update: if isAdmin() && validImage(request.resource.data);
-      allow delete: if isAdmin();
-    }
-    match /accessories/{docId} {
-      allow read: if true;
-      allow create, update: if isAdmin() && validImage(request.resource.data);
-      allow delete: if isAdmin();
-    }
-
     // فحص بسيط لشكل بيانات العميل (بيمنع بيانات غريبة أو ضخمة)
     function validClient(d) {
-      return optString(d, 'name', 120)
-        && optString(d, 'phone', 40)
-        && optString(d, 'address', 300)
-        && optString(d, 'notes', 2000)
+      return optString(d, 'name', 240)
+        && optString(d, 'phone', 80)
+        && optString(d, 'address', 600)
+        && optString(d, 'notes', 4000)
         && (!('work_stage' in d) ||
             (d.work_stage is int && d.work_stage >= 1 && d.work_stage <= 4))
-        && optBool(d, 'installation_done');
+        && (!('installation_done' in d) || d.installation_done is bool);
+    }
+
+    // فحص الفاتورة المحفوظة جوه مستند العميل (حقل invoice).
+    // الهدف: منع أي كتابة ضخمة أو شكلها غلط (سقف للدفعات والبنود والحالة).
+    function validInvoice(d) {
+      return !('invoice' in d) || d.invoice == null || (
+        d.invoice is map
+        && d.invoice.size() <= 60
+        && (!('payments' in d.invoice) ||
+            (d.invoice.payments is list && d.invoice.payments.size() <= 300))
+        && (!('apt_custom_lines' in d.invoice) ||
+            (d.invoice.apt_custom_lines is list
+             && d.invoice.apt_custom_lines.size() <= 300))
+        && (!('balc_custom_lines' in d.invoice) ||
+            (d.invoice.balc_custom_lines is list
+             && d.invoice.balc_custom_lines.size() <= 300))
+        && (!('status' in d.invoice) ||
+            d.invoice.status in ['unpaid', 'partial', 'paid', 'overpaid'])
+        && (!('total' in d.invoice) || d.invoice.total is number)
+        && (!('subtotal' in d.invoice) || d.invoice.subtotal is number)
+        && (!('discount_amount' in d.invoice) ||
+            d.invoice.discount_amount is number)
+      );
     }
 
     // بيانات العملاء والفواتير والأجندة: للأدمن فقط.
@@ -86,7 +91,9 @@ service cloud.firestore {
     // العملية (batch)، يعني مفيش حذف نهائي للبيانات.
     match /clients/{clientId} {
       allow read: if isAdmin();
-      allow create, update: if isAdmin() && validClient(request.resource.data);
+      allow create, update: if isAdmin()
+        && validClient(request.resource.data)
+        && validInvoice(request.resource.data);
       allow delete: if isAdmin() &&
         existsAfter(/databases/$(database)/documents/clients_archive/$(clientId));
 
@@ -101,10 +108,7 @@ service cloud.firestore {
     // أرشيف العملاء المحذوفين: الأدمن يقرا ويضيف ويعدّل (علامة الاسترجاع)،
     // لكن الحذف النهائي ممنوع تمامًا من التطبيق.
     match /clients_archive/{clientId} {
-      allow read: if isAdmin();
-      allow create, update: if isAdmin()
-        && request.resource.data.keys().hasOnly(
-             ['name', 'original_id', 'data', 'deleted_at', 'restored_at']);
+      allow read, create, update: if isAdmin();
       allow delete: if false;
 
       match /details/{docId} {
@@ -127,18 +131,27 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // إعدادات التطبيق (ثوابت الحساب / الأسعار العامة): settings/prices
-    // للأدمن فقط، وبنحدّ شكل المستند وعدد الأسعار.
+    // إعدادات التطبيق: settings/prices (الأسعار) و settings/telegram_backup
+    // (بوت نسخة الصور على تليجرام). الاتنين للأدمن فقط.
     match /settings/{docId} {
       allow read: if isAdmin();
-      allow create, update: if isAdmin()
-        && request.resource.data.keys().hasOnly(['prices', 'updated_at'])
-        && request.resource.data.get('prices', {}) is map
-        && request.resource.data.get('prices', {}).size() <= 60;
+      allow create, update: if isAdmin() && (
+        (docId == 'prices'
+          && request.resource.data.keys().hasOnly(['prices', 'updated_at'])
+          && request.resource.data.get('prices', {}) is map
+          && request.resource.data.get('prices', {}).size() <= 60)
+        ||
+        (docId == 'telegram_backup'
+          && request.resource.data.keys().hasOnly(
+               ['bot_token', 'chat_id', 'enabled', 'updated_at'])
+          && request.resource.data.get('bot_token', '') is string
+          && request.resource.data.get('chat_id', '') is string
+          && request.resource.data.get('enabled', true) is bool)
+      );
       allow delete: if false;
     }
 
-    // أي مسار تاني غير مذكور فوق ممنوع (قفل صريح، حتى لو اتضافت collections بعدين)
+    // أي مسار تاني غير مذكور فوق ممنوع تلقائيًا
     match /{document=**} {
       allow read, write: if false;
     }
