@@ -18,6 +18,7 @@ const Map<int, String> _stageLabels = {
   2: 'جاري التحضير',
   3: 'جاهز للتركيب',
   4: 'تمت',
+  5: 'ملغي',
 };
 
 String _ar(Object? n) => (n ?? '').toString().replaceAllMapped(
@@ -39,7 +40,7 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
   int _archivedJobs = 0;
 
   // عدد العملاء في كل مرحلة شغل (١ أحمر • ٢ أصفر • ٣ أزرق • ٤ أخضر)
-  final Map<int, int> _stageCounts = {1: 0, 2: 0, 3: 0, 4: 0};
+  final Map<int, int> _stageCounts = {for (final s in WorkStage.all) s: 0};
 
   // إحصائيات الأنواع
   final Map<String, int> _categoryCounts = {
@@ -76,6 +77,8 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
         _stageCounts[stage] = (_stageCounts[stage] ?? 0) + 1;
 
         final done = data['installation_done'] == true;
+        // الملغي مش شغل شغال ولا شغل خلص: بنعدّه في مراحل الشغل بس
+        if (WorkStage.isCancelled(stage)) continue;
         if (done) {
           _archivedJobs++;
         } else if (data['installation_date'] != null) {
@@ -175,10 +178,12 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      for (final s in const [1, 2, 3, 4])
+                      for (final s in WorkStage.all)
                         Expanded(
                           child: Padding(
-                            padding: EdgeInsets.only(left: s == 4 ? 0 : 8),
+                            padding: EdgeInsets.only(
+                              left: s == WorkStage.cancelled ? 0 : 6,
+                            ),
                             child: _buildStageCard(s),
                           ),
                         ),
@@ -310,7 +315,7 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
         height: 12,
         child: Row(
           children: [
-            for (final s in const [1, 2, 3, 4])
+            for (final s in WorkStage.all)
               if ((_stageCounts[s] ?? 0) > 0)
                 Expanded(
                   flex: _stageCounts[s]!,

@@ -58,8 +58,10 @@ service cloud.firestore {
         && optString(d, 'address', 600)
         && optString(d, 'notes', 4000)
         && (!('work_stage' in d) ||
-            (d.work_stage is int && d.work_stage >= 1 && d.work_stage <= 4))
-        && (!('installation_done' in d) || d.installation_done is bool);
+            (d.work_stage is int && d.work_stage >= 1 && d.work_stage <= 5))
+        && (!('installation_done' in d) || d.installation_done is bool)
+        && (!('cancelled_at' in d) || d.cancelled_at == null ||
+            d.cancelled_at is timestamp);
     }
 
     // فحص الفاتورة المحفوظة جوه مستند العميل (حقل invoice).

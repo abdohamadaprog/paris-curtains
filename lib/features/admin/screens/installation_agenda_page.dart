@@ -5,6 +5,7 @@ import 'package:table_calendar/table_calendar.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/work_stage.dart';
+import '../../../core/widgets/stage_widgets.dart';
 
 // نفس ألوان الفاتورة والمقاسات والعملاء
 const Color _bg = Color(0xFF0F172A);
@@ -49,6 +50,13 @@ class _InstallationAgendaPageState extends State<InstallationAgendaPage> {
 
   /// تغيير مرحلة الشغل — بنحدّث installation_done كمان عشان التقارير تفضل شغالة
   Future<void> _setStage(_ClientDoc doc, int stage) async {
+    if (WorkStage.isCancelled(stage)) {
+      final ok = await confirmCancelWork(
+        context,
+        clientName: (doc.data()['name'] ?? '').toString(),
+      );
+      if (!ok || !mounted) return;
+    }
     try {
       await doc.reference.update(WorkStage.updateFields(stage));
     } catch (e) {
@@ -86,6 +94,8 @@ class _InstallationAgendaPageState extends State<InstallationAgendaPage> {
                   for (final doc in docs) {
                     final ts = doc.data()['installation_date'];
                     if (ts is! Timestamp) continue;
+                    // الشغلانة الملغية مش بتتحسب تركيب مطلوب: متظهرش في الأجندة
+                    if (WorkStage.isCancelled(_stageOf(doc.data()))) continue;
                     events
                         .putIfAbsent(_normalizeDate(ts.toDate()), () => [])
                         .add(doc);
@@ -363,7 +373,7 @@ class _InstallationAgendaPageState extends State<InstallationAgendaPage> {
             color: _panel,
             onSelected: (s) => _setStage(doc, s),
             itemBuilder: (_) => [
-              for (final s in const [1, 2, 3, 4])
+              for (final s in WorkStage.all)
                 PopupMenuItem<int>(
                   value: s,
                   child: Row(
@@ -384,7 +394,7 @@ class _InstallationAgendaPageState extends State<InstallationAgendaPage> {
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        '${_ar(s)} • ${_stageLabels[s]}',
+                        stageMenuLabel(s),
                         style: TextStyle(
                           color: s == stage ? _stageColors[s] : Colors.white,
                           fontWeight: s == stage

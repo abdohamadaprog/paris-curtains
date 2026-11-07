@@ -13,12 +13,7 @@ class _StageStrip extends StatefulWidget {
 
 class _StageStripState extends State<_StageStrip> {
   static const Map<int, Color> _colors = WorkStage.colors;
-  static const Map<int, String> _labels = {
-    1: 'بدأنا الشغل',
-    2: 'تحضير',
-    3: 'جاهز للتركيب',
-    4: 'تمت',
-  };
+  static const Map<int, String> _labels = WorkStage.shortLabels;
 
   Map<int, int>? _counts;
 
@@ -45,12 +40,14 @@ class _StageStripState extends State<_StageStrip> {
         col.where('work_stage', isEqualTo: WorkStage.preparing).count().get(),
         col.where('work_stage', isEqualTo: WorkStage.drilled).count().get(),
         col.where('installation_done', isEqualTo: true).count().get(),
+        col.where('work_stage', isEqualTo: WorkStage.cancelled).count().get(),
       ]);
       final total = results[0].count ?? 0;
       final preparing = results[1].count ?? 0;
       final drilled = results[2].count ?? 0;
       final done = results[3].count ?? 0;
-      final started = total - preparing - drilled - done;
+      final cancelled = results[4].count ?? 0;
+      final started = total - preparing - drilled - done - cancelled;
       if (!mounted) return;
       setState(() {
         _counts = {
@@ -58,6 +55,7 @@ class _StageStripState extends State<_StageStrip> {
           2: preparing,
           3: drilled,
           4: done,
+          5: cancelled,
         };
       });
     } catch (_) {
@@ -73,10 +71,12 @@ class _StageStripState extends State<_StageStrip> {
 
     return Row(
       children: [
-        for (final stage in const [1, 2, 3, 4])
+        for (final stage in WorkStage.all)
           Expanded(
             child: Padding(
-              padding: EdgeInsets.only(left: stage == 4 ? 0 : 8),
+              padding: EdgeInsets.only(
+                left: stage == WorkStage.cancelled ? 0 : 6,
+              ),
               child: InkWell(
                 borderRadius: BorderRadius.circular(16),
                 onTap: () => onTapStage(stage),

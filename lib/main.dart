@@ -9,6 +9,7 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
 import 'app.dart';
+import 'core/services/sync_status_service.dart';
 import 'core/theme/theme_manager.dart';
 
 Future<void> main() async {
@@ -19,6 +20,8 @@ Future<void> main() async {
   // App Check مش شرط يخلص قبل فتح التطبيق: لو اتأخر (نت بطيء) مش هنوقف
   // شاشة البداية عشانه. بيشتغل في الخلفية والطلبات بتاخد التوكن أول ما يجهز.
   unawaited(_activateAppCheck());
+  // متابعة حالة النت والتعديلات اللي لسه ماترفعتش (للشغل بدون نت)
+  SyncStatus.instance.start();
   await themeManager.loadTheme();
   runApp(const ParisCurtainsApp());
 }

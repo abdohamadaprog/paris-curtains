@@ -177,7 +177,7 @@ extension _MeasurementData on _ParisClientMeasurementsPageState {
 
       final trash = _trash.map((t) => t.toMap()).toList();
 
-      await ClientDetailsRepository.save(
+      final outcome = await ClientDetailsRepository.save(
         clientId: widget.clientId,
         clientFields: {
           'name': _nameController.text.trim(),
@@ -196,14 +196,19 @@ extension _MeasurementData on _ParisClientMeasurementsPageState {
       _rebuild(() {
         _isAutoSaving = false;
         _savedSuccess = true;
+        _savedLocalOnly = outcome == WriteOutcome.queued;
       });
 
       if (!isAuto) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم حفظ مقاسات العميل بنجاح ✨'),
-            backgroundColor: Color(0xFF1E7E34),
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: Text(
+              outcome == WriteOutcome.queued
+                  ? 'اتحفظ على الجهاز، وهيترفع لما النت يرجع ✨'
+                  : 'تم حفظ مقاسات العميل بنجاح ✨',
+            ),
+            backgroundColor: const Color(0xFF1E7E34),
+            duration: const Duration(seconds: 2),
           ),
         );
       }

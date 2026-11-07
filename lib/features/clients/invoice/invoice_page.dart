@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/constants/work_stage.dart';
+import '../../../core/services/sync_status_service.dart';
+import '../../../core/widgets/stage_widgets.dart';
 import '../data/client_details_repository.dart';
 import 'invoice_calculator.dart';
 import 'invoice_image_page.dart';
@@ -28,7 +30,6 @@ const Color _kGreen = Color(0xFF10B981);
 
 // مراحل الشغل: المصدر الوحيد في core/constants/work_stage.dart
 const Map<int, Color> _kStageColors = WorkStage.colors;
-const Map<int, String> _kStageLabels = WorkStage.labels;
 
 /// دالة مساعدة لتحويل أي نص أو رقم إلى أرقام عربية مشرقية (٠١٢٣٤٥٦٧٨٩)
 String _arNum(dynamic value) {
@@ -392,7 +393,8 @@ class _InvoicePageState extends State<InvoicePage>
     setState(() => _saving = true);
 
     try {
-      await _writeInvoice();
+      // لو مفيش نت: الفاتورة بتتخزّن على الجهاز ومبنعلّقش الحفظ اللي بعده
+      final outcome = await SyncStatus.instance.settle(_writeInvoice());
 
       if (!mounted) return;
       setState(() {
@@ -402,14 +404,16 @@ class _InvoicePageState extends State<InvoicePage>
       });
       if (!silent) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'تم حفظ الفاتورة ✨',
+              outcome == WriteOutcome.queued
+                  ? 'اتحفظت على الجهاز، وهتترفع لما النت يرجع ✨'
+                  : 'تم حفظ الفاتورة ✨',
               textAlign: TextAlign.center,
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             backgroundColor: _kGreen,
-            duration: Duration(seconds: 2),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
@@ -691,7 +695,7 @@ class _InvoicePageState extends State<InvoicePage>
       color: _kPanel,
       onSelected: _setStage,
       itemBuilder: (_) => [
-        for (final s in const [1, 2, 3, 4])
+        for (final s in WorkStage.all)
           PopupMenuItem<int>(
             value: s,
             child: Row(
@@ -712,7 +716,7 @@ class _InvoicePageState extends State<InvoicePage>
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  '${_arNum(s)} • ${_kStageLabels[s]}',
+                  stageMenuLabel(s),
                   style: TextStyle(
                     color: s == _stage ? _kStageColors[s] : Colors.white,
                     fontWeight: s == _stage ? FontWeight.bold : FontWeight.w500,
@@ -734,19 +738,16 @@ class _InvoicePageState extends State<InvoicePage>
             BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 9),
           ],
         ),
-        child: Text(
-          _arNum(_stage),
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.w900,
-            fontSize: 17,
-          ),
-        ),
+        child: stageMark(_stage, color, size: 17),
       ),
     );
   }
 
   Future<void> _setStage(int stage) async {
+    if (WorkStage.isCancelled(stage) && stage != _stage) {
+      final ok = await confirmCancelWork(context);
+      if (!ok || !mounted) return;
+    }
     setState(() => _stage = stage);
     try {
       await FirebaseFirestore.instance

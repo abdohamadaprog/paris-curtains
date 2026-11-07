@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../core/services/sync_status_service.dart';
+
 /// مقاسات العميل (الشبابيك + البلكونات + المحذوفات).
 ///
 /// بتتخزن في مستند منفصل: clients/{id}/details/main
@@ -133,7 +135,7 @@ class ClientDetailsRepository {
 
   /// حفظ المقاسات. بيكتب المستند الجديد وبيشيل الحقول القديمة التقيلة من
   /// مستند العميل في نفس العملية (Batch)، فالترحيل بيحصل لوحده.
-  static Future<void> save({
+  static Future<WriteOutcome> save({
     required String clientId,
     required Map<String, dynamic> clientFields,
     required ClientDetails details,
@@ -158,8 +160,9 @@ class ClientDetailsRepository {
           'balconies': FieldValue.delete(),
           'deleted_cards': FieldValue.delete(),
         }, SetOptions(merge: true));
-        await batch.commit();
-        return;
+        // مش بنستنى السيرفر أكتر من ثانية ونص: لو مفيش نت الكتابة بتتخزّن
+        // على الجهاز وبترجع queued (والـ SDK بيرفعها لوحده بعدين).
+        return await SyncStatus.instance.settle(batch.commit());
       } catch (e) {
         if (!_isDenied(e)) rethrow;
         _detailsDeniedAt = DateTime.now();
@@ -167,10 +170,12 @@ class ClientDetailsRepository {
     }
 
     // رجوع للتخزين القديم (لو القواعد مش مسموحة للمسار الجديد)
-    await _clientRef(clientId).set({
-      ...clientFields,
-      ...payload,
-      'updated_at': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    return SyncStatus.instance.settle(
+      _clientRef(clientId).set({
+        ...clientFields,
+        ...payload,
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true)),
+    );
   }
 }

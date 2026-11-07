@@ -14,6 +14,7 @@ import '../../clients/invoice/price_settings_page.dart';
 import '../../../core/config/app_features.dart';
 import '../../../core/services/notification_service.dart';
 import '../services/local_backup_service.dart';
+import '../../../core/widgets/sync_status_banner.dart';
 import 'backup_page.dart';
 import 'telegram_backup_page.dart';
 import 'admin_analytics_page.dart';
@@ -115,14 +116,26 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _bg,
+      // زرار عايم: عميل جديد من أول شاشة بضغطة واحدة
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _navTo(const ClientsListPage(autoAdd: true)),
+        backgroundColor: _gold,
+        foregroundColor: Colors.black,
+        icon: const Icon(Icons.person_add_alt_1_rounded, size: 22),
+        label: const Text(
+          'عميل جديد',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+      ),
       body: SafeArea(
         bottom: false,
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(child: _buildHeader()),
+            const SliverToBoxAdapter(child: SyncStatusBanner()),
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 30),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
                   _buildWelcome(),

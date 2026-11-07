@@ -95,12 +95,19 @@ extension _ClientHelpers on _ClientsListPageState {
     );
   }
 
-  /// تغيير مرحلة الشغل (١ أحمر • ٢ أصفر • ٣ أزرق • ٤ أخضر).
+  /// تغيير مرحلة الشغل (١ أحمر • ٢ أصفر • ٣ أزرق • ٤ أخضر • ٥ رمادي = ملغي).
   /// بنحدّث installation_done كمان عشان الأجندة والتقارير يفضلوا شغالين.
   Future<void> _setStage(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
     int stage,
   ) async {
+    if (WorkStage.isCancelled(stage)) {
+      final ok = await confirmCancelWork(
+        context,
+        clientName: (doc.data()['name'] ?? '').toString(),
+      );
+      if (!ok || !mounted) return;
+    }
     try {
       await doc.reference.update(WorkStage.updateFields(stage));
     } on FirebaseException catch (e) {
@@ -123,6 +130,5 @@ const Color _gold = AppColors.primaryGold;
 
 // مراحل الشغل: المصدر الوحيد في core/constants/work_stage.dart
 const Map<int, Color> _stageColors = WorkStage.colors;
-const Map<int, String> _stageLabels = WorkStage.labels;
 
 int _stageOf(Map<String, dynamic> data) => WorkStage.fromData(data);

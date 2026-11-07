@@ -10,6 +10,8 @@ import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/sync_status_service.dart';
+import '../../../core/widgets/sync_status_banner.dart';
 import '../../../core/services/telegram_backup_service.dart';
 import 'package:paris_curtains/features/clients/invoice/invoice_page.dart';
 import '../data/client_details_repository.dart';
@@ -69,6 +71,9 @@ class _ParisClientMeasurementsPageState
   bool _saving = false;
   bool _isAutoSaving = false;
   bool _savedSuccess = false;
+
+  /// آخر حفظ اتخزّن على الجهاز بس (مفيش نت) ولسه ماترفعش للسيرفر
+  bool _savedLocalOnly = false;
   bool _showTrash = false;
   bool _loaded = false;
   bool _loadFailed = false;
@@ -94,6 +99,16 @@ class _ParisClientMeasurementsPageState
 
   @override
   void dispose() {
+    // لو المستخدم رجع قبل ما مؤقّت الحفظ التلقائي (٦٥٠ مللي) يخلص، نحفظ
+    // آخر تعديل دلوقتي قبل ما الكنترولرز تتقفل (من غير ده كان بيضيع).
+    // _performSave بتقرا الكنترولرز بشكل متزامن قبل أول await، ومبتنادّيش
+    // setState وإحنا بنتقفل.
+    if (_autoSaveTimer?.isActive == true &&
+        _userEdited &&
+        _loaded &&
+        !_loadFailed) {
+      unawaited(_performSave(isAuto: true));
+    }
     _autoSaveTimer?.cancel();
     _tabs.dispose();
     _aptScroll.dispose();
@@ -232,6 +247,7 @@ class _ParisClientMeasurementsPageState
             children: [
               Column(
                 children: [
+                  const SyncStatusBanner(),
                   _clientInfoBar(),
                   _measureTabsBar(),
                   if (_showTrash)
@@ -287,12 +303,14 @@ class _ParisClientMeasurementsPageState
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: _isAutoSaving
+                color: (_isAutoSaving || _savedLocalOnly)
                     ? Colors.amber.withValues(alpha: 0.15)
                     : Colors.green.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: _isAutoSaving ? Colors.amber : Colors.green,
+                  color: (_isAutoSaving || _savedLocalOnly)
+                      ? Colors.amber
+                      : Colors.green,
                   width: 0.8,
                 ),
               ),
@@ -314,11 +332,20 @@ class _ParisClientMeasurementsPageState
                       style: TextStyle(color: Colors.amber, fontSize: 10),
                     ),
                   ] else ...[
-                    const Icon(Icons.check, color: Colors.greenAccent, size: 12),
+                    Icon(
+                      _savedLocalOnly ? Icons.phone_android_rounded : Icons.check,
+                      color: _savedLocalOnly ? Colors.amber : Colors.greenAccent,
+                      size: 12,
+                    ),
                     const SizedBox(width: 3),
-                    const Text(
-                      'محفوظ',
-                      style: TextStyle(color: Colors.greenAccent, fontSize: 10),
+                    Text(
+                      _savedLocalOnly ? 'محفوظ على الجهاز' : 'محفوظ',
+                      style: TextStyle(
+                        color: _savedLocalOnly
+                            ? Colors.amber
+                            : Colors.greenAccent,
+                        fontSize: 10,
+                      ),
                     ),
                   ],
                 ],

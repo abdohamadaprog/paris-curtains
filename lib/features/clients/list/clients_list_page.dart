@@ -7,6 +7,9 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/work_stage.dart';
+import '../../../core/services/sync_status_service.dart';
+import '../../../core/widgets/stage_widgets.dart';
+import '../../../core/widgets/sync_status_banner.dart';
 import '../../../core/theme/theme_manager.dart';
 import '../../auth/login_page.dart';
 import '../measurements/paris_client_measurements_page.dart';
@@ -57,7 +60,14 @@ String _normalizeName(String input) {
 /// صفحة إدارة العملاء الخاصة بلوحة تحكم باريس للستائر.
 /// تستخدم مجموعة Firestore الحالية: clients
 class ClientsListPage extends StatefulWidget {
-  const ClientsListPage({super.key, this.initialStage = 0});
+  const ClientsListPage({
+    super.key,
+    this.initialStage = 0,
+    this.autoAdd = false,
+  });
+
+  /// يفتح نافذة "إضافة عميل" أول ما الصفحة تفتح (من الزرار العايم في الداشبورد)
+  final bool autoAdd;
 
   /// فلتر مرحلة مبدئي (١-٤) — ٠ يعني كل المراحل
   final int initialStage;
@@ -94,10 +104,15 @@ class _ClientsListPageState extends State<ClientsListPage>
   @override
   void initState() {
     super.initState();
-    _stageFilter = widget.initialStage.clamp(0, 4);
+    _stageFilter = widget.initialStage.clamp(0, WorkStage.cancelled);
     _tabs = TabController(length: 2, vsync: this);
     _loadFromCache();
     _listen();
+    if (widget.autoAdd) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _addClient();
+      });
+    }
   }
 
   @override
@@ -221,7 +236,8 @@ class _ClientsListPageState extends State<ClientsListPage>
       if (query.isNotEmpty && !c.searchKey.contains(query)) continue;
       if (_stageFilter != 0 && c.stage != _stageFilter) continue;
       final d = c.installDate;
-      if (d != null && d.isBefore(today)) {
+      // الملغي بيروح الأرشيف على طول (مهما كان موعد التركيب)
+      if (WorkStage.isCancelled(c.stage) || (d != null && d.isBefore(today))) {
         archive.add(c);
       } else {
         current.add(c);
@@ -269,6 +285,7 @@ class _ClientsListPageState extends State<ClientsListPage>
         child: Column(
           children: [
             _buildHeader(context),
+            const SyncStatusBanner(),
             _buildSearchRow(context),
             _buildTabs(context),
             _buildStageFilter(context),
@@ -475,7 +492,7 @@ class _ClientsListPageState extends State<ClientsListPage>
 
   /// فلتر المراحل: الكل + ١ أحمر + ٢ أصفر + ٣ أزرق + ٤ أخضر (بالعدد)
   Widget _buildStageFilter(BuildContext context) {
-    final counts = {1: 0, 2: 0, 3: 0, 4: 0};
+    final counts = {for (final s in WorkStage.all) s: 0};
     final query = _normalizeName(_search);
     var total = 0;
     for (final c in _items) {
@@ -545,15 +562,21 @@ class _ClientsListPageState extends State<ClientsListPage>
               _refilter();
             }),
           ),
-          for (final stage in const [1, 2, 3, 4])
+          for (final stage in WorkStage.all)
             chip(
               selected: _stageFilter == stage,
               color: _stageColors[stage]!,
-              label: '${_ar(stage)} • ${_ar(counts[stage])}',
-              onTap: () => setState(() {
-                _stageFilter = _stageFilter == stage ? 0 : stage;
-                _refilter();
-              }),
+              label: WorkStage.isCancelled(stage)
+                  ? 'ملغي • ${_ar(counts[stage])}'
+                  : '${_ar(stage)} • ${_ar(counts[stage])}',
+              onTap: () {
+                setState(() {
+                  _stageFilter = _stageFilter == stage ? 0 : stage;
+                  _refilter();
+                });
+                // الملغي ساكن في الأرشيف: ننقل المستخدم له أول ما يفلتر عليه
+                if (_stageFilter == WorkStage.cancelled) _tabs.animateTo(1);
+              },
             ),
         ],
       ),

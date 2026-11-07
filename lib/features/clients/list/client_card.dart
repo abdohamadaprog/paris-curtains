@@ -112,7 +112,7 @@ extension _ClientCard on _ClientsListPageState {
       color: _dialogColor(context),
       onSelected: (stage) => _setStage(c.doc, stage),
       itemBuilder: (_) => [
-        for (final stage in const [1, 2, 3, 4])
+        for (final stage in WorkStage.all)
           PopupMenuItem<int>(
             value: stage,
             child: Row(
@@ -133,7 +133,7 @@ extension _ClientCard on _ClientsListPageState {
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  '${_ar(stage)} • ${_stageLabels[stage]}',
+                  stageMenuLabel(stage),
                   style: TextStyle(
                     color: stage == c.stage
                         ? _stageColors[stage]
@@ -161,14 +161,7 @@ extension _ClientCard on _ClientsListPageState {
               BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 9),
             ],
           ),
-          child: Text(
-            _ar(c.stage),
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w900,
-              fontSize: 18,
-            ),
-          ),
+          child: stageMark(c.stage, color),
         ),
       ),
     );
@@ -217,9 +210,14 @@ extension _ClientCard on _ClientsListPageState {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: _primaryText(context),
+                      color: WorkStage.isCancelled(c.stage)
+                          ? _mutedText(context)
+                          : _primaryText(context),
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
+                      decoration: WorkStage.isCancelled(c.stage)
+                          ? TextDecoration.lineThrough
+                          : null,
                     ),
                   ),
                 ),

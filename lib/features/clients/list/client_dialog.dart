@@ -162,7 +162,7 @@ extension _ClientDialog on _ClientsListPageState {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      for (final s in const [1, 2, 3, 4])
+                      for (final s in WorkStage.all)
                         Expanded(
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 3),
@@ -198,14 +198,7 @@ extension _ClientDialog on _ClientsListPageState {
                                       : null,
                                 ),
                                 alignment: Alignment.center,
-                                child: Text(
-                                  _ar(s),
-                                  style: TextStyle(
-                                    color: _stageColors[s],
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 18,
-                                  ),
-                                ),
+                                child: stageMark(s, _stageColors[s]!),
                               ),
                             ),
                           ),
@@ -214,7 +207,7 @@ extension _ClientDialog on _ClientsListPageState {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '${_ar(stage)} • ${_stageLabels[stage]}',
+                    stageMenuLabel(stage),
                     style: TextStyle(
                       color: _stageColors[stage],
                       fontSize: 12.5,
@@ -300,6 +293,12 @@ extension _ClientDialog on _ClientsListPageState {
       if (proceed != true || !mounted) return;
     }
 
+    // تأكيد الإلغاء (بس لو المرحلة اتغيّرت لملغي دلوقتي)
+    if (WorkStage.isCancelled(stage) && stage != oldStage) {
+      final ok = await confirmCancelWork(context, clientName: name);
+      if (!ok || !mounted) return;
+    }
+
     try {
       final fields = <String, dynamic>{
         'name': name,
@@ -311,7 +310,7 @@ extension _ClientDialog on _ClientsListPageState {
             : Timestamp.fromDate(installationDate!),
       };
       if (!isEdit || stage != oldStage) {
-        fields.addAll(WorkStage.updateFields(stage));
+        fields.addAll(WorkStage.updateFields(stage, forCreate: !isEdit));
         if (stage == WorkStage.done && installationDate != null) {
           fields['installation_done_at'] = Timestamp.fromDate(
             installationDate!,
@@ -322,14 +321,30 @@ extension _ClientDialog on _ClientsListPageState {
         if (registrationDate != null) {
           fields['created_at'] = Timestamp.fromDate(registrationDate!);
         }
-        await doc.reference.update(fields);
-        if (mounted) _message('تم تعديل بيانات العميل');
+        final outcome = await SyncStatus.instance.settle(
+          doc.reference.update(fields),
+        );
+        if (mounted) {
+          _message(
+            outcome == WriteOutcome.queued
+                ? 'اتحفظ على الجهاز، وهيترفع لما النت يرجع'
+                : 'تم تعديل بيانات العميل',
+          );
+        }
       } else {
         fields['created_at'] = registrationDate == null
             ? FieldValue.serverTimestamp()
             : Timestamp.fromDate(registrationDate!);
-        await FirebaseFirestore.instance.collection('clients').add(fields);
-        if (mounted) _message('تم إضافة العميل بنجاح');
+        final outcome = await SyncStatus.instance.settle(
+          FirebaseFirestore.instance.collection('clients').add(fields),
+        );
+        if (mounted) {
+          _message(
+            outcome == WriteOutcome.queued
+                ? 'اتضاف على الجهاز، وهيترفع لما النت يرجع'
+                : 'تم إضافة العميل بنجاح',
+          );
+        }
       }
     } catch (e) {
       if (mounted) _message('تعذر حفظ العميل: $e');
@@ -396,8 +411,14 @@ extension _ClientDialog on _ClientsListPageState {
       });
       batch.delete(detailsRef);
       batch.delete(clientRef);
-      await batch.commit();
-      if (mounted) _message('تم نقل العميل للأرشيف');
+      final outcome = await SyncStatus.instance.settle(batch.commit());
+      if (mounted) {
+        _message(
+          outcome == WriteOutcome.queued
+              ? 'اتنقل للأرشيف على الجهاز، وهيترفع لما النت يرجع'
+              : 'تم نقل العميل للأرشيف',
+        );
+      }
     } catch (e) {
       if (mounted) _message('تعذر نقل العميل للأرشيف: $e');
     }
