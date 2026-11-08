@@ -17,8 +17,9 @@ class _QuickAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     return Material(
-      color: const Color(0xFF1E293B),
+      color: AppPalette.panel,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: onTap,
@@ -44,8 +45,8 @@ class _QuickAction extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 title,
-                style: const TextStyle(
-                  color: Color(0xFFF1F5F9),
+                style: TextStyle(
+                  color: AppPalette.text,
                   fontWeight: FontWeight.w900,
                   fontSize: 15,
                 ),
@@ -53,7 +54,7 @@ class _QuickAction extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5),
+                style: TextStyle(color: AppPalette.muted, fontSize: 11.5),
               ),
             ],
           ),
@@ -80,6 +81,7 @@ class _GroupRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -102,8 +104,8 @@ class _GroupRow extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: Color(0xFFF1F5F9),
+                    style: TextStyle(
+                      color: AppPalette.text,
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
@@ -111,8 +113,8 @@ class _GroupRow extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                      color: Color(0xFF94A3B8),
+                    style: TextStyle(
+                      color: AppPalette.muted,
                       fontSize: 11.5,
                     ),
                   ),

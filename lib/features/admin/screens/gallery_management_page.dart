@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_palette.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -63,7 +64,7 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
         await showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF1A1A24),
+            backgroundColor: AppPalette.panel,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
               side: BorderSide(color: AppColors.neonRed.withValues(alpha: 0.5)),
@@ -72,7 +73,7 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
               "حذف الصورة؟",
               style: TextStyle(
                 fontFamily: 'Cairo',
-                color: Colors.white,
+                color: AppPalette.text,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -100,7 +101,7 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
                   "حذف",
                   style: TextStyle(
                     fontFamily: 'Cairo',
-                    color: Colors.white,
+                    color: AppPalette.text,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -144,8 +145,8 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
         builder: (c, setSt) => Container(
           height: MediaQuery.of(context).size.height * 0.85,
           padding: const EdgeInsets.all(25),
-          decoration: const BoxDecoration(
-            color: Color(0xFF101018),
+          decoration: BoxDecoration(
+            color: AppPalette.bg,
             borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
             border: Border(
               top: BorderSide(color: AppColors.neonCyan, width: 2),
@@ -217,7 +218,7 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
                     "نوع الإكسسوار",
                     style: TextStyle(
                       fontFamily: 'Cairo',
-                      color: Colors.white,
+                      color: AppPalette.text,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -232,7 +233,7 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
                     "قماش ثقيل",
                     style: TextStyle(
                       fontFamily: 'Cairo',
-                      color: Colors.white,
+                      color: AppPalette.text,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -247,7 +248,7 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
                     "قماش خفيف",
                     style: TextStyle(
                       fontFamily: 'Cairo',
-                      color: Colors.white,
+                      color: AppPalette.text,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -302,23 +303,24 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppPalette.bg,
       appBar: AppBar(
         title: Text(
           "إدارة المعرض",
           style: TextStyle(
             fontFamily: 'Cairo',
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: AppPalette.text,
             fontSize: 20,
           ),
         ),
-        backgroundColor: AppColors.bgDark,
+        backgroundColor: AppPalette.bg,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          icon: Icon(Icons.arrow_back_ios, color: AppPalette.text),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -410,14 +412,14 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
                         Icon(
                           Icons.image_not_supported,
                           size: 60,
-                          color: Colors.white12,
+                          color: AppPalette.text.withValues(alpha: 0.12),
                         ),
                         SizedBox(height: 10),
                         Text(
                           "القسم فارغ",
                           style: TextStyle(
                             fontFamily: 'Cairo',
-                            color: Colors.white54,
+                            color: AppPalette.text.withValues(alpha: 0.54),
                           ),
                         ),
                       ],
@@ -444,7 +446,7 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
                     return Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(15),
-                        border: Border.all(color: Colors.white12),
+                        border: Border.all(color: AppPalette.onAccent.withValues(alpha: 0.12)),
                         color: const Color(0xFF1E1E2C),
                         boxShadow: [
                           BoxShadow(
@@ -466,7 +468,7 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
                                 ),
                                 fit: BoxFit.cover,
                                 placeholder: (c, u) =>
-                                    Container(color: Colors.white10),
+                                    Container(color: AppPalette.text.withValues(alpha: 0.1)),
                               ),
                             ),
                           ),
@@ -491,7 +493,7 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
                                 ),
                                 Container(
                                   width: 1,
-                                  color: Colors.white12,
+                                  color: AppPalette.text.withValues(alpha: 0.12),
                                   margin: const EdgeInsets.symmetric(
                                     vertical: 8,
                                   ),
@@ -531,10 +533,10 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.neonGold
-              : Colors.white.withValues(alpha: 0.05),
+              : AppPalette.onAccent.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(25),
           border: Border.all(
-            color: isSelected ? AppColors.neonGold : Colors.white12,
+            color: isSelected ? AppColors.neonGold : AppPalette.text.withValues(alpha: 0.12),
           ),
         ),
         child: Center(
@@ -542,7 +544,7 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
             label,
             style: TextStyle(
               fontFamily: 'Cairo',
-              color: isSelected ? Colors.black : Colors.white,
+              color: isSelected ? Colors.black : AppPalette.text,
               fontWeight: FontWeight.bold,
               fontSize: 13,
             ),
@@ -567,7 +569,7 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
           color: isSelected ? AppColors.neonOrange : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? AppColors.neonOrange : Colors.white24,
+            color: isSelected ? AppColors.neonOrange : AppPalette.onAccent.withValues(alpha: 0.24),
           ),
         ),
         child: Center(
@@ -575,7 +577,7 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
             label,
             style: TextStyle(
               fontFamily: 'Cairo',
-              color: isSelected ? Colors.white : Colors.white60,
+              color: isSelected ? AppPalette.text : AppPalette.text.withValues(alpha: 0.6),
               fontSize: 11,
               fontWeight: FontWeight.bold,
             ),
@@ -595,13 +597,13 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
         label,
         style: TextStyle(
           fontFamily: 'Cairo',
-          color: isSelected ? Colors.black : Colors.white,
+          color: isSelected ? Colors.black : AppPalette.text,
           fontWeight: FontWeight.bold,
         ),
       ),
       selected: isSelected,
       selectedColor: AppColors.neonGold,
-      backgroundColor: Colors.white10,
+      backgroundColor: AppPalette.onAccent.withValues(alpha: 0.1),
       onSelected: onSelect,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
@@ -618,9 +620,9 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 15),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: AppPalette.text.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.white24),
+        border: Border.all(color: AppPalette.text.withValues(alpha: 0.24)),
       ),
       child: DropdownButton<String>(
         value: val,
@@ -629,7 +631,7 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
         underline: const SizedBox(),
         style: TextStyle(
           fontFamily: 'Cairo',
-          color: Colors.white,
+          color: AppPalette.text,
           fontWeight: FontWeight.bold,
         ),
         items: items

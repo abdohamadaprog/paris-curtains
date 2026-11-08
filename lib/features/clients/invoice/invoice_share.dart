@@ -170,8 +170,8 @@ extension _InvoiceShare on _InvoicePageState {
     Clipboard.setData(ClipboardData(text: b.toString()));
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
+      SnackBar(
+        content: const Text(
           'تم نسخ نص الفاتورة! جاهز للإرسال على واتساب 📲',
           textAlign: TextAlign.center,
           style: TextStyle(fontWeight: FontWeight.bold),

@@ -213,12 +213,12 @@ class _MeasurementImagePageState extends State<_MeasurementImagePage> {
     return bytes.buffer.asUint8List();
   }
 
-  void _toast(String msg, {Color color = _panel}) {
+  void _toast(String msg, {Color? color}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg, textAlign: TextAlign.center),
-        backgroundColor: color,
+        backgroundColor: color ?? _panel,
       ),
     );
   }
@@ -320,7 +320,7 @@ class _MeasurementImagePageState extends State<_MeasurementImagePage> {
             IconButton(
               tooltip: 'نسخة على تليجرام',
               onPressed: _busy ? null : _sendToTelegram,
-              icon: const Icon(Icons.send_rounded, color: _gold),
+              icon: Icon(Icons.send_rounded, color: _gold),
             ),
           ],
         ),
@@ -377,7 +377,7 @@ class _MeasurementImagePageState extends State<_MeasurementImagePage> {
                       onPressed: _busy ? null : _saveToGallery,
                       style: OutlinedButton.styleFrom(
                         foregroundColor: _gold,
-                        side: const BorderSide(color: _gold),
+                        side: BorderSide(color: _gold),
                         padding: const EdgeInsets.symmetric(
                           vertical: 13,
                           horizontal: 16,

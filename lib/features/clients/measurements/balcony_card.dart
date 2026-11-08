@@ -14,7 +14,7 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
     final disabled = !item.enabled;
     final cardDecoration = disabled ? TextDecoration.lineThrough : null;
     final cardDecorColor = disabled
-        ? Colors.redAccent.withValues(alpha: 0.8)
+        ? AppPalette.redStrong.withValues(alpha: 0.8)
         : null;
 
     final wTotal = item.totalWidth;
@@ -29,15 +29,15 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: disabled
-              ? Colors.white24
-              : const Color(0xFF22D3EE).withValues(alpha: 0.45),
+              ? AppPalette.onAccent.withValues(alpha: 0.24)
+              : AppPalette.cyan.withValues(alpha: 0.45),
           width: 1.3,
         ),
         boxShadow: disabled
             ? const []
             : [
                 BoxShadow(
-                  color: const Color(0xFF06B6D4).withValues(alpha: 0.12),
+                  color: AppPalette.cyanDeep.withValues(alpha: 0.12),
                   blurRadius: 10,
                   spreadRadius: 0.5,
                   offset: const Offset(0, 3),
@@ -77,8 +77,8 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                             ? Icons.check_circle_rounded
                             : Icons.radio_button_unchecked,
                         color: item.enabled
-                            ? const Color(0xFF22D3EE)
-                            : Colors.white30,
+                            ? AppPalette.cyan
+                            : AppPalette.onAccent.withValues(alpha: 0.3),
                         size: 22,
                       ),
                     ),
@@ -90,17 +90,18 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
 
                     // اسم البلكونة (تسمية افتراضية متسلسلة وقابلة للتعديل)
                     Expanded(
+                      flex: 3,
                       child: item.isExpanded
                           ? TextFormField(
                               initialValue: item.name.text,
                               style: TextStyle(
-                                color: const Color(0xFF22D3EE),
+                                color: AppPalette.cyan,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 15,
+                                fontSize: 15.5,
                                 decoration: cardDecoration,
                                 decorationColor: cardDecorColor,
                               ),
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 isDense: true,
                                 contentPadding: EdgeInsets.symmetric(
                                   horizontal: 6,
@@ -108,12 +109,12 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                                 ),
                                 border: UnderlineInputBorder(
                                   borderSide: BorderSide(
-                                    color: Color(0xFF22D3EE),
+                                    color: AppPalette.cyan,
                                   ),
                                 ),
                                 enabledBorder: UnderlineInputBorder(
                                   borderSide: BorderSide(
-                                    color: Color(0x6622D3EE),
+                                    color: AppPalette.cyan.withValues(alpha: 0.4),
                                   ),
                                 ),
                               ),
@@ -127,9 +128,9 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                                   ? 'بلكونة خارجية ${_toArabic(index + 1)}'
                                   : item.name.text,
                               style: TextStyle(
-                                color: const Color(0xFF22D3EE),
+                                color: AppPalette.cyan,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 15,
+                                fontSize: 15.5,
                                 decoration: cardDecoration,
                                 decorationColor: cardDecorColor,
                               ),
@@ -140,43 +141,50 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                     const SizedBox(width: 8),
 
                     // شارة إجمالي العرض والأفيز السريع
-                    Container(
+                    Flexible(
+                      flex: 2,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF161E2E),
+                        color: AppPalette.insetAlt,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0x4422D3EE)),
+                        border: Border.all(color: AppPalette.cyan.withValues(alpha: 0.27)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             '${_toArabic(wTotal.toStringAsFixed(2))} م',
-                            style: const TextStyle(
-                              color: Color(0xFFF1F5F9),
+                            style: TextStyle(
+                              color: AppPalette.text,
                               fontWeight: FontWeight.bold,
-                              fontSize: 12,
+                              fontSize: 13,
                             ),
                           ),
                           const SizedBox(width: 6),
                           Container(
                             width: 1,
                             height: 12,
-                            color: Colors.white24,
+                            color: AppPalette.text.withValues(alpha: 0.24),
                           ),
                           const SizedBox(width: 6),
                           Text(
                             '${_toArabic(totalAvez)} أفيز',
-                            style: const TextStyle(
-                              color: Color(0xFFFBBF24),
+                            style: TextStyle(
+                              color: AppPalette.amber,
                               fontWeight: FontWeight.bold,
-                              fontSize: 12,
+                              fontSize: 13,
                             ),
                           ),
                         ],
+                      ),
+                    ),
                       ),
                     ),
 
@@ -191,9 +199,9 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                       ),
                       padding: EdgeInsets.zero,
                       tooltip: 'تكرار البلكونة',
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.copy_rounded,
-                        color: Color(0xFF22D3EE),
+                        color: AppPalette.cyan,
                         size: 17,
                       ),
                       onPressed: () => _duplicateBalcony(item),
@@ -208,9 +216,9 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                       ),
                       padding: EdgeInsets.zero,
                       tooltip: 'حذف',
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.delete_outline,
-                        color: Colors.redAccent,
+                        color: AppPalette.redStrong,
                         size: 18,
                       ),
                       onPressed: () => _deleteBalcony(index),
@@ -221,7 +229,7 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                       item.isExpanded
                           ? Icons.keyboard_arrow_up_rounded
                           : Icons.keyboard_arrow_down_rounded,
-                      color: Colors.white70,
+                      color: AppPalette.text.withValues(alpha: 0.7),
                       size: 20,
                     ),
                   ],
@@ -233,7 +241,7 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
             // جسم الكارت الموسع (محدد الأضلاع + مدخلات المقاسات + الرسم الحي)
             // ==================================================================
             if (item.isExpanded && !disabled) ...[
-              const Divider(color: Color(0x3322D3EE), height: 1),
+              Divider(color: AppPalette.cyan.withValues(alpha: 0.2), height: 1),
               Padding(
                 padding: const EdgeInsets.all(12),
                 child: Column(
@@ -242,27 +250,33 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                     // عنوان أزرار الأضلاع
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.architecture_rounded,
-                          color: Color(0xFF22D3EE),
+                          color: AppPalette.cyan,
                           size: 16,
                         ),
                         const SizedBox(width: 6),
-                        const Text(
-                          'تحديد شكل وأضلاع البلكونة:',
+                        Text(
+                          'شكل وأضلاع البلكونة:',
                           style: TextStyle(
-                            color: Color(0xFFCBD5E1),
-                            fontSize: 12.5,
+                            color: AppPalette.textSoft,
+                            fontSize: 13.5,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const Spacer(),
-                        Text(
-                          'قاعدة الأفيز: < ٣م = ٢ أفيز • ≥ ٣م = ٣ أفيز',
-                          style: TextStyle(
-                            color: Colors.amber.shade300,
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w500,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: Text(
+                              'قاعدة الأفيز: < ٣م = ٢ أفيز • ≥ ٣م = ٣ أفيز',
+                              style: TextStyle(
+                                color: AppPalette.amberSoft,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -271,7 +285,9 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                     const SizedBox(height: 8),
 
                     // أزرار اختيار الأضلاع الـ 4 برموز مميزة وتفاعلية
-                    Row(
+                    IntrinsicHeight(
+                      child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _buildSideSelectorBtn(
                           item: item,
@@ -302,6 +318,7 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                         ),
                       ],
                     ),
+                    ),
 
                     const SizedBox(height: 12),
 
@@ -322,9 +339,9 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF070A10),
+                        color: AppPalette.inset,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0x3322D3EE)),
+                        border: Border.all(color: AppPalette.cyan.withValues(alpha: 0.2)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -332,27 +349,27 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                           _buildMiniStat(
                             title: 'إجمالي المقاس',
                             value: '${_toArabic(wTotal.toStringAsFixed(2))} م',
-                            color: const Color(0xFF22D3EE),
+                            color: AppPalette.cyan,
                           ),
                           Container(
                             width: 1,
                             height: 24,
-                            color: Colors.white12,
+                            color: AppPalette.text.withValues(alpha: 0.12),
                           ),
                           _buildMiniStat(
                             title: 'قماش (× ١.٥)',
                             value: '${_toArabic(fMeters.toStringAsFixed(2))} م',
-                            color: const Color(0xFF67E8F9),
+                            color: AppPalette.cyanLight,
                           ),
                           Container(
                             width: 1,
                             height: 24,
-                            color: Colors.white12,
+                            color: AppPalette.text.withValues(alpha: 0.12),
                           ),
                           _buildMiniStat(
                             title: 'إجمالي الأفيز',
                             value: '${_toArabic(totalAvez)} أفيز',
-                            color: const Color(0xFFFBBF24),
+                            color: AppPalette.amber,
                           ),
                         ],
                       ),
@@ -393,25 +410,26 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
           padding: const EdgeInsets.symmetric(vertical: 7),
           decoration: BoxDecoration(
             color: isSelected
-                ? const Color(0xFF0E7490).withValues(alpha: 0.35)
-                : const Color(0xFF131826),
+                ? AppPalette.cyan.withValues(alpha: 0.35)
+                : AppPalette.insetChip,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: isSelected
-                  ? const Color(0xFF22D3EE)
-                  : const Color(0xFF334155),
+                  ? AppPalette.cyan
+                  : AppPalette.line,
               width: isSelected ? 1.4 : 1.0,
             ),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
                 symbol,
                 style: TextStyle(
                   color: isSelected
-                      ? const Color(0xFF22D3EE)
-                      : const Color(0xFF94A3B8),
+                      ? AppPalette.cyan
+                      : AppPalette.muted,
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                   height: 1.0,
@@ -422,11 +440,11 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                 title,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: isSelected ? Colors.white : const Color(0xFF94A3B8),
-                  fontSize: 9.5,
+                  color: isSelected ? AppPalette.text : AppPalette.muted,
+                  fontSize: 11.5,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
             ],
@@ -535,26 +553,28 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF94A3B8),
-              fontSize: 10.5,
-              fontWeight: FontWeight.w600,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: AppPalette.muted,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
             ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 4),
           TextFormField(
             controller: controller,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: AppPalette.text,
               fontWeight: FontWeight.bold,
-              fontSize: 14,
+              fontSize: 14.5,
             ),
             decoration: InputDecoration(
               isDense: true,
@@ -563,19 +583,19 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                 vertical: 6,
               ),
               suffixText: 'م',
-              suffixStyle: const TextStyle(
-                color: Color(0xFF22D3EE),
-                fontSize: 10,
+              suffixStyle: TextStyle(
+                color: AppPalette.cyan,
+                fontSize: 12.5,
               ),
               filled: true,
               fillColor: _panel,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(6),
-                borderSide: const BorderSide(color: Color(0xFF334155)),
+                borderSide: BorderSide(color: AppPalette.line),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(6),
-                borderSide: const BorderSide(color: Color(0xFF22D3EE)),
+                borderSide: BorderSide(color: AppPalette.cyan),
               ),
             ),
             onChanged: (text) {
@@ -598,7 +618,7 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
             padding: const EdgeInsets.symmetric(vertical: 2),
             decoration: BoxDecoration(
               color: val > 0
-                  ? const Color(0xFFFBBF24).withValues(alpha: 0.12)
+                  ? AppPalette.amber.withValues(alpha: 0.12)
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(4),
             ),
@@ -606,8 +626,8 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
               val > 0 ? '${_toArabic(avez)} أفيز' : '—',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: val > 0 ? const Color(0xFFFBBF24) : Colors.white24,
-                fontSize: 10.5,
+                color: val > 0 ? AppPalette.amber : AppPalette.text.withValues(alpha: 0.24),
+                fontSize: 12.5,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -624,9 +644,9 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
     return Container(
       height: 120,
       decoration: BoxDecoration(
-        color: const Color(0xFF080B12),
+        color: AppPalette.inset,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0x3322D3EE)),
+        border: Border.all(color: AppPalette.cyan.withValues(alpha: 0.2)),
       ),
       child: Stack(
         children: [
@@ -654,21 +674,21 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0x99111827),
+                color: AppPalette.scrim,
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
                     Icons.remove_red_eye_rounded,
-                    color: Color(0xFF22D3EE),
+                    color: AppPalette.cyan,
                     size: 11,
                   ),
                   SizedBox(width: 4),
                   Text(
                     'مخطط تنفيذي حي',
-                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9.5),
+                    style: TextStyle(color: AppPalette.muted, fontSize: 12.5),
                   ),
                 ],
               ),
@@ -685,12 +705,15 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
     required String value,
     required Color color,
   }) {
-    return Column(
+    return Flexible(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           title,
-          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10),
+          style: TextStyle(color: AppPalette.muted, fontSize: 12.5),
         ),
         const SizedBox(height: 2),
         Text(
@@ -698,10 +721,12 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
           style: TextStyle(
             color: color,
             fontWeight: FontWeight.w900,
-            fontSize: 13,
+            fontSize: 14,
           ),
         ),
       ],
+    ),
+      ),
     );
   }
 }
@@ -710,6 +735,7 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
 // رسّام المخطط المعماري للبلكونة بحسب عدد الأضلاع والأفيز
 // ============================================================================
 class _BalconyCanvasPainter extends CustomPainter {
+  final bool dark = AppPalette.isDark;
   final int sidesCount;
   final double s1;
   final double s2;
@@ -720,7 +746,7 @@ class _BalconyCanvasPainter extends CustomPainter {
   final int avez3;
   final int avez4;
 
-  const _BalconyCanvasPainter({
+  _BalconyCanvasPainter({
     required this.sidesCount,
     required this.s1,
     required this.s2,
@@ -738,19 +764,19 @@ class _BalconyCanvasPainter extends CustomPainter {
     final h = size.height;
 
     final wallPaint = Paint()
-      ..color = const Color(0xFF22D3EE)
+      ..color = AppPalette.cyan
       ..strokeWidth = 3.5
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
     final wallGlowPaint = Paint()
-      ..color = const Color(0xFF06B6D4).withValues(alpha: 0.25)
+      ..color = AppPalette.cyanDeep.withValues(alpha: 0.25)
       ..strokeWidth = 7.0
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
     final pointPaint = Paint()
-      ..color = const Color(0xFFFBBF24)
+      ..color = AppPalette.amber
       ..style = PaintingStyle.fill;
 
     // رسم حسب عدد الأضلاع
@@ -923,8 +949,8 @@ class _BalconyCanvasPainter extends CustomPainter {
   }) {
     final span = TextSpan(
       text: text,
-      style: const TextStyle(
-        color: Color(0xFFF1F5F9),
+      style: TextStyle(
+        color: AppPalette.text,
         fontSize: 10,
         fontWeight: FontWeight.bold,
       ),
@@ -969,7 +995,8 @@ class _BalconyCanvasPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BalconyCanvasPainter oldDelegate) {
-    return oldDelegate.sidesCount != sidesCount ||
+    return oldDelegate.dark != dark ||
+        oldDelegate.sidesCount != sidesCount ||
         oldDelegate.s1 != s1 ||
         oldDelegate.s2 != s2 ||
         oldDelegate.s3 != s3 ||

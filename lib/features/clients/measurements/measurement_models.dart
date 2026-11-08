@@ -474,18 +474,18 @@ enum _CeilingType {
 
 // ألوان وثوابت صفحة المقاسات المشتركة بين كل الملفات
 // ألوان وهوية ستائر باريس الملكية مع ثوابت آمنة متوافقة
-const Color _gold = AppColors.primaryGold;
+Color get _gold => AppPalette.gold;
 
-const Color _neon = AppColors.lightGold;
+Color get _neon => AppPalette.goldLight;
 
-const Color _bg = Color(0xFF0F172A);
+Color get _bg => AppPalette.bg;
 
-const Color _panel = Color(0xFF1E293B);
+Color get _panel => AppPalette.panel;
 
 // ألوان إضافية مطابقة لصفحة الفاتورة
-const Color _line = Color(0xFF334155);
+Color get _line => AppPalette.line;
 
-const Color _muted = Color(0xFF94A3B8);
+Color get _muted => AppPalette.muted;
 
 // ============================================================================
 // كارت المقاس: مصغّر في القائمة، وبلمسة واحدة نفس الكارت يكبر (Pop-up)

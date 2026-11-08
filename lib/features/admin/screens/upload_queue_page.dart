@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_palette.dart';
 
 import '../services/upload_queue_service.dart';
 
@@ -30,6 +31,7 @@ class _UploadQueuePageState extends State<UploadQueuePage> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     final items = _queue.items;
     final done = _queue.succeeded + _queue.failed;
     final progress = items.isEmpty ? 0.0 : done / items.length;
@@ -37,7 +39,7 @@ class _UploadQueuePageState extends State<UploadQueuePage> {
       backgroundColor: const Color(0xFF111217),
       appBar: AppBar(
         backgroundColor: const Color(0xFF191A20),
-        foregroundColor: Colors.white,
+        foregroundColor: AppPalette.onAccent,
         title: const Text(
           'متابعة رفع الصور',
           style: TextStyle(fontFamily: 'Cairo'),
@@ -61,8 +63,8 @@ class _UploadQueuePageState extends State<UploadQueuePage> {
                       : (_queue.failed > 0
                             ? 'في صور محتاجة إعادة محاولة'
                             : 'حالة عمليات الرفع'),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: AppPalette.text,
                     fontFamily: 'Cairo',
                     fontWeight: FontWeight.bold,
                     fontSize: 17,
@@ -74,7 +76,7 @@ class _UploadQueuePageState extends State<UploadQueuePage> {
                   child: LinearProgressIndicator(
                     value: progress,
                     minHeight: 8,
-                    backgroundColor: Colors.white12,
+                    backgroundColor: AppPalette.onAccent.withValues(alpha: 0.12),
                     color: const Color(0xFFD6B46A),
                   ),
                 ),
@@ -83,7 +85,7 @@ class _UploadQueuePageState extends State<UploadQueuePage> {
                   spacing: 14,
                   runSpacing: 8,
                   children: [
-                    _count('الإجمالي', _queue.total, Colors.white),
+                    _count('الإجمالي', _queue.total, AppPalette.onAccent),
                     _count('ناجح', _queue.succeeded, Colors.greenAccent),
                     _count('فاشل', _queue.failed, Colors.redAccent),
                     _count('متبقي', _queue.pending, Colors.amberAccent),
@@ -104,10 +106,10 @@ class _UploadQueuePageState extends State<UploadQueuePage> {
                   ),
                 ],
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'تستمر العملية أثناء التنقل داخل التطبيق. لو اتقفل التطبيق أثناء الرفع، قد تحتاج لإعادة اختيار الصورة إذا لم يعد الملف الأصلي متاحًا.',
                   style: TextStyle(
-                    color: Colors.white60,
+                    color: AppPalette.text.withValues(alpha: 0.6),
                     fontFamily: 'Cairo',
                     fontSize: 12,
                   ),
@@ -117,12 +119,12 @@ class _UploadQueuePageState extends State<UploadQueuePage> {
           ),
           const SizedBox(height: 16),
           if (items.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.all(28),
               child: Center(
                 child: Text(
                   'لا توجد عمليات رفع حاليًا.',
-                  style: TextStyle(color: Colors.white70, fontFamily: 'Cairo'),
+                  style: TextStyle(color: AppPalette.text.withValues(alpha: 0.7), fontFamily: 'Cairo'),
                 ),
               ),
             )
@@ -138,7 +140,7 @@ class _UploadQueuePageState extends State<UploadQueuePage> {
     children: [
       Text(
         '$label: ',
-        style: const TextStyle(color: Colors.white70, fontFamily: 'Cairo'),
+        style: TextStyle(color: AppPalette.text.withValues(alpha: 0.7), fontFamily: 'Cairo'),
       ),
       Text(
         '$value',
@@ -151,7 +153,7 @@ class _UploadQueuePageState extends State<UploadQueuePage> {
     final (label, color, icon) = switch (item.status) {
       UploadItemStatus.pending => (
         'في الانتظار',
-        Colors.white60,
+        AppPalette.text.withValues(alpha: 0.6),
         Icons.schedule,
       ),
       UploadItemStatus.uploading => (
@@ -180,7 +182,7 @@ class _UploadQueuePageState extends State<UploadQueuePage> {
         border: Border.all(
           color: item.status == UploadItemStatus.failed
               ? Colors.redAccent.withValues(alpha: .45)
-              : Colors.white10,
+              : AppPalette.text.withValues(alpha: 0.1),
         ),
       ),
       child: Row(
@@ -196,8 +198,8 @@ class _UploadQueuePageState extends State<UploadQueuePage> {
                   item.filename,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: AppPalette.text,
                     fontFamily: 'Cairo',
                     fontWeight: FontWeight.bold,
                   ),

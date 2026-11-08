@@ -1,17 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_palette.dart';
 import 'package:flutter/services.dart';
 
 import 'invoice_calculator.dart';
 
 // ألوان الصفحة (نفس هوية صفحة الفاتورة)
-const Color _kBg = Color(0xFF0F172A);
-const Color _kPanel = Color(0xFF1E293B);
-const Color _kLine = Color(0xFF334155);
-const Color _kGold = Color(0xFFC5A059);
-const Color _kMuted = Color(0xFF94A3B8);
-const Color _kGreen = Color(0xFF10B981);
-const Color _kRed = Color(0xFFE57373);
+Color get _kBg => AppPalette.bg;
+Color get _kPanel => AppPalette.panel;
+Color get _kLine => AppPalette.line;
+Color get _kGold => AppPalette.gold;
+Color get _kMuted => AppPalette.muted;
+Color get _kGreen => AppPalette.green;
+Color get _kRed => AppPalette.red;
 
 // ============================================================================
 // تخزين ثوابت الحساب (الأسعار العامة) في Firestore: settings/prices
@@ -191,7 +192,7 @@ class _PriceSettingsPageState extends State<PriceSettingsPage> {
       await PricesRepository.save(overrides);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
             'تم حفظ ثوابت الحساب ✨',
             textAlign: TextAlign.center,
@@ -206,7 +207,7 @@ class _PriceSettingsPageState extends State<PriceSettingsPage> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
             'تعذّر الحفظ. اتأكد من النت والصلاحيات وجرّب تاني',
             textAlign: TextAlign.center,
@@ -224,11 +225,11 @@ class _PriceSettingsPageState extends State<PriceSettingsPage> {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           backgroundColor: _kPanel,
-          title: const Text(
+          title: Text(
             'إرجاع كل الأسعار للأصلية؟',
-            style: TextStyle(color: Colors.white, fontSize: 16),
+            style: TextStyle(color: AppPalette.text, fontSize: 16),
           ),
-          content: const Text(
+          content: Text(
             'هيرجّع كل الخانات للأسعار الأصلية في التطبيق. '
             'مش هيتحفظ غير لما تدوس "حفظ".',
             style: TextStyle(color: _kMuted, height: 1.5),
@@ -236,11 +237,11 @@ class _PriceSettingsPageState extends State<PriceSettingsPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('إلغاء', style: TextStyle(color: _kMuted)),
+              child: Text('إلغاء', style: TextStyle(color: _kMuted)),
             ),
             TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('إرجاع', style: TextStyle(color: _kGold)),
+              child: Text('إرجاع', style: TextStyle(color: _kGold)),
             ),
           ],
         ),
@@ -255,6 +256,7 @@ class _PriceSettingsPageState extends State<PriceSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     final defsByKey = {for (final d in kPriceDefs) d.key: d};
     final grouped = <String>{for (final g in _kGroups) ...g.keys};
     final others = kPriceDefs
@@ -283,25 +285,25 @@ class _PriceSettingsPageState extends State<PriceSettingsPage> {
           backgroundColor: _kPanel,
           elevation: 0,
           centerTitle: true,
-          iconTheme: const IconThemeData(color: Colors.white),
-          title: const Text(
+          iconTheme: IconThemeData(color: AppPalette.text),
+          title: Text(
             'ثوابت الحساب',
             style: TextStyle(
               fontWeight: FontWeight.w900,
               fontSize: 19,
-              color: Colors.white,
+              color: AppPalette.text,
             ),
           ),
           actions: [
             IconButton(
               tooltip: 'إرجاع كل الأسعار للأصلية',
-              icon: const Icon(Icons.restart_alt_rounded, color: _kMuted),
+              icon: Icon(Icons.restart_alt_rounded, color: _kMuted),
               onPressed: _loading ? null : _resetAll,
             ),
           ],
         ),
         body: _loading
-            ? const Center(child: CircularProgressIndicator(color: _kGold))
+            ? Center(child: CircularProgressIndicator(color: _kGold))
             : Column(
                 children: [
                   Expanded(
@@ -324,7 +326,7 @@ class _PriceSettingsPageState extends State<PriceSettingsPage> {
                                 children: [
                                   for (int i = 0; i < g.keys.length; i++) ...[
                                     if (i > 0)
-                                      const Divider(
+                                      Divider(
                                         height: 1,
                                         color: _kLine,
                                       ),
@@ -352,7 +354,7 @@ class _PriceSettingsPageState extends State<PriceSettingsPage> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _kGold.withValues(alpha: 0.35)),
       ),
-      child: const Row(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(Icons.info_outline_rounded, color: _kGold, size: 20),
@@ -362,7 +364,7 @@ class _PriceSettingsPageState extends State<PriceSettingsPage> {
               'دي الأسعار الافتراضية لأي فاتورة جديدة. الفواتير اللي '
               'اتحفظت قبل كده بتفضل على أسعارها وقت الحفظ، وتقدر '
               'تعدّل سعر فاتورة معينة من صفحة الفاتورة نفسها.',
-              style: TextStyle(color: Colors.white, fontSize: 12.5, height: 1.6),
+              style: TextStyle(color: AppPalette.text, fontSize: 12.5, height: 1.6),
             ),
           ),
         ],
@@ -377,8 +379,8 @@ class _PriceSettingsPageState extends State<PriceSettingsPage> {
         const SizedBox(width: 8),
         Text(
           g.title,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: AppPalette.text,
             fontWeight: FontWeight.w800,
             fontSize: 14.5,
           ),
@@ -405,8 +407,8 @@ class _PriceSettingsPageState extends State<PriceSettingsPage> {
               children: [
                 Text(
                   d.label,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: AppPalette.text,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -428,7 +430,7 @@ class _PriceSettingsPageState extends State<PriceSettingsPage> {
             IconButton(
               tooltip: 'رجّع الأصلي',
               visualDensity: VisualDensity.compact,
-              icon: const Icon(Icons.undo_rounded, color: _kGold, size: 18),
+              icon: Icon(Icons.undo_rounded, color: _kGold, size: 18),
               onPressed: () {
                 ctrl.text = _fmt(d.value);
                 setState(() {});
@@ -446,7 +448,7 @@ class _PriceSettingsPageState extends State<PriceSettingsPage> {
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'[0-9٠-٩.,٫]')),
               ],
-              style: const TextStyle(
+              style: TextStyle(
                 color: _kGold,
                 fontWeight: FontWeight.bold,
                 fontSize: 15,
@@ -455,7 +457,7 @@ class _PriceSettingsPageState extends State<PriceSettingsPage> {
               decoration: InputDecoration(
                 isDense: true,
                 suffixText: suffix,
-                suffixStyle: const TextStyle(color: _kMuted, fontSize: 11),
+                suffixStyle: TextStyle(color: _kMuted, fontSize: 11),
                 filled: true,
                 fillColor: _kBg,
                 contentPadding: const EdgeInsets.symmetric(
@@ -488,7 +490,7 @@ class _PriceSettingsPageState extends State<PriceSettingsPage> {
       top: false,
       child: Container(
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: _kPanel,
           border: Border(top: BorderSide(color: _kLine)),
         ),
@@ -520,7 +522,7 @@ class _PriceSettingsPageState extends State<PriceSettingsPage> {
                 ),
               ),
               icon: _saving
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(

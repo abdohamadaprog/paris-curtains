@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_palette.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../core/constants/app_colors.dart';
@@ -109,10 +110,10 @@ class _PromoReorderPageState extends State<PromoReorderPage> {
         await showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF1A1A24),
-            title: const Text(
+            backgroundColor: AppPalette.panel,
+            title: Text(
               "حذف العرض؟",
-              style: TextStyle(color: Colors.white),
+              style: TextStyle(color: AppPalette.text),
             ),
             content: const Text(
               "سيتم حذف الصورة نهائياً من السلايدر.",
@@ -161,10 +162,11 @@ class _PromoReorderPageState extends State<PromoReorderPage> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppPalette.bg,
       appBar: AppBar(
-        backgroundColor: AppColors.bgDark,
+        backgroundColor: AppPalette.bg,
         elevation: 0,
         centerTitle: true,
         title: Text(
@@ -172,11 +174,11 @@ class _PromoReorderPageState extends State<PromoReorderPage> {
           style: TextStyle(
             fontFamily: 'Cairo',
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: AppPalette.text,
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          icon: Icon(Icons.arrow_back_ios, color: AppPalette.text),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
@@ -271,11 +273,11 @@ class _PromoReorderPageState extends State<PromoReorderPage> {
                                       ? child
                                       : Container(
                                           height: 160,
-                                          color: Colors.white10,
-                                          child: const Center(
+                                          color: AppPalette.text.withValues(alpha: 0.1),
+                                          child: Center(
                                             child: Icon(
                                               Icons.image,
-                                              color: Colors.white24,
+                                              color: AppPalette.text.withValues(alpha: 0.24),
                                             ),
                                           ),
                                         ),
@@ -298,8 +300,8 @@ class _PromoReorderPageState extends State<PromoReorderPage> {
                                 ),
                                 child: Text(
                                   "ترتيب: ${index + 1}",
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: TextStyle(
+                                    color: AppPalette.text,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 12,
                                   ),
@@ -319,9 +321,9 @@ class _PromoReorderPageState extends State<PromoReorderPage> {
                                     color: Colors.red,
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.delete,
-                                    color: Colors.white,
+                                    color: AppPalette.text,
                                     size: 20,
                                   ),
                                 ),

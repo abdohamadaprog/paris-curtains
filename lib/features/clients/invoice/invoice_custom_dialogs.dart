@@ -14,7 +14,7 @@ extension _InvoiceCustomDialogs on _InvoicePageState {
         return Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            backgroundColor: const Color(0xFF1E293B),
+            backgroundColor: AppPalette.panel,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -22,8 +22,8 @@ extension _InvoiceCustomDialogs on _InvoicePageState {
               isBalcony
                   ? 'إضافة بند لفاتورة البلكونة'
                   : 'إضافة بند لفاتورة الشقة',
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: AppPalette.text,
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
               ),
@@ -34,10 +34,10 @@ extension _InvoiceCustomDialogs on _InvoicePageState {
                 children: [
                   TextField(
                     controller: labelCtrl,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
+                    style: TextStyle(color: AppPalette.text),
+                    decoration: InputDecoration(
                       labelText: 'اسم البند',
-                      labelStyle: TextStyle(color: Color(0xFF94A3B8)),
+                      labelStyle: TextStyle(color: AppPalette.muted),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -49,10 +49,10 @@ extension _InvoiceCustomDialogs on _InvoicePageState {
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
-                          style: const TextStyle(color: Colors.white),
-                          decoration: const InputDecoration(
+                          style: TextStyle(color: AppPalette.text),
+                          decoration: InputDecoration(
                             labelText: 'الكمية',
-                            labelStyle: TextStyle(color: Color(0xFF94A3B8)),
+                            labelStyle: TextStyle(color: AppPalette.muted),
                           ),
                         ),
                       ),
@@ -60,10 +60,10 @@ extension _InvoiceCustomDialogs on _InvoicePageState {
                       Expanded(
                         child: TextField(
                           controller: unitCtrl,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: const InputDecoration(
+                          style: TextStyle(color: AppPalette.text),
+                          decoration: InputDecoration(
                             labelText: 'الوحدة (متر/قطعة..)',
-                            labelStyle: TextStyle(color: Color(0xFF94A3B8)),
+                            labelStyle: TextStyle(color: AppPalette.muted),
                           ),
                         ),
                       ),
@@ -75,10 +75,10 @@ extension _InvoiceCustomDialogs on _InvoicePageState {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
+                    style: TextStyle(color: AppPalette.text),
+                    decoration: InputDecoration(
                       labelText: 'سعر الوحدة (ج.م)',
-                      labelStyle: TextStyle(color: Color(0xFF94A3B8)),
+                      labelStyle: TextStyle(color: AppPalette.muted),
                     ),
                   ),
                 ],
@@ -87,9 +87,9 @@ extension _InvoiceCustomDialogs on _InvoicePageState {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text(
+                child: Text(
                   'إلغاء',
-                  style: TextStyle(color: Color(0xFF94A3B8)),
+                  style: TextStyle(color: AppPalette.muted),
                 ),
               ),
               ElevatedButton(
@@ -121,8 +121,8 @@ extension _InvoiceCustomDialogs on _InvoicePageState {
                   Navigator.pop(ctx);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFC5A059),
-                  foregroundColor: const Color(0xFF0F172A),
+                  backgroundColor: AppPalette.gold,
+                  foregroundColor: AppPalette.bg,
                 ),
                 child: const Text(
                   'إضافة البند',
@@ -154,7 +154,7 @@ extension _InvoiceCustomDialogs on _InvoicePageState {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF1E293B),
+      backgroundColor: AppPalette.panel,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -178,13 +178,13 @@ extension _InvoiceCustomDialogs on _InvoicePageState {
                     ),
                     const SizedBox(height: 12),
                     Row(
-                      children: const [
-                        Icon(Icons.tune_rounded, color: Color(0xFFC5A059)),
+                      children: [
+                        Icon(Icons.tune_rounded, color: AppPalette.gold),
                         SizedBox(width: 8),
                         Text(
                           'تعديل قائمة الأسعار الافتراضية',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: AppPalette.text,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
@@ -196,7 +196,7 @@ extension _InvoiceCustomDialogs on _InvoicePageState {
                       child: ListView.separated(
                         itemCount: kPriceDefs.length,
                         separatorBuilder: (_, _) =>
-                            const Divider(color: Color(0xFF334155), height: 1),
+                            Divider(color: AppPalette.line, height: 1),
                         itemBuilder: (_, i) {
                           final def = kPriceDefs[i];
                           final current = localCopy[def.key] ?? def.value;
@@ -204,15 +204,15 @@ extension _InvoiceCustomDialogs on _InvoicePageState {
                             dense: true,
                             title: Text(
                               def.label,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: AppPalette.text,
                                 fontSize: 13,
                               ),
                             ),
                             subtitle: Text(
                               'الوحدة: ${def.unit}',
-                              style: const TextStyle(
-                                color: Color(0xFF94A3B8),
+                              style: TextStyle(
+                                color: AppPalette.muted,
                                 fontSize: 11,
                               ),
                             ),
@@ -222,16 +222,16 @@ extension _InvoiceCustomDialogs on _InvoicePageState {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0F172A),
+                                color: AppPalette.bg,
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: const Color(0xFF334155),
+                                  color: AppPalette.line,
                                 ),
                               ),
                               child: Text(
                                 '${_money(current)} ج',
-                                style: const TextStyle(
-                                  color: Color(0xFFC5A059),
+                                style: TextStyle(
+                                  color: AppPalette.gold,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -257,9 +257,9 @@ extension _InvoiceCustomDialogs on _InvoicePageState {
                         Expanded(
                           child: TextButton(
                             onPressed: () => Navigator.pop(ctx),
-                            child: const Text(
+                            child: Text(
                               'إلغاء',
-                              style: TextStyle(color: Color(0xFF94A3B8)),
+                              style: TextStyle(color: AppPalette.muted),
                             ),
                           ),
                         ),
@@ -276,8 +276,8 @@ extension _InvoiceCustomDialogs on _InvoicePageState {
                               Navigator.pop(ctx);
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFC5A059),
-                              foregroundColor: const Color(0xFF0F172A),
+                              backgroundColor: AppPalette.gold,
+                              foregroundColor: AppPalette.bg,
                             ),
                             child: const Text(
                               'تطبيق الأسعار الجديدة',

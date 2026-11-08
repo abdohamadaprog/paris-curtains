@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_palette.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/app_colors.dart';
@@ -81,6 +82,7 @@ class _UploadImagePageState extends State<UploadImagePage> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     return Scaffold(
       backgroundColor: UploadStyle.background,
       floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
@@ -140,7 +142,7 @@ class _UploadImagePageState extends State<UploadImagePage> {
           IconButton(
             tooltip: 'رجوع',
             onPressed: _isUploading ? null : _confirmExit,
-            icon: const Icon(
+            icon: Icon(
               Icons.arrow_back_rounded,
               color: UploadStyle.textPrimary,
             ),
@@ -150,14 +152,14 @@ class _UploadImagePageState extends State<UploadImagePage> {
               children: [
                 Text(
                   _isAccessoryMode ? 'إضافة إكسسوارات' : 'إضافة عمل جديد',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Cairo',
                     fontSize: 19,
                     fontWeight: FontWeight.bold,
                     color: UploadStyle.textPrimary,
                   ),
                 ),
-                const Text(
+                Text(
                   'باريس للستائر',
                   style: TextStyle(
                     fontFamily: 'Cairo',
@@ -177,7 +179,7 @@ class _UploadImagePageState extends State<UploadImagePage> {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: UploadStyle.border),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.add_photo_alternate_outlined,
               color: UploadStyle.gold,
             ),
@@ -194,6 +196,7 @@ class _BackgroundGlow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     return IgnorePointer(
       child: Stack(
         children: [

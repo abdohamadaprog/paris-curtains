@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'core/theme/app_palette.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_manager.dart';
 import 'features/splash/splash_screen.dart';
@@ -26,6 +27,10 @@ class ParisCurtainsApp extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeManager.themeMode,
+          builder: (context, child) {
+            AppPalette.setBrightness(Theme.of(context).brightness);
+            return child ?? const SizedBox.shrink();
+          },
           home: const SplashScreen(),
         );
       },

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_palette.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/constants/work_stage.dart';
@@ -21,12 +22,12 @@ part 'invoice_custom_dialogs.dart';
 part 'invoice_share.dart';
 
 // ألوان الفاتورة (لون مميز واحد = الذهبي، عشان الشكل يبقى هادي وواضح)
-const Color _kBg = Color(0xFF0F172A);
-const Color _kPanel = Color(0xFF1E293B);
-const Color _kLine = Color(0xFF334155);
-const Color _kGold = Color(0xFFC5A059);
-const Color _kMuted = Color(0xFF94A3B8);
-const Color _kGreen = Color(0xFF10B981);
+Color get _kBg => AppPalette.bg;
+Color get _kPanel => AppPalette.panel;
+Color get _kLine => AppPalette.line;
+Color get _kGold => AppPalette.gold;
+Color get _kMuted => AppPalette.muted;
+Color get _kGreen => AppPalette.green;
 
 // مراحل الشغل: المصدر الوحيد في core/constants/work_stage.dart
 const Map<int, Color> _kStageColors = WorkStage.colors;
@@ -501,13 +502,14 @@ class _InvoicePageState extends State<InvoicePage>
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: _kBg,
         appBar: _buildAppBar(),
         body: _loading
-            ? const Center(child: CircularProgressIndicator(color: _kGold))
+            ? Center(child: CircularProgressIndicator(color: _kGold))
             : _loadError != null
             ? _buildErrorView()
             : Column(
@@ -532,23 +534,23 @@ class _InvoicePageState extends State<InvoicePage>
       backgroundColor: _kPanel,
       elevation: 0,
       centerTitle: true,
-      title: const Text(
+      title: Text(
         'الفاتورة',
         style: TextStyle(
           fontWeight: FontWeight.w900,
           fontSize: 19,
-          color: Colors.white,
+          color: AppPalette.text,
         ),
       ),
       actions: [
         IconButton(
           tooltip: 'ثوابت الحساب (الأسعار العامة)',
-          icon: const Icon(Icons.price_change_rounded, color: _kGold),
+          icon: Icon(Icons.price_change_rounded, color: _kGold),
           onPressed: _openGlobalPrices,
         ),
         IconButton(
           tooltip: 'أسعار الفاتورة دي',
-          icon: const Icon(Icons.tune_rounded, color: _kMuted),
+          icon: Icon(Icons.tune_rounded, color: _kMuted),
           onPressed: _openPriceSettings,
         ),
         IconButton(
@@ -565,12 +567,12 @@ class _InvoicePageState extends State<InvoicePage>
         ),
         IconButton(
           tooltip: 'صورة الفاتورة (باللوجو) للمشاركة',
-          icon: const Icon(Icons.image_rounded, color: _kGold),
+          icon: Icon(Icons.image_rounded, color: _kGold),
           onPressed: _openInvoiceImage,
         ),
         IconButton(
           tooltip: 'نسخ الفاتورة كنص',
-          icon: const Icon(Icons.share_rounded, color: _kGold),
+          icon: Icon(Icons.share_rounded, color: _kGold),
           onPressed: _shareAsText,
         ),
         // مؤشر الحفظ (الحفظ تلقائي، والضغط عليه بيحفظ فورًا)
@@ -579,7 +581,7 @@ class _InvoicePageState extends State<InvoicePage>
               ? 'فشل الحفظ — اضغط لإعادة المحاولة'
               : 'حفظ الفاتورة',
           icon: _saving
-              ? const SizedBox(
+              ? SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
@@ -614,7 +616,7 @@ class _InvoicePageState extends State<InvoicePage>
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: _kPanel,
         border: Border(bottom: BorderSide(color: _kLine)),
       ),
@@ -631,8 +633,8 @@ class _InvoicePageState extends State<InvoicePage>
                   widget.clientName.isEmpty
                       ? 'عميل بدون اسم'
                       : widget.clientName,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: AppPalette.text,
                     fontWeight: FontWeight.w900,
                     fontSize: 18,
                   ),
@@ -646,7 +648,7 @@ class _InvoicePageState extends State<InvoicePage>
                       if (hasPhone) _arNum(widget.phone!),
                       if (hasAddress) widget.address!,
                     ].join('  •  '),
-                    style: const TextStyle(color: _kMuted, fontSize: 12.5),
+                    style: TextStyle(color: _kMuted, fontSize: 12.5),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -662,7 +664,7 @@ class _InvoicePageState extends State<InvoicePage>
               if (_invoiceNumber != null)
                 Text(
                   _invoiceNumber!,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: _kGold,
                     fontSize: 11.5,
                     fontWeight: FontWeight.bold,
@@ -670,7 +672,7 @@ class _InvoicePageState extends State<InvoicePage>
                 ),
               Text(
                 today,
-                style: const TextStyle(color: _kMuted, fontSize: 12.5),
+                style: TextStyle(color: _kMuted, fontSize: 12.5),
               ),
               Text(
                 invoiceStatusLabel(status),
@@ -718,7 +720,7 @@ class _InvoicePageState extends State<InvoicePage>
                 Text(
                   stageMenuLabel(s),
                   style: TextStyle(
-                    color: s == _stage ? _kStageColors[s] : Colors.white,
+                    color: s == _stage ? _kStageColors[s] : AppPalette.text,
                     fontWeight: s == _stage ? FontWeight.bold : FontWeight.w500,
                   ),
                 ),
@@ -817,12 +819,12 @@ class _InvoicePageState extends State<InvoicePage>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.cloud_off_rounded, color: _kMuted, size: 46),
+            Icon(Icons.cloud_off_rounded, color: _kMuted, size: 46),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'تعذر تحميل بيانات الفاتورة',
               style: TextStyle(
-                color: Colors.white,
+                color: AppPalette.text,
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
@@ -830,7 +832,7 @@ class _InvoicePageState extends State<InvoicePage>
             const SizedBox(height: 6),
             Text(
               _loadError ?? '',
-              style: const TextStyle(color: _kMuted, fontSize: 12),
+              style: TextStyle(color: _kMuted, fontSize: 12),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),

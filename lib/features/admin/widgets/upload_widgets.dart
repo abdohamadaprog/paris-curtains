@@ -1,30 +1,30 @@
 import 'package:flutter/material.dart';
-import '../../../core/constants/app_colors.dart';
+import '../../../core/theme/app_palette.dart';
 
 class UploadStyle {
   UploadStyle._();
 
-  static const Color gold = AppColors.primaryGold;
-  static const Color goldLight = AppColors.lightGold;
-  static const Color background = Color(0xFF101116);
-  static const Color surface = Color(0xFF1A1B23);
-  static const Color surfaceLight = Color(0xFF24252E);
-  static const Color textPrimary = Color(0xFFF8F5EF);
-  static const Color textSecondary = Color(0xFFB8B5AF);
-  static const Color border = Color(0xFF393943);
-  static const Color success = Color(0xFF72C69A);
-  static const Color danger = Color(0xFFE57373);
+  static Color get gold => AppPalette.gold;
+  static Color get goldLight => AppPalette.goldLight;
+  static Color get background => AppPalette.bg;
+  static Color get surface => AppPalette.panel;
+  static Color get surfaceLight => AppPalette.panel2;
+  static Color get textPrimary => AppPalette.text;
+  static Color get textSecondary => AppPalette.muted;
+  static Color get border => AppPalette.line;
+  static Color get success => AppPalette.green;
+  static Color get danger => AppPalette.red;
 
   static const double radius = 18;
 
-  static const TextStyle heading = TextStyle(
+  static TextStyle get heading => TextStyle(
     fontFamily: 'Cairo',
     fontSize: 17,
     fontWeight: FontWeight.bold,
     color: textPrimary,
   );
 
-  static const TextStyle body = TextStyle(
+  static TextStyle get body => TextStyle(
     fontFamily: 'Cairo',
     fontSize: 13,
     color: textSecondary,
@@ -38,6 +38,7 @@ class NeonStepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     const labels = ['الصور', 'التفاصيل', 'النشر'];
 
     return Container(
@@ -79,7 +80,7 @@ class NeonStepper extends StatelessWidget {
           ),
           child: Center(
             child: completed
-                ? const Icon(
+                ? Icon(
                     Icons.check_rounded,
                     size: 20,
                     color: UploadStyle.background,
@@ -137,6 +138,7 @@ class NeonButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     return SizedBox(
       width: double.infinity,
       height: 54,
@@ -186,6 +188,7 @@ class GlassSelectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     final selected = value != null;
 
     return Material(
@@ -221,7 +224,7 @@ class GlassSelectionCard extends StatelessWidget {
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Cairo',
                   fontSize: 11,
                   color: UploadStyle.textSecondary,
@@ -266,6 +269,7 @@ class CategoryOptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -310,7 +314,7 @@ class CategoryOptionCard extends StatelessWidget {
               ),
               if (isSelected) ...[
                 const SizedBox(height: 4),
-                const Icon(
+                Icon(
                   Icons.check_circle_rounded,
                   size: 15,
                   color: UploadStyle.gold,

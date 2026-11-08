@@ -1,18 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_palette.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
-import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/work_stage.dart';
 import '../../../core/widgets/stage_widgets.dart';
 
 // نفس ألوان الفاتورة والمقاسات والعملاء
-const Color _bg = Color(0xFF0F172A);
-const Color _panel = Color(0xFF1E293B);
-const Color _line = Color(0xFF334155);
-const Color _gold = AppColors.primaryGold;
-const Color _muted = Color(0xFF94A3B8);
+Color get _bg => AppPalette.bg;
+Color get _panel => AppPalette.panel;
+Color get _line => AppPalette.line;
+Color get _gold => AppPalette.gold;
+Color get _muted => AppPalette.muted;
 
 // مراحل الشغل: المصدر الوحيد في core/constants/work_stage.dart
 const Map<int, Color> _stageColors = WorkStage.colors;
@@ -69,6 +69,7 @@ class _InstallationAgendaPageState extends State<InstallationAgendaPage> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     return Scaffold(
       backgroundColor: _bg,
       body: SafeArea(
@@ -84,7 +85,7 @@ class _InstallationAgendaPageState extends State<InstallationAgendaPage> {
                 builder: (context, snapshot) {
                   if (!snapshot.hasData &&
                       snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
+                    return Center(
                       child: CircularProgressIndicator(color: _gold),
                     );
                   }
@@ -141,7 +142,7 @@ class _InstallationAgendaPageState extends State<InstallationAgendaPage> {
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(6, 8, 16, 10),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: _panel,
         border: Border(bottom: BorderSide(color: _line)),
       ),
@@ -149,14 +150,14 @@ class _InstallationAgendaPageState extends State<InstallationAgendaPage> {
         children: [
           IconButton(
             icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-            color: Colors.white,
+            color: AppPalette.text,
             onPressed: () => Navigator.pop(context),
           ),
-          const Expanded(
+          Expanded(
             child: Text(
               'أجندة التركيبات',
               style: TextStyle(
-                color: Colors.white,
+                color: AppPalette.text,
                 fontWeight: FontWeight.w900,
                 fontSize: 19,
               ),
@@ -168,7 +169,7 @@ class _InstallationAgendaPageState extends State<InstallationAgendaPage> {
               color: _gold.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(11),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.event_available_rounded,
               color: _gold,
               size: 22,
@@ -196,7 +197,7 @@ class _InstallationAgendaPageState extends State<InstallationAgendaPage> {
         rowHeight: 46,
         selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
         eventLoader: (day) => events[_normalizeDate(day)] ?? const [],
-        headerStyle: const HeaderStyle(
+        headerStyle: HeaderStyle(
           titleCentered: true,
           formatButtonVisible: false,
           titleTextStyle: TextStyle(
@@ -204,30 +205,30 @@ class _InstallationAgendaPageState extends State<InstallationAgendaPage> {
             fontWeight: FontWeight.w900,
             color: _gold,
           ),
-          leftChevronIcon: Icon(Icons.chevron_left_rounded, color: Colors.white),
+          leftChevronIcon: Icon(Icons.chevron_left_rounded, color: AppPalette.onAccent),
           rightChevronIcon: Icon(
             Icons.chevron_right_rounded,
-            color: Colors.white,
+            color: AppPalette.text,
           ),
         ),
-        daysOfWeekStyle: const DaysOfWeekStyle(
+        daysOfWeekStyle: DaysOfWeekStyle(
           weekdayStyle: TextStyle(color: _muted, fontSize: 12),
           weekendStyle: TextStyle(color: _gold, fontSize: 12),
         ),
         calendarStyle: CalendarStyle(
-          defaultTextStyle: const TextStyle(color: Colors.white),
-          weekendTextStyle: const TextStyle(color: _gold),
+          defaultTextStyle: TextStyle(color: AppPalette.onAccent),
+          weekendTextStyle: TextStyle(color: _gold),
           outsideTextStyle: const TextStyle(color: Color(0xFF475569)),
-          selectedTextStyle: const TextStyle(
+          selectedTextStyle: TextStyle(
             color: _bg,
             fontWeight: FontWeight.w900,
           ),
-          selectedDecoration: const BoxDecoration(
+          selectedDecoration: BoxDecoration(
             color: _gold,
             shape: BoxShape.circle,
           ),
-          todayTextStyle: const TextStyle(
-            color: Colors.white,
+          todayTextStyle: TextStyle(
+            color: AppPalette.text,
             fontWeight: FontWeight.bold,
           ),
           todayDecoration: BoxDecoration(
@@ -300,9 +301,9 @@ class _InstallationAgendaPageState extends State<InstallationAgendaPage> {
           Expanded(
             child: Text(
               'شغل يوم ${_ar(DateFormat('d/M/yyyy').format(_selectedDay!))}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w900,
-                color: Colors.white,
+                color: AppPalette.text,
                 fontSize: 15,
               ),
             ),
@@ -331,7 +332,7 @@ class _InstallationAgendaPageState extends State<InstallationAgendaPage> {
   }
 
   Widget _buildEmptyDay() {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -396,7 +397,7 @@ class _InstallationAgendaPageState extends State<InstallationAgendaPage> {
                       Text(
                         stageMenuLabel(s),
                         style: TextStyle(
-                          color: s == stage ? _stageColors[s] : Colors.white,
+                          color: s == stage ? _stageColors[s] : AppPalette.text,
                           fontWeight: s == stage
                               ? FontWeight.bold
                               : FontWeight.w500,
@@ -443,10 +444,10 @@ class _InstallationAgendaPageState extends State<InstallationAgendaPage> {
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w900,
                     fontSize: 16.5,
-                    color: Colors.white,
+                    color: AppPalette.text,
                   ),
                 ),
                 const SizedBox(height: 3),
@@ -465,7 +466,7 @@ class _InstallationAgendaPageState extends State<InstallationAgendaPage> {
                       address,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 11.5, color: _muted),
+                      style: TextStyle(fontSize: 11.5, color: _muted),
                     ),
                   ),
               ],

@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_palette.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/app_colors.dart';
@@ -89,14 +90,14 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surfaceDark,
-        title: const Text(
+        backgroundColor: AppPalette.panel,
+        title: Text(
           'حذف العرض؟',
-          style: TextStyle(fontFamily: 'Cairo', color: Colors.white),
+          style: TextStyle(fontFamily: 'Cairo', color: AppPalette.text),
         ),
-        content: const Text(
+        content: Text(
           'هتتشال الصورة من سلايدر الصفحة الرئيسية.',
-          style: TextStyle(fontFamily: 'Cairo', color: Color(0xFFB8B5AF)),
+          style: TextStyle(fontFamily: 'Cairo', color: AppPalette.muted),
         ),
         actions: [
           TextButton(
@@ -137,21 +138,22 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppPalette.bg,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'صور السلايدر والعروض',
           style: TextStyle(
             fontFamily: 'Cairo',
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: AppPalette.text,
           ),
         ),
-        backgroundColor: AppColors.bgDark,
+        backgroundColor: AppPalette.bg,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          icon: Icon(Icons.arrow_back_ios, color: AppPalette.text),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
@@ -185,7 +187,7 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
               margin: const EdgeInsets.all(20),
               height: 120,
               decoration: BoxDecoration(
-                color: AppColors.surfaceDark,
+                color: AppPalette.panel,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: AppColors.primaryGold),
               ),
@@ -194,7 +196,7 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
                     ? const CircularProgressIndicator(
                         color: AppColors.primaryGold,
                       )
-                    : const Column(
+                    : Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
@@ -207,7 +209,7 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
                             'اضغط لرفع صورة عرض جديدة',
                             style: TextStyle(
                               fontFamily: 'Cairo',
-                              color: Colors.white,
+                              color: AppPalette.text,
                               fontSize: 16,
                             ),
                           ),
@@ -216,7 +218,7 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
               ),
             ),
           ),
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(horizontal: 20),
             child: Align(
               alignment: Alignment.centerRight,
@@ -224,7 +226,7 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
                 'تقدر تغير أو تمسح أي صورة ظاهرة في الهوم من هنا',
                 style: TextStyle(
                   fontFamily: 'Cairo',
-                  color: Color(0xFFB8B5AF),
+                  color: AppPalette.muted,
                   fontSize: 12,
                 ),
               ),
@@ -265,12 +267,12 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
                   });
 
                 if (docs.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Text(
                       'مفيش صور عروض حالياً',
                       style: TextStyle(
                         fontFamily: 'Cairo',
-                        color: Color(0xFFB8B5AF),
+                        color: AppPalette.muted,
                       ),
                     ),
                   );
@@ -291,7 +293,7 @@ class _PromoManagementPageState extends State<PromoManagementPage> {
 
                     return Container(
                       decoration: BoxDecoration(
-                        color: AppColors.surfaceDark,
+                        color: AppPalette.panel,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           color: AppColors.primaryGold.withValues(alpha: 0.45),

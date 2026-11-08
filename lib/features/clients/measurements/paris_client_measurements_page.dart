@@ -4,12 +4,12 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_palette.dart';
 import 'package:flutter/rendering.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import '../../../core/constants/app_colors.dart';
 import '../../../core/services/sync_status_service.dart';
 import '../../../core/widgets/sync_status_banner.dart';
 import '../../../core/services/telegram_backup_service.dart';
@@ -231,6 +231,7 @@ class _ParisClientMeasurementsPageState
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     return PopScope(
       canPop: _expandedId == null,
       onPopInvokedWithResult: (didPop, result) {
@@ -290,8 +291,8 @@ class _ParisClientMeasurementsPageState
           Expanded(
             child: Text(
               widget.clientName,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: AppPalette.text,
                 fontSize: 19,
                 fontWeight: FontWeight.w900,
               ),
@@ -304,13 +305,13 @@ class _ParisClientMeasurementsPageState
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: (_isAutoSaving || _savedLocalOnly)
-                    ? Colors.amber.withValues(alpha: 0.15)
-                    : Colors.green.withValues(alpha: 0.15),
+                    ? AppPalette.amberStrong.withValues(alpha: 0.15)
+                    : AppPalette.green.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: (_isAutoSaving || _savedLocalOnly)
-                      ? Colors.amber
-                      : Colors.green,
+                      ? AppPalette.amberStrong
+                      : AppPalette.green,
                   width: 0.8,
                 ),
               ),
@@ -318,23 +319,23 @@ class _ParisClientMeasurementsPageState
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (_isAutoSaving) ...[
-                    const SizedBox(
+                    SizedBox(
                       width: 10,
                       height: 10,
                       child: CircularProgressIndicator(
                         strokeWidth: 1.5,
-                        color: Colors.amber,
+                        color: AppPalette.amberStrong,
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Text(
+                    Text(
                       'جاري الحفظ...',
-                      style: TextStyle(color: Colors.amber, fontSize: 10),
+                      style: TextStyle(color: AppPalette.amberStrong, fontSize: 10),
                     ),
                   ] else ...[
                     Icon(
                       _savedLocalOnly ? Icons.phone_android_rounded : Icons.check,
-                      color: _savedLocalOnly ? Colors.amber : Colors.greenAccent,
+                      color: _savedLocalOnly ? AppPalette.amberStrong : AppPalette.mint,
                       size: 12,
                     ),
                     const SizedBox(width: 3),
@@ -342,8 +343,8 @@ class _ParisClientMeasurementsPageState
                       _savedLocalOnly ? 'محفوظ على الجهاز' : 'محفوظ',
                       style: TextStyle(
                         color: _savedLocalOnly
-                            ? Colors.amber
-                            : Colors.greenAccent,
+                            ? AppPalette.amberStrong
+                            : AppPalette.mint,
                         fontSize: 10,
                       ),
                     ),
@@ -357,7 +358,7 @@ class _ParisClientMeasurementsPageState
         IconButton(
           tooltip: 'صورة المقاسات',
           onPressed: _openMeasurementsImage,
-          icon: const Icon(Icons.image_rounded, color: Colors.white70),
+          icon: Icon(Icons.image_rounded, color: AppPalette.text.withValues(alpha: 0.7)),
         ),
         IconButton(
           tooltip: 'المحذوفات',
@@ -367,19 +368,19 @@ class _ParisClientMeasurementsPageState
             label: Text(_toArabic(_trash.length)),
             child: Icon(
               _showTrash ? Icons.close : Icons.delete_outline_rounded,
-              color: _trash.isNotEmpty ? Colors.amberAccent : Colors.white54,
+              color: _trash.isNotEmpty ? AppPalette.amber : AppPalette.text.withValues(alpha: 0.54),
             ),
           ),
         ),
         IconButton(
           tooltip: 'حفظ يدوي',
           icon: _saving
-              ? const SizedBox(
+              ? SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2, color: _gold),
                 )
-              : const Icon(Icons.save_rounded, color: _gold),
+              : Icon(Icons.save_rounded, color: _gold),
           onPressed: () => _performSave(isAuto: false),
         ),
       ],
@@ -393,11 +394,11 @@ class _ParisClientMeasurementsPageState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.cloud_off_rounded, color: Colors.white38, size: 46),
+              Icon(Icons.cloud_off_rounded, color: AppPalette.text.withValues(alpha: 0.38), size: 46),
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 'تعذر تحميل المقاسات. تأكد من الاتصال.',
-                style: TextStyle(color: Colors.white70),
+                style: TextStyle(color: AppPalette.text.withValues(alpha: 0.7)),
               ),
               const SizedBox(height: 12),
               OutlinedButton.icon(
@@ -413,7 +414,7 @@ class _ParisClientMeasurementsPageState
           ),
         );
       }
-      return const Center(child: CircularProgressIndicator(color: _gold));
+      return Center(child: CircularProgressIndicator(color: _gold));
     }
     return TabBarView(
       controller: _tabs,
@@ -492,14 +493,14 @@ class _ParisClientMeasurementsPageState
           const SizedBox(height: 10),
           Text(
             text,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: AppPalette.text,
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 4),
-          Text(hint, style: const TextStyle(color: _muted, fontSize: 13)),
+          Text(hint, style: TextStyle(color: _muted, fontSize: 13)),
         ],
       ),
     );

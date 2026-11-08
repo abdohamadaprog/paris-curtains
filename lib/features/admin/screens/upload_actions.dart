@@ -126,13 +126,13 @@ extension _UploadActions on _UploadImagePageState {
                         return ActionChip(
                           label: Text(
                             option,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'Cairo',
                               color: UploadStyle.textPrimary,
                             ),
                           ),
                           backgroundColor: UploadStyle.surfaceLight,
-                          side: const BorderSide(color: UploadStyle.border),
+                          side: BorderSide(color: UploadStyle.border),
                           onPressed: () {
                             Navigator.pop(sheetContext, option);
                           },
@@ -254,14 +254,14 @@ extension _UploadActions on _UploadImagePageState {
       builder: (dialogContext) {
         return AlertDialog(
           backgroundColor: UploadStyle.surface,
-          title: const Text(
+          title: Text(
             'الخروج من الصفحة؟',
             style: TextStyle(
               fontFamily: 'Cairo',
               color: UploadStyle.textPrimary,
             ),
           ),
-          content: const Text(
+          content: Text(
             'الصور المختارة هتتمسح من الاختيارات الحالية.',
             style: TextStyle(
               fontFamily: 'Cairo',
@@ -271,7 +271,7 @@ extension _UploadActions on _UploadImagePageState {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text(
+              child: Text(
                 'إلغاء',
                 style: TextStyle(
                   fontFamily: 'Cairo',
@@ -281,7 +281,7 @@ extension _UploadActions on _UploadImagePageState {
             ),
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text(
+              child: Text(
                 'خروج',
                 style: TextStyle(
                   fontFamily: 'Cairo',
@@ -307,14 +307,14 @@ extension _UploadActions on _UploadImagePageState {
       builder: (dialogContext) {
         return AlertDialog(
           backgroundColor: UploadStyle.surface,
-          title: const Text(
+          title: Text(
             'إلغاء إضافة الإكسسوارات؟',
             style: TextStyle(
               fontFamily: 'Cairo',
               color: UploadStyle.textPrimary,
             ),
           ),
-          content: const Text(
+          content: Text(
             'هترجع لوضع إضافة الستاير، والصور المختارة هتفضل موجودة.',
             style: TextStyle(
               fontFamily: 'Cairo',
@@ -328,7 +328,7 @@ extension _UploadActions on _UploadImagePageState {
             ),
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text(
+              child: Text(
                 'إلغاء الوضع',
                 style: TextStyle(color: UploadStyle.danger),
               ),

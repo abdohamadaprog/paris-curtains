@@ -359,7 +359,9 @@ extension _MeasurementData on _ParisClientMeasurementsPageState {
       lastDate: DateTime(2100),
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.dark(primary: _gold, surface: _panel),
+          colorScheme: AppPalette.isDark
+              ? ColorScheme.dark(primary: _gold, surface: _panel)
+              : ColorScheme.light(primary: _gold, surface: _panel),
         ),
         child: child!,
       ),

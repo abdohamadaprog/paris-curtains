@@ -14,7 +14,7 @@ extension _InvoiceQuickEdit on _InvoicePageState {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF1E293B),
+      backgroundColor: AppPalette.panel,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -53,8 +53,8 @@ extension _InvoiceQuickEdit on _InvoicePageState {
                     const SizedBox(height: 14),
                     Text(
                       title,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: AppPalette.text,
                         fontWeight: FontWeight.w900,
                         fontSize: 16,
                       ),
@@ -68,17 +68,17 @@ extension _InvoiceQuickEdit on _InvoicePageState {
                         horizontal: 20,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0F172A),
+                        color: AppPalette.bg,
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFC5A059)),
+                        border: Border.all(color: AppPalette.gold),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
                             _arNum(controller.text),
-                            style: const TextStyle(
-                              color: Color(0xFFC5A059),
+                            style: TextStyle(
+                              color: AppPalette.gold,
                               fontSize: 32,
                               fontWeight: FontWeight.w900,
                             ),
@@ -87,8 +87,8 @@ extension _InvoiceQuickEdit on _InvoicePageState {
                             const SizedBox(width: 8),
                             Text(
                               unit,
-                              style: const TextStyle(
-                                color: Color(0xFF94A3B8),
+                              style: TextStyle(
+                                color: AppPalette.muted,
                                 fontSize: 14,
                               ),
                             ),
@@ -140,14 +140,14 @@ extension _InvoiceQuickEdit on _InvoicePageState {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: AppPalette.text,
                         fontWeight: FontWeight.bold,
                       ),
                       textAlign: TextAlign.center,
                       decoration: InputDecoration(
                         filled: true,
-                        fillColor: const Color(0xFF0F172A),
+                        fillColor: AppPalette.bg,
                         hintText: 'أو اكتب القيمة مباشرة',
                         hintStyle: const TextStyle(
                           color: Color(0xFF64748B),
@@ -155,8 +155,8 @@ extension _InvoiceQuickEdit on _InvoicePageState {
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF334155),
+                          borderSide: BorderSide(
+                            color: AppPalette.line,
                           ),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
@@ -178,9 +178,9 @@ extension _InvoiceQuickEdit on _InvoicePageState {
                         Expanded(
                           child: TextButton(
                             onPressed: () => Navigator.pop(ctx),
-                            child: const Text(
+                            child: Text(
                               'إلغاء',
-                              style: TextStyle(color: Color(0xFF94A3B8)),
+                              style: TextStyle(color: AppPalette.muted),
                             ),
                           ),
                         ),
@@ -194,8 +194,8 @@ extension _InvoiceQuickEdit on _InvoicePageState {
                               Navigator.pop(ctx);
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFC5A059),
-                              foregroundColor: const Color(0xFF0F172A),
+                              backgroundColor: AppPalette.gold,
+                              foregroundColor: AppPalette.bg,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
@@ -234,19 +234,19 @@ extension _InvoiceQuickEdit on _InvoicePageState {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: isPositive
-              ? const Color(0xFFC5A059).withValues(alpha: 0.18)
-              : const Color(0xFF0F172A),
+              ? AppPalette.gold.withValues(alpha: 0.18)
+              : AppPalette.bg,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isPositive
-                ? const Color(0xFFC5A059)
-                : const Color(0xFF334155),
+                ? AppPalette.gold
+                : AppPalette.line,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isPositive ? const Color(0xFFC5A059) : Colors.white,
+            color: isPositive ? AppPalette.gold : AppPalette.text,
             fontWeight: FontWeight.w900,
             fontSize: 12,
           ),

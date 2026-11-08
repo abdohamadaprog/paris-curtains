@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_palette.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/image_url.dart';
 
@@ -14,7 +15,7 @@ class _FeaturedWorksPageState extends State<FeaturedWorksPage> {
   // الحد الأقصى لعدد صور الرئيسية — بيتحفظ في public_config/home
   // (4 : 60) وبيتقرأ في الرئيسية عند كل فتح.
   int _maxLimit = 25;
-  static const Color _gold = AppColors.primaryGold;
+  static Color get _gold => AppPalette.gold;
 
   @override
   void initState() {
@@ -78,8 +79,9 @@ class _FeaturedWorksPageState extends State<FeaturedWorksPage> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppPalette.bg,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -93,7 +95,7 @@ class _FeaturedWorksPageState extends State<FeaturedWorksPage> {
         stream: FirebaseFirestore.instance.collection('gallery_images').snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator(color: _gold));
+            return Center(child: CircularProgressIndicator(color: _gold));
           }
 
           final docs = snapshot.data!.docs;
@@ -118,7 +120,7 @@ class _FeaturedWorksPageState extends State<FeaturedWorksPage> {
                       children: [
                         Text(
                           'المحدد للرئيسية: $featuredCount من $_maxLimit صورة',
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
+                          style: TextStyle(fontWeight: FontWeight.bold, color: AppPalette.text, fontSize: 13),
                         ),
                         Icon(
                           featuredCount >= _maxLimit ? Icons.check_circle_rounded : Icons.info_outline_rounded,
@@ -130,10 +132,10 @@ class _FeaturedWorksPageState extends State<FeaturedWorksPage> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'عدد صور الرئيسية',
-                            style: TextStyle(color: Colors.white70, fontSize: 12),
+                            style: TextStyle(color: AppPalette.text.withValues(alpha: 0.7), fontSize: 12),
                           ),
                         ),
                         IconButton(
@@ -142,11 +144,11 @@ class _FeaturedWorksPageState extends State<FeaturedWorksPage> {
                           onPressed: _maxLimit <= 4
                               ? null
                               : () => _setLimit(_maxLimit - 1),
-                          icon: const Icon(Icons.remove_circle_outline, color: _gold, size: 20),
+                          icon: Icon(Icons.remove_circle_outline, color: _gold, size: 20),
                         ),
                         Text(
                           '$_maxLimit',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: AppPalette.text, fontWeight: FontWeight.bold),
                         ),
                         IconButton(
                           visualDensity: VisualDensity.compact,
@@ -154,7 +156,7 @@ class _FeaturedWorksPageState extends State<FeaturedWorksPage> {
                           onPressed: _maxLimit >= 60
                               ? null
                               : () => _setLimit(_maxLimit + 1),
-                          icon: const Icon(Icons.add_circle_outline, color: _gold, size: 20),
+                          icon: Icon(Icons.add_circle_outline, color: _gold, size: 20),
                         ),
                       ],
                     ),
@@ -197,11 +199,11 @@ class _FeaturedWorksPageState extends State<FeaturedWorksPage> {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: isFeatured ? Colors.green : Colors.black54,
-                                border: Border.all(color: Colors.white, width: 1.5),
+                                border: Border.all(color: AppPalette.onAccent, width: 1.5),
                               ),
                               child: Icon(
                                 isFeatured ? Icons.check : Icons.add,
-                                color: Colors.white,
+                                color: AppPalette.onAccent,
                                 size: 14,
                               ),
                             ),

@@ -1,16 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_palette.dart';
 
 import '../../../core/services/telegram_backup_service.dart';
 
-const Color _kBg = Color(0xFF0F172A);
-const Color _kPanel = Color(0xFF1E293B);
-const Color _kLine = Color(0xFF334155);
-const Color _kGold = Color(0xFFC5A059);
-const Color _kMuted = Color(0xFF94A3B8);
-const Color _kGreen = Color(0xFF10B981);
-const Color _kRed = Color(0xFFE57373);
-const Color _kOrange = Color(0xFFF59E0B);
+Color get _kBg => AppPalette.bg;
+Color get _kPanel => AppPalette.panel;
+Color get _kLine => AppPalette.line;
+Color get _kGold => AppPalette.gold;
+Color get _kMuted => AppPalette.muted;
+Color get _kGreen => AppPalette.green;
+Color get _kRed => AppPalette.red;
+Color get _kOrange => AppPalette.orange;
 
 /// إعداد النسخة الاحتياطية على قناة تليجرام + رفع الصور القديمة.
 ///
@@ -260,6 +261,7 @@ class _TelegramBackupPageState extends State<TelegramBackupPage> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -268,13 +270,13 @@ class _TelegramBackupPageState extends State<TelegramBackupPage> {
           backgroundColor: _kPanel,
           elevation: 0,
           centerTitle: true,
-          iconTheme: const IconThemeData(color: Colors.white),
-          title: const Text(
+          iconTheme: IconThemeData(color: AppPalette.text),
+          title: Text(
             'نسخة تليجرام',
             style: TextStyle(
               fontWeight: FontWeight.w900,
               fontSize: 18,
-              color: Colors.white,
+              color: AppPalette.text,
             ),
           ),
         ),
@@ -285,7 +287,7 @@ class _TelegramBackupPageState extends State<TelegramBackupPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'كل صورة بتترفع على المعرض بيتبعت نسخة منها على قناتك '
                     'الخاصة على تليجرام — أمان إضافي مجاني لو حصل أي مشكلة '
                     'في Cloudinary.',
@@ -299,7 +301,7 @@ class _TelegramBackupPageState extends State<TelegramBackupPage> {
                     obscureText: _obscure,
                     enableSuggestions: false,
                     autocorrect: false,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    style: TextStyle(color: AppPalette.text, fontSize: 13),
                     decoration: _input('123456789:AAH...').copyWith(
                       suffixIcon: IconButton(
                         tooltip: _obscure ? 'إظهار' : 'إخفاء',
@@ -320,7 +322,7 @@ class _TelegramBackupPageState extends State<TelegramBackupPage> {
                   TextField(
                     controller: _chatCtrl,
                     keyboardType: TextInputType.text,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    style: TextStyle(color: AppPalette.text, fontSize: 13),
                     decoration: _input('-1001234567890'),
                   ),
                   Align(
@@ -344,11 +346,11 @@ class _TelegramBackupPageState extends State<TelegramBackupPage> {
                     value: _enabled,
                     onChanged: (v) => setState(() => _enabled = v),
                     contentPadding: EdgeInsets.zero,
-                    title: const Text(
+                    title: Text(
                       'رفع تلقائي للصور الجديدة',
-                      style: TextStyle(color: Colors.white, fontSize: 13.5),
+                      style: TextStyle(color: AppPalette.text, fontSize: 13.5),
                     ),
-                    subtitle: const Text(
+                    subtitle: Text(
                       'لو قفلته، الصور مش هتترفع غير لما تدوس الزرار اللي تحت.',
                       style: TextStyle(color: _kMuted, fontSize: 11.5),
                     ),
@@ -361,7 +363,7 @@ class _TelegramBackupPageState extends State<TelegramBackupPage> {
                           onPressed: _busy ? null : _save,
                           style: OutlinedButton.styleFrom(
                             foregroundColor: _kMuted,
-                            side: const BorderSide(color: _kLine),
+                            side: BorderSide(color: _kLine),
                             padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
                           icon: const Icon(Icons.save_rounded, size: 18),
@@ -397,7 +399,7 @@ class _TelegramBackupPageState extends State<TelegramBackupPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'بترفع كل صور المعرض اللي لسه مرفوعتش على القناة. '
                     'بتنزل صورة كل ٣ ثواني عشان تليجرام ميرفضش الرفع — '
                     'سيبه شغال ومتقفلش الصفحة.',
@@ -442,7 +444,7 @@ class _TelegramBackupPageState extends State<TelegramBackupPage> {
                           : _uploadOldImages,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _busy ? _kRed : _kPanel,
-                        foregroundColor: Colors.white,
+                        foregroundColor: AppPalette.onAccent,
                         padding: const EdgeInsets.symmetric(vertical: 13),
                         side: BorderSide(color: _busy ? _kRed : _kLine),
                       ),
@@ -465,11 +467,11 @@ class _TelegramBackupPageState extends State<TelegramBackupPage> {
             _card(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
+                children: [
                   Text(
                     'إزاي تجيب البيانات؟',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: AppPalette.text,
                       fontWeight: FontWeight.w900,
                       fontSize: 13.5,
                     ),
@@ -517,8 +519,8 @@ class _TelegramBackupPageState extends State<TelegramBackupPage> {
         const SizedBox(width: 8),
         Text(
           text,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: AppPalette.text,
             fontWeight: FontWeight.w800,
             fontSize: 15,
           ),
@@ -530,7 +532,7 @@ class _TelegramBackupPageState extends State<TelegramBackupPage> {
   Widget _label(String text) {
     return Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         color: _kMuted,
         fontSize: 12,
         fontWeight: FontWeight.w700,
@@ -548,15 +550,15 @@ class _TelegramBackupPageState extends State<TelegramBackupPage> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: _kLine),
+        borderSide: BorderSide(color: _kLine),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: _kLine),
+        borderSide: BorderSide(color: _kLine),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: _kGold),
+        borderSide: BorderSide(color: _kGold),
       ),
     );
   }

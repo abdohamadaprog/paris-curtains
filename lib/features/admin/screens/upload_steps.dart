@@ -120,9 +120,9 @@ extension _UploadSteps on _UploadImagePageState {
           ],
         ),
         const SizedBox(height: 26),
-        const Text('نوع الستارة', style: UploadStyle.heading),
+        Text('نوع الستارة', style: UploadStyle.heading),
         const SizedBox(height: 5),
-        const Text('اختار النوع المناسب للشغل', style: UploadStyle.body),
+        Text('اختار النوع المناسب للشغل', style: UploadStyle.body),
         const SizedBox(height: 14),
         GridView.builder(
           shrinkWrap: true,
@@ -299,7 +299,7 @@ extension _UploadSteps on _UploadImagePageState {
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Cairo',
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
@@ -313,7 +313,7 @@ extension _UploadSteps on _UploadImagePageState {
                 style: UploadStyle.body,
               ),
               const SizedBox(height: 12),
-              const Row(
+              Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
@@ -369,7 +369,7 @@ extension _UploadSteps on _UploadImagePageState {
             child: Text(
               value,
               textAlign: TextAlign.end,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'Cairo',
                 color: UploadStyle.textPrimary,
                 fontWeight: FontWeight.bold,
@@ -392,9 +392,9 @@ extension _UploadSteps on _UploadImagePageState {
       ),
       child: Column(
         children: [
-          const Text('تقييم العمل', style: UploadStyle.heading),
+          Text('تقييم العمل', style: UploadStyle.heading),
           const SizedBox(height: 5),
-          const Text(
+          Text(
             'اختار تقييم من نجمة إلى خمس نجوم',
             style: UploadStyle.body,
           ),
@@ -421,7 +421,7 @@ extension _UploadSteps on _UploadImagePageState {
           ),
           Text(
             '${_rating.toInt()} / 5',
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'Cairo',
               fontWeight: FontWeight.bold,
               color: UploadStyle.goldLight,

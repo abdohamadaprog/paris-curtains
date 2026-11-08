@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_palette.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -125,6 +126,7 @@ class _GalleryReorderPageState extends State<GalleryReorderPage> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     var displayList = _allImages.where((doc) {
       var data = doc.data() as Map<String, dynamic>;
       if (_selectedCategory == "الكل") {
@@ -140,21 +142,21 @@ class _GalleryReorderPageState extends State<GalleryReorderPage> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppPalette.bg,
       appBar: AppBar(
         title: Text(
           "ترتيب المعرض",
           style: TextStyle(
             fontFamily: 'Cairo',
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: AppPalette.text,
           ),
         ),
-        backgroundColor: AppColors.bgDark,
+        backgroundColor: AppPalette.bg,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          icon: Icon(Icons.arrow_back_ios, color: AppPalette.text),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
@@ -169,12 +171,12 @@ class _GalleryReorderPageState extends State<GalleryReorderPage> {
                   ),
                 ),
                 onPressed: _saveOrder,
-                icon: const Icon(Icons.save, color: Colors.white, size: 18),
+                icon: Icon(Icons.save, color: AppPalette.text, size: 18),
                 label: Text(
                   "حفظ",
                   style: TextStyle(
                     fontFamily: 'Cairo',
-                    color: Colors.white,
+                    color: AppPalette.text,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -277,7 +279,7 @@ class _GalleryReorderPageState extends State<GalleryReorderPage> {
                                   ),
                                   fit: BoxFit.cover,
                                   placeholder: (c, u) =>
-                                      Container(color: Colors.white10),
+                                      Container(color: AppPalette.text.withValues(alpha: 0.1)),
                                 ),
                               ),
                               if (isSelected)
@@ -310,7 +312,7 @@ class _GalleryReorderPageState extends State<GalleryReorderPage> {
                                     "${_allImages.indexOf(doc) + 1}",
                                     style: TextStyle(
                                       fontFamily: 'Cairo',
-                                      color: Colors.white,
+                                      color: AppPalette.text,
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -328,7 +330,7 @@ class _GalleryReorderPageState extends State<GalleryReorderPage> {
                                       data['accessory_type'] ?? "",
                                       style: TextStyle(
                                         fontFamily: 'Cairo',
-                                        color: Colors.white,
+                                        color: AppPalette.text,
                                         fontSize: 9,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -354,7 +356,7 @@ class _GalleryReorderPageState extends State<GalleryReorderPage> {
                   : "اضغط على المكان الجديد",
               style: TextStyle(
                 fontFamily: 'Cairo',
-                color: Colors.white70,
+                color: AppPalette.text.withValues(alpha: 0.7),
                 fontSize: 14,
               ),
               textAlign: TextAlign.center,
@@ -376,10 +378,10 @@ class _GalleryReorderPageState extends State<GalleryReorderPage> {
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.neonCyan
-              : Colors.white.withValues(alpha: 0.05),
+              : AppPalette.onAccent.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? AppColors.neonCyan : Colors.white12,
+            color: isSelected ? AppColors.neonCyan : AppPalette.text.withValues(alpha: 0.12),
           ),
         ),
         child: Center(
@@ -387,7 +389,7 @@ class _GalleryReorderPageState extends State<GalleryReorderPage> {
             label,
             style: TextStyle(
               fontFamily: 'Cairo',
-              color: isSelected ? Colors.black : Colors.white,
+              color: isSelected ? Colors.black : AppPalette.text,
               fontWeight: FontWeight.bold,
               fontSize: 13,
             ),
@@ -420,7 +422,7 @@ class _GalleryReorderPageState extends State<GalleryReorderPage> {
             label,
             style: TextStyle(
               fontFamily: 'Cairo',
-              color: isSelected ? Colors.white : Colors.grey,
+              color: isSelected ? AppPalette.text : Colors.grey,
               fontSize: 11,
               fontWeight: FontWeight.bold,
             ),

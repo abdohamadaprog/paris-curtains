@@ -68,8 +68,8 @@ extension _MeasurementCardHero on _ParisClientMeasurementsPageState {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text(
               '${_toArabic(index + 1)} / ${_toArabic(_measurements.length)}',
-              style: const TextStyle(
-                color: Colors.white70,
+              style: TextStyle(
+                color: AppPalette.text.withValues(alpha: 0.7),
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -140,9 +140,9 @@ extension _MeasurementCardHero on _ParisClientMeasurementsPageState {
                       Align(
                         alignment: Alignment.centerLeft,
                         child: IconButton(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.close_rounded,
-                            color: Colors.white70,
+                            color: AppPalette.text.withValues(alpha: 0.7),
                           ),
                           tooltip: 'إغلاق',
                           onPressed: _closeCard,
@@ -191,6 +191,7 @@ class _PanelReveal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: visible ? 1 : 0),
       duration: Duration(milliseconds: visible ? 380 : 150),

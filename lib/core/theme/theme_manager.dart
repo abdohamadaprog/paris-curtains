@@ -4,7 +4,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ThemeManager extends ChangeNotifier {
   static const String _themeKey = 'isDarkMode';
 
-  bool _isDarkMode = true;
+  // أول مرة: يتبع إعداد موبايل الزبون، وبعدها يحفظ اختياره.
+  bool _isDarkMode =
+      WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+          Brightness.dark;
 
   bool get isDarkMode => _isDarkMode;
 
@@ -12,7 +15,7 @@ class ThemeManager extends ChangeNotifier {
 
   Future<void> loadTheme() async {
     final prefs = await SharedPreferences.getInstance();
-    _isDarkMode = prefs.getBool(_themeKey) ?? true;
+    _isDarkMode = prefs.getBool(_themeKey) ?? _isDarkMode;
     notifyListeners();
   }
 

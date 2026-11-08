@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_palette.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../../../core/constants/app_colors.dart';
 
 // 1. كارت الإحصائيات (العداد)
 class AdminStatItem extends StatelessWidget {
@@ -20,6 +20,7 @@ class AdminStatItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection(collection).snapshots(),
       builder: (context, snapshot) {
@@ -39,14 +40,14 @@ class AdminStatItem extends StatelessWidget {
             ),
             Row(
               children: [
-                Icon(icon, color: Colors.white54, size: 14),
+                Icon(icon, color: AppPalette.text.withValues(alpha: 0.54), size: 14),
                 const SizedBox(width: 5),
                 Text(
                   label,
                   style: TextStyle(
                     fontFamily: 'Cairo',
                     fontSize: 12,
-                    color: Colors.white54,
+                    color: AppPalette.text.withValues(alpha: 0.54),
                   ),
                 ),
               ],
@@ -76,13 +77,14 @@ class AdminLargeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     return GestureDetector(
       onTap: onTap,
       child: Container(
         height: 80,
         margin: const EdgeInsets.only(bottom: 15),
         decoration: BoxDecoration(
-          color: AppColors.glassWhite,
+          color: AppPalette.text.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(25),
           border: Border.all(color: color.withValues(alpha: 0.3)),
           boxShadow: [
@@ -128,7 +130,7 @@ class AdminLargeCard extends StatelessWidget {
                     fontFamily: 'Cairo',
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppPalette.text,
                   ),
                 ),
                 Text(
@@ -142,11 +144,11 @@ class AdminLargeCard extends StatelessWidget {
               ],
             ),
             const Spacer(),
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(left: 20),
               child: Icon(
                 Icons.arrow_forward_ios_rounded,
-                color: Colors.white24,
+                color: AppPalette.text.withValues(alpha: 0.24),
                 size: 18,
               ),
             ),
@@ -174,12 +176,13 @@ class AdminSmallCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 15),
         decoration: BoxDecoration(
-          color: AppColors.glassWhite,
+          color: AppPalette.text.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: color.withValues(alpha: 0.3)),
           boxShadow: [
@@ -200,7 +203,7 @@ class AdminSmallCard extends StatelessWidget {
                 fontFamily: 'Cairo',
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: AppPalette.text,
               ),
             ),
           ],

@@ -8,19 +8,19 @@ extension _MeasurementHeader on _ParisClientMeasurementsPageState {
     final hasPhone = widget.phone != null && widget.phone!.isNotEmpty;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: _panel,
         border: Border(bottom: BorderSide(color: _line)),
       ),
       child: Row(
         children: [
           if (hasPhone) ...[
-            const Icon(Icons.phone_rounded, color: _gold, size: 16),
+            Icon(Icons.phone_rounded, color: _gold, size: 16),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
                 _toArabic(widget.phone),
-                style: const TextStyle(color: Colors.white70, fontSize: 13.5),
+                style: TextStyle(color: AppPalette.text.withValues(alpha: 0.7), fontSize: 14.5),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -39,13 +39,13 @@ extension _MeasurementHeader on _ParisClientMeasurementsPageState {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.event, color: _gold, size: 15),
+                  Icon(Icons.event, color: _gold, size: 15),
                   const SizedBox(width: 5),
                   Text(
                     _date(_installationDate),
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: _neon,
-                      fontSize: 12.5,
+                      fontSize: 13.5,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -80,8 +80,8 @@ extension _MeasurementHeader on _ParisClientMeasurementsPageState {
         ),
         labelColor: _bg,
         unselectedLabelColor: _muted,
-        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-        unselectedLabelStyle: const TextStyle(fontSize: 14),
+        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
+        unselectedLabelStyle: const TextStyle(fontSize: 14.5),
         splashBorderRadius: BorderRadius.circular(10),
         tabs: [
           _tabLabel(Icons.window_rounded, 'الشقة', _measurements.length),
@@ -127,9 +127,9 @@ extension _MeasurementHeader on _ParisClientMeasurementsPageState {
       }
       pills.addAll([
         _summaryPill('مقاسات', _toArabic(count), _gold),
-        _summaryPill('ثقيل', '${_fmtAr(heavy)} م', const Color(0xFFFFD45A)),
-        _summaryPill('خفيف', '${_fmtAr(light)} م', const Color(0xFF70D6FF)),
-        _summaryPill('عجل', _toArabic(wheels), Colors.white),
+        _summaryPill('ثقيل', '${_fmtAr(heavy)} م', AppPalette.amber),
+        _summaryPill('خفيف', '${_fmtAr(light)} م', AppPalette.skyLight),
+        _summaryPill('عجل', _toArabic(wheels), AppPalette.onAccent),
       ]);
     } else {
       var width = 0.0;
@@ -145,15 +145,15 @@ extension _MeasurementHeader on _ParisClientMeasurementsPageState {
       }
       pills.addAll([
         _summaryPill('بلكونات', _toArabic(count), _gold),
-        _summaryPill('عرض', '${_fmtAr(width)} م', const Color(0xFFFFD45A)),
-        _summaryPill('قماش', '${_fmtAr(fabric)} م', const Color(0xFF70D6FF)),
-        _summaryPill('أفيز', _toArabic(avez), Colors.white),
+        _summaryPill('عرض', '${_fmtAr(width)} م', AppPalette.amber),
+        _summaryPill('قماش', '${_fmtAr(fabric)} م', AppPalette.skyLight),
+        _summaryPill('أفيز', _toArabic(avez), AppPalette.onAccent),
       ]);
     }
 
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: _panel,
         border: Border(top: BorderSide(color: _line, width: 1.5)),
       ),
@@ -174,7 +174,7 @@ extension _MeasurementHeader on _ParisClientMeasurementsPageState {
             icon: const Icon(Icons.receipt_long_rounded, size: 20),
             label: const Text(
               'الفاتورة',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5),
             ),
           ),
         ],
@@ -195,13 +195,13 @@ extension _MeasurementHeader on _ParisClientMeasurementsPageState {
         children: [
           Text(
             '$label: ',
-            style: const TextStyle(color: _muted, fontSize: 11),
+            style: TextStyle(color: _muted, fontSize: 12.5),
           ),
           Text(
             value,
             style: TextStyle(
               color: color,
-              fontSize: 11.5,
+              fontSize: 12.5,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -223,12 +223,12 @@ extension _TrashPanelUi on _ParisClientMeasurementsPageState {
         decoration: BoxDecoration(
           color: Colors.black38,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.white12),
+          border: Border.all(color: AppPalette.text.withValues(alpha: 0.12)),
         ),
-        child: const Center(
+        child: Center(
           child: Text(
             'سلة المحذوفات فارغة',
-            style: TextStyle(color: Colors.white54, fontSize: 12),
+            style: TextStyle(color: AppPalette.text.withValues(alpha: 0.54), fontSize: 13),
           ),
         ),
       );
@@ -240,25 +240,25 @@ extension _TrashPanelUi on _ParisClientMeasurementsPageState {
       decoration: BoxDecoration(
         color: _panel,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
+        border: Border.all(color: AppPalette.redStrong.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.delete_sweep_rounded,
-                color: Colors.redAccent,
+                color: AppPalette.redStrong,
                 size: 16,
               ),
               const SizedBox(width: 6),
               Text(
                 'المحذوفات (${_toArabic(_trash.length)})',
-                style: const TextStyle(
-                  color: Colors.redAccent,
+                style: TextStyle(
+                  color: AppPalette.redStrong,
                   fontWeight: FontWeight.bold,
-                  fontSize: 12.5,
+                  fontSize: 13.5,
                 ),
               ),
               const Spacer(),
@@ -267,9 +267,9 @@ extension _TrashPanelUi on _ParisClientMeasurementsPageState {
                   _rebuild(() => _trash.clear());
                   _triggerAutoSave();
                 },
-                child: const Text(
+                child: Text(
                   'تفريغ السلة',
-                  style: TextStyle(color: Colors.white54, fontSize: 11),
+                  style: TextStyle(color: AppPalette.text.withValues(alpha: 0.54), fontSize: 12.5),
                 ),
               ),
             ],
@@ -280,7 +280,7 @@ extension _TrashPanelUi on _ParisClientMeasurementsPageState {
                 Expanded(
                   child: Text(
                     item.name.isEmpty ? 'عنصر محذوف' : item.name,
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    style: TextStyle(color: AppPalette.text.withValues(alpha: 0.7), fontSize: 13),
                   ),
                 ),
                 TextButton(
@@ -295,9 +295,9 @@ extension _TrashPanelUi on _ParisClientMeasurementsPageState {
                     });
                     _triggerAutoSave();
                   },
-                  child: const Text(
+                  child: Text(
                     'استرجاع',
-                    style: TextStyle(color: _gold, fontSize: 11.5),
+                    style: TextStyle(color: _gold, fontSize: 12.5),
                   ),
                 ),
               ],

@@ -23,7 +23,7 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
     // ستايل الشطب على كامل نصوص الكارت عند التعطيل
     final cardDecoration = disabled ? TextDecoration.lineThrough : null;
     final cardDecorColor = disabled
-        ? Colors.redAccent.withValues(alpha: 0.8)
+        ? AppPalette.redStrong.withValues(alpha: 0.8)
         : null;
 
     return MediaQuery(
@@ -34,10 +34,10 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
       decoration: bare
           ? null
           : BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF26354B), _panel],
+          colors: [AppPalette.cardTop, _panel],
         ),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
@@ -85,7 +85,7 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                               item.enabled
                                   ? Icons.check_circle_rounded
                                   : Icons.radio_button_unchecked,
-                              color: item.enabled ? _gold : Colors.white30,
+                              color: item.enabled ? _gold : AppPalette.text.withValues(alpha: 0.3),
                               size: 21,
                             ),
                           ),
@@ -97,7 +97,7 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                               children: [
                                 const Text(
                                   '🌟',
-                                  style: TextStyle(fontSize: 12),
+                                  style: TextStyle(fontSize: 13),
                                 ),
                                 const SizedBox(width: 4),
                                 Flexible(
@@ -106,7 +106,7 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                                         ? 'مقاس بدون اسم'
                                         : item.name.text,
                                     style: TextStyle(
-                                      color: disabled ? Colors.white54 : _gold,
+                                      color: disabled ? AppPalette.text.withValues(alpha: 0.54) : _gold,
                                       fontSize: 16.5,
                                       fontWeight: FontWeight.w900,
                                       decoration: cardDecoration,
@@ -119,7 +119,7 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                                 const SizedBox(width: 4),
                                 const Text(
                                   '🌟 🪟',
-                                  style: TextStyle(fontSize: 13),
+                                  style: TextStyle(fontSize: 14),
                                 ),
                               ],
                             ),
@@ -143,9 +143,9 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                             constraints: BoxConstraints.tightFor(width: 26, height: btnH),
                             padding: EdgeInsets.zero,
                             tooltip: 'حذف المقاس',
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.delete_outline,
-                              color: Colors.redAccent,
+                              color: AppPalette.redStrong,
                               size: 18,
                             ),
                             onPressed: () {
@@ -165,11 +165,11 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                               ? const SizedBox(width: 22)
                               : ReorderableDragStartListener(
                             index: index,
-                            child: const Padding(
+                            child: Padding(
                               padding: EdgeInsets.only(right: 2),
                               child: Icon(
                                 Icons.drag_indicator,
-                                color: Colors.white38,
+                                color: AppPalette.text.withValues(alpha: 0.38),
                                 size: 20,
                               ),
                             ),
@@ -182,20 +182,17 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                       // ========================================================
                       // السطر 2: [بند المقاس يمين] ⬅️⬅️ [٦ متر ثقيل + ٤ متر خفيف]
                       // ========================================================
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerRight,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                      Row(
                           children: [
                             // بند المقاس على اليمين في بادج بارز
                             Container(
-                              padding: EdgeInsets.symmetric(horizontal: 7, vertical: pb),
+                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: pb + 4),
                               decoration: BoxDecoration(
-                                color: _gold.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(6),
+                                color: _gold.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                  color: _gold.withValues(alpha: 0.4),
+                                  color: _gold.withValues(alpha: 0.6),
+                                  width: 1.5,
                                 ),
                               ),
                               child: Row(
@@ -203,7 +200,7 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                                 children: [
                                   const Text(
                                     '📌',
-                                    style: TextStyle(fontSize: 12),
+                                    style: TextStyle(fontSize: 16),
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
@@ -213,25 +210,26 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                                           : _fmt(wVal),
                                     ),
                                     style: TextStyle(
-                                      color: Colors.white,
+                                      color: AppPalette.text,
                                       fontWeight: FontWeight.w900,
-                                      fontSize: 15.5,
+                                      fontSize: 25,
+                                      height: 1.1,
                                       decoration: cardDecoration,
                                       decorationColor: cardDecorColor,
                                     ),
                                   ),
-                                  const Text(
+                                  Text(
                                     ' م',
                                     style: TextStyle(
                                       color: _neon,
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 13,
+                                      fontSize: 17,
                                     ),
                                   ),
                                   const SizedBox(width: 4),
                                   const Text(
                                     '📌',
-                                    style: TextStyle(fontSize: 12),
+                                    style: TextStyle(fontSize: 16),
                                   ),
                                 ],
                               ),
@@ -239,6 +237,13 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
 
                             const SizedBox(width: 6),
 
+                            Expanded(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: AlignmentDirectional.centerStart,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
                             // إيموشن السهم مرتين يوضح اتجاه الكلام
                             const Text('⬅️⬅️', style: TextStyle(fontSize: 13)),
 
@@ -247,32 +252,35 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                             // كتابة (٦ متر ثقيل + ٤ متر خفيف) بالخط الواضح الصريح
                             _meterPill(
                               '${_fmtAr(calc.heavyMeters)} متر ثقيل',
-                              const Color(0xFFFFD45A),
+                              AppPalette.amber,
                               pb,
                               cardDecoration,
                               cardDecorColor,
                             ),
-                            const Padding(
+                            Padding(
                               padding: EdgeInsets.symmetric(horizontal: 5),
                               child: Text(
                                 '+',
                                 style: TextStyle(
-                                  color: Colors.white54,
+                                  color: AppPalette.text.withValues(alpha: 0.54),
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 13,
+                                  fontSize: 14,
                                 ),
                               ),
                             ),
                             _meterPill(
                               '${_fmtAr(calc.lightMeters)} متر خفيف',
-                              const Color(0xFF70D6FF),
+                              AppPalette.skyLight,
                               pb,
                               cardDecoration,
                               cardDecorColor,
                             ),
                           ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
 
                       SizedBox(height: gap),
 
@@ -298,14 +306,14 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                                 children: [
                                   const Text(
                                     '📩 ',
-                                    style: TextStyle(fontSize: 11),
+                                    style: TextStyle(fontSize: 12.5),
                                   ),
                                   Text(
                                     'الارتفاع ${_toArabic(item.height.text.trim().isNotEmpty ? item.height.text.trim() : _fmt(hVal))} م',
                                     style: TextStyle(
-                                      color: Colors.white,
+                                      color: AppPalette.text,
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 13,
+                                      fontSize: 14,
                                       decoration: cardDecoration,
                                       decorationColor: cardDecorColor,
                                     ),
@@ -376,21 +384,21 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                               Text(
                                 'خياطة ثقيل ${_fmtAr(calc.heavyHeight)} م',
                                 style: TextStyle(
-                                  color: const Color(0xFFFFE082),
+                                  color: AppPalette.amberSoft,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 13,
+                                  fontSize: 14,
                                   decoration: cardDecoration,
                                   decorationColor: cardDecorColor,
                                 ),
                               ),
-                              const Padding(
+                              Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 8),
                                 child: Text(
                                   '•',
                                   style: TextStyle(
                                     color: _gold,
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 14,
+                                    fontSize: 14.5,
                                   ),
                                 ),
                               ),
@@ -399,9 +407,9 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                               Text(
                                 'خياطة خفيف ${_fmtAr(calc.lightHeight)} م',
                                 style: TextStyle(
-                                  color: const Color(0xFF8AE9C1),
+                                  color: AppPalette.mint,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 13,
+                                  fontSize: 14,
                                   decoration: cardDecoration,
                                   decorationColor: cardDecorColor,
                                 ),
@@ -430,8 +438,8 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                             Text(
                               '${_toArabic(item.velvetSides)} ج قطيفة "${item.method.label}" + ${item.lightLayers > 0 ? '${_toArabic(item.lightSides)} ج كتان خفيف' : "بدون خفيف"}',
                               style: TextStyle(
-                                color: const Color(0xFFF1E6D2),
-                                fontSize: 13,
+                                color: AppPalette.cream,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w700,
                                 decoration: cardDecoration,
                                 decorationColor: cardDecorColor,
@@ -439,10 +447,10 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                             ),
 
                             if (item.method != _WorkMethod.press) ...[
-                            const Text(
+                            Text(
                               '•',
                               style: TextStyle(
-                                color: Colors.white54,
+                                color: AppPalette.text.withValues(alpha: 0.54),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -451,9 +459,9 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                             Text(
                               '${calc.heavyWheelsLabel} + ${_toArabic(calc.lightWheels)} عجلة = ${_fmtAr(calc.wheelsFabricMeters)} م قماش • شريط ${_fmtAr(calc.heavyTapeMeters)} م + ${_fmtAr(calc.lightTapeMeters)} م',
                               style: TextStyle(
-                                color: const Color(0xFFFFD45A),
+                                color: AppPalette.amber,
                                 fontWeight: FontWeight.w800,
-                                fontSize: 13,
+                                fontSize: 14,
                                 decoration: cardDecoration,
                                 decorationColor: cardDecorColor,
                               ),
@@ -499,7 +507,7 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
         style: TextStyle(
           color: color,
           fontWeight: FontWeight.w900,
-          fontSize: 14,
+          fontSize: 14.5,
           decoration: decoration,
           decorationColor: decorationColor,
         ),

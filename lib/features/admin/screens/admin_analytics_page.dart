@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_palette.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:fl_chart/fl_chart.dart'; // ✅ مكتبة الرسوم
-import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/work_stage.dart';
 
 // نفس ألوان الفاتورة والمقاسات والعملاء
-const Color _bg = Color(0xFF0F172A);
-const Color _panel = Color(0xFF1E293B);
-const Color _line = Color(0xFF334155);
-const Color _gold = AppColors.primaryGold;
-const Color _muted = Color(0xFF94A3B8);
+Color get _bg => AppPalette.bg;
+Color get _panel => AppPalette.panel;
+Color get _line => AppPalette.line;
+Color get _gold => AppPalette.gold;
+Color get _muted => AppPalette.muted;
 
 const Map<int, Color> _stageColors = WorkStage.colors;
 const Map<int, String> _stageLabels = {
@@ -120,24 +120,25 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     return Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           "تحليل البيانات",
-          style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white),
+          style: TextStyle(fontWeight: FontWeight.w900, color: AppPalette.text),
         ),
         backgroundColor: _panel,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          color: Colors.white,
+          color: AppPalette.text,
           onPressed: () => Navigator.pop(context),
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: _gold))
+          ? Center(child: CircularProgressIndicator(color: _gold))
           : SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 30),
               child: Column(
@@ -156,7 +157,7 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
                       _buildStatCard(
                         "شغل جاري",
                         _ar(_activeJobs),
-                        const Color(0xFF38BDF8),
+                        AppPalette.sky,
                         Icons.engineering_rounded,
                       ),
                       const SizedBox(width: 10),
@@ -256,8 +257,8 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
         const SizedBox(width: 7),
         Text(
           title,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: AppPalette.text,
             fontSize: 15.5,
             fontWeight: FontWeight.w900,
           ),
@@ -287,17 +288,17 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
             const SizedBox(height: 6),
             Text(
               count,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 23,
                 fontWeight: FontWeight.w900,
-                color: Colors.white,
+                color: AppPalette.text,
                 height: 1.1,
               ),
             ),
             const SizedBox(height: 2),
             Text(
               title,
-              style: const TextStyle(fontSize: 11, color: _muted),
+              style: TextStyle(fontSize: 11, color: _muted),
             ),
           ],
         ),
@@ -376,7 +377,7 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 6),
-        Text(title, style: const TextStyle(color: Colors.white, fontSize: 12.5)),
+        Text(title, style: TextStyle(color: AppPalette.text, fontSize: 12.5)),
       ],
     );
   }
@@ -393,7 +394,7 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
             value: entry.value.toDouble(),
             title: _ar(entry.value), // الرقم يظهر جوه
             radius: 52,
-            titleStyle: const TextStyle(
+            titleStyle: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w900,
               color: _bg,
@@ -410,13 +411,13 @@ class _AdminAnalyticsPageState extends State<AdminAnalyticsPage> {
       case "ويفي":
         return _gold;
       case "بلتكانة":
-        return const Color(0xFF38BDF8);
+        return AppPalette.sky;
       case "مواسير":
-        return const Color(0xFFA78BFA);
+        return AppPalette.violet;
       case "حلقات كبس":
         return const Color(0xFFFB7185);
       case "إكسسوارات":
-        return const Color(0xFF22E58B);
+        return AppPalette.green;
       default:
         return _muted;
     }

@@ -18,21 +18,21 @@ extension _MeasurementEditPanel on _ParisClientMeasurementsPageState {
         fillColor: _bg,
         labelText: label,
         hintText: hint,
-        labelStyle: const TextStyle(fontSize: 12, color: _muted),
-        hintStyle: const TextStyle(fontSize: 12, color: _muted),
+        labelStyle: TextStyle(fontSize: 13, color: _muted),
+        hintStyle: TextStyle(fontSize: 13, color: _muted),
         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
         suffixIcon: suffix,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: _line),
+          borderSide: BorderSide(color: _line),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: _line),
+          borderSide: BorderSide(color: _line),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: _gold, width: 1.4),
+          borderSide: BorderSide(color: _gold, width: 1.4),
         ),
       );
     }
@@ -41,9 +41,9 @@ extension _MeasurementEditPanel on _ParisClientMeasurementsPageState {
       padding: const EdgeInsets.fromLTRB(2, 12, 2, 6),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           color: _muted,
-          fontSize: 12.5,
+          fontSize: 13.5,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -91,8 +91,8 @@ extension _MeasurementEditPanel on _ParisClientMeasurementsPageState {
                   ),
                   textAlign: TextAlign.center,
                   onChanged: (_) => changed(() {}),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: AppPalette.text,
                     fontSize: 17,
                     fontWeight: FontWeight.w900,
                   ),
@@ -143,7 +143,7 @@ extension _MeasurementEditPanel on _ParisClientMeasurementsPageState {
                         fontWeight: v == selected
                             ? FontWeight.w900
                             : FontWeight.w600,
-                        fontSize: 13,
+                        fontSize: 14,
                       ),
                     ),
                   ),
@@ -172,9 +172,9 @@ extension _MeasurementEditPanel on _ParisClientMeasurementsPageState {
             TextField(
               controller: item.name,
               onChanged: (_) => changed(() {}),
-              style: const TextStyle(
+              style: TextStyle(
                 color: _gold,
-                fontSize: 15,
+                fontSize: 15.5,
                 fontWeight: FontWeight.w900,
               ),
               decoration: fieldDeco(hint: 'مثال: الصالون'),
@@ -236,9 +236,9 @@ extension _MeasurementEditPanel on _ParisClientMeasurementsPageState {
                 keyboardType: TextInputType.number,
                 textAlign: TextAlign.center,
                 onChanged: (_) => changed(() {}),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
+                style: TextStyle(
+                  color: AppPalette.text,
+                  fontSize: 15.5,
                   fontWeight: FontWeight.w900,
                 ),
                 decoration: fieldDeco(
@@ -247,7 +247,7 @@ extension _MeasurementEditPanel on _ParisClientMeasurementsPageState {
                       ? null
                       : IconButton(
                           tooltip: 'رجوع للحساب التلقائي',
-                          icon: const Icon(Icons.refresh, size: 18, color: _gold),
+                          icon: Icon(Icons.refresh, size: 18, color: _gold),
                           onPressed: () {
                             item.wheels.clear();
                             changed(() {});
@@ -259,9 +259,9 @@ extension _MeasurementEditPanel on _ParisClientMeasurementsPageState {
                 padding: const EdgeInsets.only(top: 5, right: 2),
                 child: Text(
                   'قماش العجل ${_fmtAr(calc.wheelsFabricMeters)} م (العجل × 0.148)',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFFFFD45A),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: AppPalette.amber,
                   ),
                 ),
               ),
@@ -278,7 +278,7 @@ extension _MeasurementEditPanel on _ParisClientMeasurementsPageState {
               icon: const Icon(Icons.copy_rounded, size: 17),
               label: const Text(
                 'تكرار المقاس',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: _gold,
@@ -320,9 +320,9 @@ extension _MeasurementEditPanel on _ParisClientMeasurementsPageState {
               height: 38,
               child: Text(
                 itemLabel(e),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
+                style: TextStyle(
+                  color: AppPalette.text,
+                  fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -332,7 +332,7 @@ extension _MeasurementEditPanel on _ParisClientMeasurementsPageState {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
         decoration: BoxDecoration(
-          color: const Color(0xFF163820),
+          color: AppPalette.successBg,
           borderRadius: BorderRadius.circular(5),
           border: Border.all(
             color: const Color(0xFF28A745).withValues(alpha: 0.4),
@@ -341,21 +341,21 @@ extension _MeasurementEditPanel on _ParisClientMeasurementsPageState {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('✅ $icon ', style: const TextStyle(fontSize: 11)),
+            Text('✅ $icon ', style: const TextStyle(fontSize: 12.5)),
             Text(
               label,
               style: TextStyle(
-                color: const Color(0xFF98E2A8),
+                color: AppPalette.mintSoft,
                 fontWeight: FontWeight.bold,
-                fontSize: 12.5,
+                fontSize: 13.5,
                 decoration: cardDecoration,
                 decorationColor: cardDecorColor,
               ),
             ),
             const SizedBox(width: 2),
-            const Icon(
+            Icon(
               Icons.arrow_drop_down,
-              color: Color(0xFF98E2A8),
+              color: AppPalette.mintSoft,
               size: 16,
             ),
           ],

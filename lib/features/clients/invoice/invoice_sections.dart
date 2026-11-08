@@ -131,14 +131,14 @@ extension _InvoiceSectionsUi on _InvoicePageState {
                 Text(
                   e.value,
                   style: TextStyle(
-                    color: e.key == _balconyFabricKey ? _kGold : Colors.white,
+                    color: e.key == _balconyFabricKey ? _kGold : AppPalette.text,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(width: 14),
                 Text(
                   '${_money(_customPrices[e.key] ?? defaultPrices()[e.key] ?? 0)} ج/م',
-                  style: const TextStyle(color: _kMuted, fontSize: 12),
+                  style: TextStyle(color: _kMuted, fontSize: 12),
                 ),
               ],
             ),
@@ -152,14 +152,14 @@ extension _InvoiceSectionsUi on _InvoicePageState {
               line.label,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: AppPalette.text,
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
               ),
             ),
           ),
-          const Icon(Icons.arrow_drop_down_rounded, color: _kGold, size: 22),
+          Icon(Icons.arrow_drop_down_rounded, color: _kGold, size: 22),
         ],
       ),
     );
@@ -289,7 +289,7 @@ extension _InvoiceSectionsUi on _InvoicePageState {
                 const SizedBox(width: 8),
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: _kGold,
                     fontWeight: FontWeight.w900,
                     fontSize: 15.5,
@@ -309,7 +309,7 @@ extension _InvoiceSectionsUi on _InvoicePageState {
                         children: [
                           Text(
                             allIn ? 'الكل' : (noneIn ? 'بدون' : 'جزء'),
-                            style: const TextStyle(color: _kMuted, fontSize: 12),
+                            style: TextStyle(color: _kMuted, fontSize: 12),
                           ),
                           const SizedBox(width: 5),
                           Icon(
@@ -328,11 +328,11 @@ extension _InvoiceSectionsUi on _InvoicePageState {
               ],
             ),
           ),
-          const Divider(color: _kLine, height: 1),
+          Divider(color: _kLine, height: 1),
 
           for (var i = 0; i < visible.length; i++) ...[
             if (i > 0)
-              const Divider(color: _kLine, height: 1, indent: 14, endIndent: 14),
+              Divider(color: _kLine, height: 1, indent: 14, endIndent: 14),
             _buildLineRow(
               visible[i],
               included: !excluded.contains(visible[i].key),
@@ -361,10 +361,10 @@ extension _InvoiceSectionsUi on _InvoicePageState {
           ],
 
           if (showAdd) ...[
-            if (visible.isNotEmpty) const Divider(color: _kLine, height: 1),
+            if (visible.isNotEmpty) Divider(color: _kLine, height: 1),
             InkWell(
               onTap: () => _openAddCustomLineDialog(isBalcony: isBalcony),
-              child: const Padding(
+              child: Padding(
                 padding: EdgeInsets.symmetric(vertical: 11),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -388,7 +388,7 @@ extension _InvoiceSectionsUi on _InvoicePageState {
           // إجمالي القسم (المحدد فقط)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: _kBg,
               borderRadius: BorderRadius.vertical(bottom: Radius.circular(15)),
             ),
@@ -396,7 +396,7 @@ extension _InvoiceSectionsUi on _InvoicePageState {
               children: [
                 Text(
                   totalLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: _kMuted,
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
@@ -406,7 +406,7 @@ extension _InvoiceSectionsUi on _InvoicePageState {
                 Text(
                   '${_money(totalVal)} ج.م',
                   style: TextStyle(
-                    color: noneIn ? _kMuted : Colors.white,
+                    color: noneIn ? _kMuted : AppPalette.text,
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
                   ),
@@ -487,8 +487,8 @@ extension _InvoiceSectionsUi on _InvoicePageState {
                           line.label,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: AppPalette.text,
                             fontWeight: FontWeight.w700,
                             fontSize: 14,
                           ),
@@ -496,7 +496,7 @@ extension _InvoiceSectionsUi on _InvoicePageState {
                   ),
                   const SizedBox(width: 6),
                   chip(qtyText, onQty),
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.symmetric(horizontal: 4),
                     child: Text(
                       '×',
@@ -555,7 +555,7 @@ extension _InvoiceSectionsUi on _InvoicePageState {
           Text(
             l,
             style: TextStyle(
-              color: big ? Colors.white : _kMuted,
+              color: big ? AppPalette.text : _kMuted,
               fontSize: big ? 15.5 : 13.5,
               fontWeight: big ? FontWeight.w900 : FontWeight.w600,
             ),
@@ -564,7 +564,7 @@ extension _InvoiceSectionsUi on _InvoicePageState {
           Text(
             '${_money(v)} ج.م',
             style: TextStyle(
-              color: big ? _kGold : Colors.white,
+              color: big ? _kGold : AppPalette.text,
               fontSize: big ? 18 : 14,
               fontWeight: FontWeight.w900,
             ),
@@ -585,7 +585,7 @@ extension _InvoiceSectionsUi on _InvoicePageState {
           if (hasAccessories) row('إجمالي الإكسسوارات', accessories),
           if (hasFabric) row('إجمالي القماش', fabric),
           if (hasAccessories || hasFabric)
-            const Divider(color: _kLine, height: 14),
+            Divider(color: _kLine, height: 14),
           row(label, roundMoney(accessories + fabric), big: true),
         ],
       ),
@@ -607,8 +607,8 @@ extension _InvoiceSectionsUi on _InvoicePageState {
             const SizedBox(height: 12),
             Text(
               title,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: AppPalette.text,
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
@@ -617,7 +617,7 @@ extension _InvoiceSectionsUi on _InvoicePageState {
             const SizedBox(height: 6),
             Text(
               sub,
-              style: const TextStyle(color: _kMuted, fontSize: 13),
+              style: TextStyle(color: _kMuted, fontSize: 13),
               textAlign: TextAlign.center,
             ),
           ],

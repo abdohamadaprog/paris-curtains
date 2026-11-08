@@ -65,6 +65,7 @@ class _StageStripState extends State<_StageStrip> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     final counts = _counts ?? const <int, int>{};
     final loaded = _counts != null;
     final onTapStage = widget.onTapStage;
@@ -85,7 +86,7 @@ class _StageStripState extends State<_StageStrip> {
                   decoration: BoxDecoration(
                     color: Color.alphaBlend(
                       _colors[stage]!.withValues(alpha: 0.10),
-                      const Color(0xFF1E293B),
+                      AppPalette.panel,
                     ),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(

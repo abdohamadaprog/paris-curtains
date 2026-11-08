@@ -12,7 +12,7 @@ extension _UploadImagesUi on _UploadImagePageState {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: UploadStyle.border),
         ),
-        child: const Column(
+        child: Column(
           children: [
             Icon(
               Icons.photo_size_select_actual_outlined,
@@ -31,7 +31,7 @@ extension _UploadImagesUi on _UploadImagePageState {
       children: [
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text('الصور وتحديد الأنواع', style: UploadStyle.heading),
             ),
             Container(
@@ -42,7 +42,7 @@ extension _UploadImagesUi on _UploadImagePageState {
               ),
               child: Text(
                 '${_selectedImages.length} صورة',
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Cairo',
                   color: UploadStyle.goldLight,
                   fontSize: 12,
@@ -103,10 +103,10 @@ extension _UploadImagesUi on _UploadImagePageState {
                               color: Colors.black87,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.close_rounded,
                               size: 14,
-                              color: Colors.white,
+                              color: AppPalette.text,
                             ),
                           ),
                         ),
@@ -120,7 +120,7 @@ extension _UploadImagesUi on _UploadImagePageState {
                       children: [
                         Text(
                           'صورة رقم ${index + 1}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'Cairo',
                             fontSize: 12,
                             color: UploadStyle.textSecondary,
@@ -132,7 +132,7 @@ extension _UploadImagesUi on _UploadImagePageState {
                           initialValue: currentType,
                           isExpanded: true,
                           dropdownColor: UploadStyle.surfaceLight,
-                          hint: const Text(
+                          hint: Text(
                             'حدد نوع الإكسسوار',
                             style: TextStyle(
                               fontFamily: 'Cairo',
@@ -157,12 +157,12 @@ extension _UploadImagesUi on _UploadImagePageState {
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
+                              borderSide: BorderSide(
                                 color: UploadStyle.gold,
                               ),
                             ),
                           ),
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.keyboard_arrow_down_rounded,
                             color: UploadStyle.gold,
                           ),
@@ -172,7 +172,7 @@ extension _UploadImagesUi on _UploadImagePageState {
                                   value: type,
                                   child: Text(
                                     type,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontFamily: 'Cairo',
                                       color: UploadStyle.textPrimary,
                                       fontWeight: FontWeight.bold,
@@ -204,7 +204,7 @@ extension _UploadImagesUi on _UploadImagePageState {
                                       _selectedAccessoryType = currentType;
                                     });
                                   },
-                            child: const Text(
+                            child: Text(
                               'تطبيق النوع على كل الصور',
                               style: TextStyle(
                                 fontFamily: 'Cairo',
@@ -235,7 +235,7 @@ extension _UploadImagesUi on _UploadImagePageState {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: UploadStyle.border),
         ),
-        child: const Column(
+        child: Column(
           children: [
             Icon(
               Icons.photo_size_select_actual_outlined,
@@ -254,7 +254,7 @@ extension _UploadImagesUi on _UploadImagePageState {
       children: [
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text('الصور المختارة', style: UploadStyle.heading),
             ),
             Container(
@@ -265,7 +265,7 @@ extension _UploadImagesUi on _UploadImagePageState {
               ),
               child: Text(
                 '${_selectedImages.length} صورة',
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Cairo',
                   color: UploadStyle.goldLight,
                   fontSize: 12,
@@ -311,12 +311,12 @@ extension _UploadImagesUi on _UploadImagePageState {
                                 _imageBytesCache.remove(removed.path);
                               });
                             },
-                      child: const Padding(
+                      child: Padding(
                         padding: EdgeInsets.all(5),
                         child: Icon(
                           Icons.close_rounded,
                           size: 16,
-                          color: Colors.white,
+                          color: AppPalette.text,
                         ),
                       ),
                     ),
@@ -336,7 +336,7 @@ extension _UploadImagesUi on _UploadImagePageState {
                     ),
                     child: Text(
                       '${index + 1}',
-                      style: const TextStyle(color: Colors.white, fontSize: 11),
+                      style: TextStyle(color: AppPalette.text, fontSize: 11),
                     ),
                   ),
                 ),
@@ -373,7 +373,7 @@ extension _UploadImagesUi on _UploadImagePageState {
         color: UploadStyle.surfaceLight,
         alignment: Alignment.center,
         padding: const EdgeInsets.all(8),
-        child: const Column(
+        child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.image_outlined, color: UploadStyle.goldLight, size: 30),
@@ -426,7 +426,7 @@ extension _UploadImagesUi on _UploadImagePageState {
     return Container(
       color: UploadStyle.surfaceLight,
       alignment: Alignment.center,
-      child: const Icon(
+      child: Icon(
         Icons.broken_image_outlined,
         color: UploadStyle.textSecondary,
       ),

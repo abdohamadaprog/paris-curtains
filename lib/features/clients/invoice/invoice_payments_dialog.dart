@@ -43,14 +43,14 @@ extension _InvoicePaymentsDialogs on _InvoicePageState {
                   textDirection: TextDirection.rtl,
                   child: AlertDialog(
                     backgroundColor: _kPanel,
-                    title: const Text(
+                    title: Text(
                       'حذف الدفعة؟',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+                      style: TextStyle(color: AppPalette.text, fontSize: 16),
                     ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(c, false),
-                        child: const Text(
+                        child: Text(
                           'إلغاء',
                           style: TextStyle(color: _kMuted),
                         ),
@@ -83,13 +83,13 @@ extension _InvoicePaymentsDialogs on _InvoicePageState {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 title: Row(
-                  children: const [
+                  children: [
                     Icon(Icons.payments_rounded, color: _kGreen),
                     SizedBox(width: 8),
                     Text(
                       'سجل الدفعات',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: AppPalette.text,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -106,7 +106,7 @@ extension _InvoicePaymentsDialogs on _InvoicePageState {
                         Text(
                           'الإجمالي ${_money(total)} • المدفوع ${_money(_depositPaid)}'
                           ' • ${remaining > 0 ? 'المتبقي ${_money(remaining)}' : 'خالص'}',
-                          style: const TextStyle(color: _kMuted, fontSize: 12.5),
+                          style: TextStyle(color: _kMuted, fontSize: 12.5),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -121,7 +121,7 @@ extension _InvoicePaymentsDialogs on _InvoicePageState {
                         ),
                         const SizedBox(height: 10),
                         if (_payments.isEmpty)
-                          const Padding(
+                          Padding(
                             padding: EdgeInsets.symmetric(vertical: 8),
                             child: Text(
                               'لسه مفيش دفعات مسجّلة.',
@@ -134,8 +134,8 @@ extension _InvoicePaymentsDialogs on _InvoicePageState {
                             contentPadding: EdgeInsets.zero,
                             title: Text(
                               '${_money(_payments[i].amount)} ج.م',
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: AppPalette.text,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -145,7 +145,7 @@ extension _InvoicePaymentsDialogs on _InvoicePageState {
                                 if (_payments[i].note.isNotEmpty)
                                   _payments[i].note,
                               ].join('  •  '),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: _kMuted,
                                 fontSize: 12,
                               ),
@@ -159,14 +159,14 @@ extension _InvoicePaymentsDialogs on _InvoicePageState {
                               onPressed: () => removePayment(i),
                             ),
                           ),
-                        const Divider(color: _kLine),
+                        Divider(color: _kLine),
                         TextField(
                           controller: amountCtrl,
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: AppPalette.text,
                             fontWeight: FontWeight.bold,
                             fontSize: 17,
                           ),
@@ -180,20 +180,20 @@ extension _InvoicePaymentsDialogs on _InvoicePageState {
                               fontSize: 13,
                             ),
                             suffixText: 'ج.م',
-                            suffixStyle: const TextStyle(
+                            suffixStyle: TextStyle(
                               color: _kGreen,
                               fontWeight: FontWeight.bold,
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: _kLine),
+                              borderSide: BorderSide(color: _kLine),
                             ),
                           ),
                         ),
                         const SizedBox(height: 8),
                         TextField(
                           controller: noteCtrl,
-                          style: const TextStyle(color: Colors.white),
+                          style: TextStyle(color: AppPalette.text),
                           decoration: InputDecoration(
                             filled: true,
                             fillColor: _kBg,
@@ -204,7 +204,7 @@ extension _InvoicePaymentsDialogs on _InvoicePageState {
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: _kLine),
+                              borderSide: BorderSide(color: _kLine),
                             ),
                           ),
                         ),
@@ -220,7 +220,7 @@ extension _InvoicePaymentsDialogs on _InvoicePageState {
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: _kGreen,
-                              foregroundColor: Colors.white,
+                              foregroundColor: AppPalette.onAccent,
                             ),
                           ),
                         ),
@@ -231,7 +231,7 @@ extension _InvoicePaymentsDialogs on _InvoicePageState {
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx),
-                    child: const Text(
+                    child: Text(
                       'تم',
                       style: TextStyle(color: _kMuted),
                     ),
@@ -287,7 +287,7 @@ extension _InvoicePaymentsDialogs on _InvoicePageState {
                       child: Text(
                         label,
                         style: TextStyle(
-                          color: selected ? _kBg : Colors.white,
+                          color: selected ? _kBg : AppPalette.text,
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
                         ),
@@ -305,7 +305,7 @@ extension _InvoicePaymentsDialogs on _InvoicePageState {
               hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: _kLine),
+                borderSide: BorderSide(color: _kLine),
               ),
             );
 
@@ -316,9 +316,9 @@ extension _InvoicePaymentsDialogs on _InvoicePageState {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
-                title: const Text(
+                title: Text(
                   'خصم على الفاتورة',
-                  style: TextStyle(color: Colors.white, fontSize: 16),
+                  style: TextStyle(color: AppPalette.text, fontSize: 16),
                 ),
                 content: SingleChildScrollView(
                   child: Column(
@@ -327,7 +327,7 @@ extension _InvoicePaymentsDialogs on _InvoicePageState {
                     children: [
                       Text(
                         'الإجمالي قبل الخصم: ${_money(subtotal)} ج.م',
-                        style: const TextStyle(color: _kMuted, fontSize: 12.5),
+                        style: TextStyle(color: _kMuted, fontSize: 12.5),
                       ),
                       const SizedBox(height: 12),
                       Row(
@@ -344,7 +344,7 @@ extension _InvoicePaymentsDialogs on _InvoicePageState {
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: _kGold,
                           fontWeight: FontWeight.bold,
                         ),
@@ -358,7 +358,7 @@ extension _InvoicePaymentsDialogs on _InvoicePageState {
                       const SizedBox(height: 8),
                       TextField(
                         controller: noteCtrl,
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(color: AppPalette.text),
                         decoration: deco('ملاحظة (اختياري) مثال: عميل قديم'),
                       ),
                       const SizedBox(height: 12),
@@ -390,7 +390,7 @@ extension _InvoicePaymentsDialogs on _InvoicePageState {
                     ),
                   TextButton(
                     onPressed: () => Navigator.pop(ctx),
-                    child: const Text('إلغاء', style: TextStyle(color: _kMuted)),
+                    child: Text('إلغاء', style: TextStyle(color: _kMuted)),
                   ),
                   TextButton(
                     onPressed: () {
@@ -407,7 +407,7 @@ extension _InvoicePaymentsDialogs on _InvoicePageState {
                       _scheduleAutoSave();
                       Navigator.pop(ctx);
                     },
-                    child: const Text('حفظ', style: TextStyle(color: _kGold)),
+                    child: Text('حفظ', style: TextStyle(color: _kGold)),
                   ),
                 ],
               ),

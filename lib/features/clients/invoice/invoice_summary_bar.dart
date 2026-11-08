@@ -37,7 +37,7 @@ extension _InvoiceSummaryBar on _InvoicePageState {
                   children: [
                     Text(
                       label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: _kMuted,
                         fontSize: 11.5,
                         fontWeight: FontWeight.bold,
@@ -70,7 +70,7 @@ extension _InvoiceSummaryBar on _InvoicePageState {
     }
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: _kPanel,
         border: Border(top: BorderSide(color: _kLine, width: 1.5)),
         boxShadow: [
@@ -89,7 +89,7 @@ extension _InvoiceSummaryBar on _InvoicePageState {
                   block(
                     label: 'الإجمالي',
                     value: _money(combined),
-                    color: Colors.white,
+                    color: AppPalette.text,
                   ),
                   const SizedBox(width: 8),
                   block(
@@ -113,7 +113,7 @@ extension _InvoiceSummaryBar on _InvoicePageState {
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
                     'الشقة ${_money(apt)} ج  +  البلكونة ${_money(balc)} ج',
-                    style: const TextStyle(color: _kMuted, fontSize: 11.5),
+                    style: TextStyle(color: _kMuted, fontSize: 11.5),
                   ),
                 ),
               InkWell(

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_palette.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_colors.dart';
@@ -45,16 +46,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   final LocalAuthentication auth = LocalAuthentication();
 
   // نفس ألوان الفاتورة والمقاسات
-  static const Color _bg = Color(0xFF0F172A);
-  static const Color _panel = Color(0xFF1E293B);
-  static const Color _panel2 = Color(0xFF273449);
-  static const Color _line = Color(0xFF334155);
-  static const Color _gold = AppColors.primaryGold;
-  static const Color _sky = Color(0xFF38BDF8);
-  static const Color _violet = Color(0xFFA78BFA);
-  static const Color _green = Color(0xFF22E58B);
-  static const Color _white = Color(0xFFF1F5F9);
-  static const Color _muted = Color(0xFF94A3B8);
+  static Color get _bg => AppPalette.bg;
+  static Color get _panel => AppPalette.panel;
+  static Color get _panel2 => AppPalette.panel2;
+  static Color get _line => AppPalette.line;
+  static Color get _gold => AppPalette.gold;
+  static Color get _sky => AppPalette.sky;
+  static Color get _violet => AppPalette.violet;
+  static Color get _green => AppPalette.green;
+  static Color get _white => AppPalette.text;
+  static Color get _muted => AppPalette.muted;
 
   @override
   void initState() {
@@ -114,6 +115,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // يعيد البناء عند تغيير الثيم
     return Scaffold(
       backgroundColor: _bg,
       // زرار عايم: عميل جديد من أول شاشة بضغطة واحدة
@@ -319,7 +321,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final now = DateTime.now();
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: _panel,
         border: Border(bottom: BorderSide(color: _line)),
       ),
@@ -333,10 +335,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: _gold.withValues(alpha: 0.4)),
             ),
-            child: const Icon(Icons.shield_rounded, color: _gold, size: 25),
+            child: Icon(Icons.shield_rounded, color: _gold, size: 25),
           ),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -359,7 +361,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ),
           Text(
             _ar('${now.day}/${now.month}/${now.year}'),
-            style: const TextStyle(fontSize: 12, color: _muted),
+            style: TextStyle(fontSize: 12, color: _muted),
           ),
         ],
       ),
@@ -386,11 +388,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               width: 46,
               height: 46,
               color: _gold.withValues(alpha: 0.2),
-              child: const Icon(Icons.person, color: _gold),
+              child: Icon(Icons.person, color: _gold),
             ),
           ),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -431,7 +433,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         const SizedBox(width: 7),
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w900,
             color: _white,
@@ -454,7 +456,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         children: [
           for (var i = 0; i < rows.length; i++) ...[
             if (i > 0)
-              const Divider(color: _line, height: 1, indent: 66, endIndent: 14),
+              Divider(color: _line, height: 1, indent: 66, endIndent: 14),
             rows[i],
           ],
         ],
@@ -478,7 +480,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: _gold.withValues(alpha: 0.35)),
         ),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.storefront_rounded, color: _gold, size: 20),
@@ -509,7 +511,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: _panel,
-        title: const Text(
+        title: Text(
           'أمان التطبيق',
           style: TextStyle(color: _gold, fontFamily: 'Cairo'),
         ),
@@ -523,7 +525,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               builder: (context, setStateDialog) {
                 return SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text(
+                  title: Text(
                     'الدخول بالبصمة',
                     style: TextStyle(
                       fontFamily: 'Cairo',
@@ -551,7 +553,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
+            child: Text(
               'إغلاق',
               style: TextStyle(color: _gold, fontFamily: 'Cairo'),
             ),
@@ -617,7 +619,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         ),
         content: Text(
           message,
-          style: const TextStyle(fontFamily: 'Cairo', color: _white),
+          style: TextStyle(fontFamily: 'Cairo', color: _white),
         ),
       ),
     );
