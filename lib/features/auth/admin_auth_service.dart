@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// حالة المستخدم الحالي بالنسبة للوحة الإدارة
 enum AdminStatus {
@@ -32,6 +33,37 @@ class AdminAuthService {
   /// [refresh] = true بيجدّد التوكن من السيرفر (بيكشف الجلسة الملغية
   /// أو الحساب المعطّل، وبيجيب الـ claims الأحدث).
   static Future<AdminStatus> check({bool refresh = false}) async {
+    final status = await _check(refresh: refresh);
+    final user = _auth.currentUser;
+    if (user == null) return status;
+    if (status == AdminStatus.admin) {
+      await _remember(user.uid);
+    } else if (status == AdminStatus.unknown && !await _isRemembered(user.uid)) {
+      // مفيش نت ومحدش أكّد قبل كده إن الحساب ده أدمن: منفتحش لوحة الإدارة.
+      return AdminStatus.notAdmin;
+    }
+    return status;
+  }
+
+  static const String _prefKey = 'verified_admin_uid';
+
+  static Future<void> _remember(String uid) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefKey, uid);
+    } catch (_) {}
+  }
+
+  static Future<bool> _isRemembered(String uid) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_prefKey) == uid;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<AdminStatus> _check({bool refresh = false}) async {
     final user = _auth.currentUser;
     if (user == null) return AdminStatus.signedOut;
 
@@ -44,9 +76,9 @@ class AdminAuthService {
         return AdminStatus.signedOut;
       }
       // مشكلة شبكة وإحنا بنجدد: نجرّب بالتوكن المخزّن
-      if (refresh) return check(refresh: false);
+      if (refresh) return _check(refresh: false);
     } catch (_) {
-      if (refresh) return check(refresh: false);
+      if (refresh) return _check(refresh: false);
     }
 
     try {
@@ -74,5 +106,11 @@ class AdminAuthService {
       code == 'invalid-user-token' ||
       code == 'requires-recent-login';
 
-  static Future<void> signOut() => _auth.signOut();
+  static Future<void> signOut() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_prefKey);
+    } catch (_) {}
+    await _auth.signOut();
+  }
 }

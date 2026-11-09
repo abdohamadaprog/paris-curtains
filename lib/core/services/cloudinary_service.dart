@@ -12,8 +12,8 @@ import '../config/app_features.dart';
 ///  1) **الموقّع (الموصى به)**: التطبيق بياخد توقيع من Cloud Function
 ///     (`getCloudinarySignature`) — محتاج خطة Blaze.
 ///  2) **المباشر (بدون سيرفر)**: رفع بـ unsigned upload preset — بيشتغل على
-///     خطة Spark، بس أي حد يعرف اسم الـ preset يقدر يرفع. مقبول مؤقتاً لأن
-///     شاشة الرفع للأدمن بس.
+///     خطة Spark فقط (لما `cloudFunctionsEnabled = false`)، بس أي حد يعرف اسم
+///     الـ preset يقدر يرفع. مؤقت لحد الترقية لـ Blaze، ومفيش فولباك تلقائي ليه.
 ///
 /// الاختيار بيتم من `AppFeatures.cloudFunctionsEnabled`.
 class CloudinaryService {
@@ -36,18 +36,10 @@ class CloudinaryService {
     if (!AppFeatures.cloudFunctionsEnabled) {
       return _uploadUnsigned(bytes, filename: filename, folder: folder);
     }
-    try {
-      return await _uploadSigned(bytes, filename: filename, folder: folder);
-    } on FirebaseFunctionsException catch (e) {
-      // لو الدالة مش متنزّلة (Spark) أو وقعت: نجرب المباشر بدل ما الرفع يفشل
-      if (e.code == 'not-found' ||
-          e.code == 'unavailable' ||
-          e.code == 'internal' ||
-          e.code == 'failed-precondition') {
-        return _uploadUnsigned(bytes, filename: filename, folder: folder);
-      }
-      rethrow;
-    }
+    // لما الدوال مفعّلة بنرفع بتوقيع بس. مفيش رجوع للرفع غير الموقّع عند أي
+    // خطأ، لأن ده كان بيفتح الثغرة (أي حد يعرف الـ preset يقدر يرفع).
+    // الخطأ بيظهر للمستخدم وطابور الرفع بيعيد المحاولة.
+    return _uploadSigned(bytes, filename: filename, folder: folder);
   }
 
   static Future<String> _uploadSigned(

@@ -56,9 +56,7 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(13),
               ),
-              onTap: () {
-                _rebuild(() => item.isExpanded = !item.isExpanded);
-              },
+              onTap: () => _openBalconyEditor(item),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -91,39 +89,7 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                     // اسم البلكونة (تسمية افتراضية متسلسلة وقابلة للتعديل)
                     Expanded(
                       flex: 3,
-                      child: item.isExpanded
-                          ? TextFormField(
-                              initialValue: item.name.text,
-                              style: TextStyle(
-                                color: AppPalette.cyan,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15.5,
-                                decoration: cardDecoration,
-                                decorationColor: cardDecorColor,
-                              ),
-                              decoration: InputDecoration(
-                                isDense: true,
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 4,
-                                ),
-                                border: UnderlineInputBorder(
-                                  borderSide: BorderSide(
-                                    color: AppPalette.cyan,
-                                  ),
-                                ),
-                                enabledBorder: UnderlineInputBorder(
-                                  borderSide: BorderSide(
-                                    color: AppPalette.cyan.withValues(alpha: 0.4),
-                                  ),
-                                ),
-                              ),
-                              onChanged: (val) {
-                                item.name.text = val;
-                                _triggerAutoSave();
-                              },
-                            )
-                          : Text(
+                      child: Text(
                               item.name.text.isEmpty
                                   ? 'بلكونة خارجية ${_toArabic(index + 1)}'
                                   : item.name.text,
@@ -224,13 +190,11 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                       onPressed: () => _deleteBalcony(index),
                     ),
 
-                    // زر فتح / طي
+                    // لمسة على الكارت بتفتح المحرر
                     Icon(
-                      item.isExpanded
-                          ? Icons.keyboard_arrow_up_rounded
-                          : Icons.keyboard_arrow_down_rounded,
-                      color: AppPalette.text.withValues(alpha: 0.7),
-                      size: 20,
+                      Icons.edit_rounded,
+                      color: AppPalette.cyan,
+                      size: 19,
                     ),
                   ],
                 ),
@@ -238,112 +202,23 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
             ),
 
             // ==================================================================
-            // جسم الكارت الموسع (محدد الأضلاع + مدخلات المقاسات + الرسم الحي)
+            // جسم الكارت المختصر: رسمة + ملخص. التعديل بيتم في المحرر (لمسة)
             // ==================================================================
-            if (item.isExpanded && !disabled) ...[
+            if (!disabled) ...[
               Divider(color: AppPalette.cyan.withValues(alpha: 0.2), height: 1),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // عنوان أزرار الأضلاع
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.architecture_rounded,
-                          color: AppPalette.cyan,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'شكل وأضلاع البلكونة:',
-                          style: TextStyle(
-                            color: AppPalette.textSoft,
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: AlignmentDirectional.centerEnd,
-                            child: Text(
-                              'قاعدة الأفيز: < ٣م = ٢ أفيز • ≥ ٣م = ٣ أفيز',
-                              style: TextStyle(
-                                color: AppPalette.amberSoft,
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    // أزرار اختيار الأضلاع الـ 4 برموز مميزة وتفاعلية
-                    IntrinsicHeight(
-                      child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildSideSelectorBtn(
-                          item: item,
-                          count: 1,
-                          symbol: '━',
-                          title: 'ضلع (مستقيمة)',
-                        ),
-                        const SizedBox(width: 6),
-                        _buildSideSelectorBtn(
-                          item: item,
-                          count: 2,
-                          symbol: '⌐',
-                          title: 'ضلعين (زاوية L)',
-                        ),
-                        const SizedBox(width: 6),
-                        _buildSideSelectorBtn(
-                          item: item,
-                          count: 3,
-                          symbol: '⊔',
-                          title: '٣ أضلاع (شكل U)',
-                        ),
-                        const SizedBox(width: 6),
-                        _buildSideSelectorBtn(
-                          item: item,
-                          count: 4,
-                          symbol: '▢',
-                          title: '٤ أضلاع (داير كامل)',
-                        ),
-                      ],
-                    ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // صناديق إدخال المقاسات حسب عدد الأضلاع المختار
-                    _buildSidesInputs(item),
-
-                    const SizedBox(height: 12),
-
-                    // الرسم الهندسي التفاعلي الحي للبلكونة
-                    _buildLiveBalconySketch(item),
-
-                    const SizedBox(height: 10),
-
-                    // شريط ملخص الورشة لمقاسات البلكونة
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppPalette.inset,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppPalette.cyan.withValues(alpha: 0.2)),
-                      ),
-                      child: Row(
+              InkWell(
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(13),
+                ),
+                onTap: () => _openBalconyEditor(item),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildLiveBalconySketch(item),
+                      const SizedBox(height: 10),
+                      Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           _buildMiniStat(
@@ -373,11 +248,21 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      Text(
+                        'اضغط للتعديل',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppPalette.text.withValues(alpha: 0.45),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
+
           ],
         ),
       ),
@@ -385,262 +270,9 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
   }
 
   // ============================================================================
-  // زر اختيار عدد الأضلاع
-  // ============================================================================
-  Widget _buildSideSelectorBtn({
-    required _Balcony item,
-    required int count,
-    required String symbol,
-    required String title,
-  }) {
-    final isSelected = item.sidesCount == count;
-
-    return Expanded(
-      child: InkWell(
-        onTap: () {
-          _rebuild(() {
-            item.sidesCount = count;
-            item.syncPartsFromSides();
-          });
-          _triggerAutoSave();
-        },
-        borderRadius: BorderRadius.circular(8),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 7),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? AppPalette.cyan.withValues(alpha: 0.35)
-                : AppPalette.insetChip,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isSelected
-                  ? AppPalette.cyan
-                  : AppPalette.line,
-              width: isSelected ? 1.4 : 1.0,
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                symbol,
-                style: TextStyle(
-                  color: isSelected
-                      ? AppPalette.cyan
-                      : AppPalette.muted,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  height: 1.0,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: isSelected ? AppPalette.text : AppPalette.muted,
-                  fontSize: 11.5,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ============================================================================
-  // صناديق الإدخال لكل ضلع
-  // ============================================================================
-  Widget _buildSidesInputs(_Balcony item) {
-    final count = item.sidesCount;
-
-    return Row(
-      children: [
-        Expanded(
-          child: _buildSideInputField(
-            label: 'الواجهة (ضلع ١)',
-            controller: item.side1,
-            val: item.side1Val,
-            item: item,
-          ),
-        ),
-        if (count >= 2) ...[
-          const SizedBox(width: 8),
-          Expanded(
-            child: _buildSideInputField(
-              label: count == 2 ? 'الجانب (ضلع ٢)' : 'اليمين (ضلع ٢)',
-              controller: item.side2,
-              val: item.side2Val,
-              item: item,
-            ),
-          ),
-        ],
-        if (count >= 3) ...[
-          const SizedBox(width: 8),
-          Expanded(
-            child: _buildSideInputField(
-              label: 'الشمال (ضلع ٣)',
-              controller: item.side3,
-              val: item.side3Val,
-              item: item,
-            ),
-          ),
-        ],
-        if (count >= 4) ...[
-          const SizedBox(width: 8),
-          Expanded(
-            child: _buildSideInputField(
-              label: 'الخلفي (ضلع ٤)',
-              controller: item.side4,
-              val: item.side4Val,
-              item: item,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  // صندوق إدخال مفرد مع أفيز مخصص
-  Widget _buildSideInputField({
-    required String label,
-    required TextEditingController controller,
-    required double val,
-    required _Balcony item,
-  }) {
-    final avez = _calcAvez(val);
-
-    // + / − بخطوة ٠٫٠٥ (من غير ما تفتح الكيبورد)
-    void bump(double delta) {
-      final cur = _Measurement.toDouble(controller.text);
-      final next = (((cur + delta) * 100).round() / 100)
-          .clamp(0.0, 99.0)
-          .toDouble();
-      controller.text = next.toStringAsFixed(2);
-      _rebuild(() => item.syncPartsFromSides());
-      _triggerAutoSave();
-    }
-
-    Widget stepBtn(IconData icon, double delta) => Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(7),
-        onTap: () => bump(delta),
-        child: Container(
-          height: 30,
-          decoration: BoxDecoration(
-            color: _panel,
-            borderRadius: BorderRadius.circular(7),
-            border: Border.all(color: _line),
-          ),
-          child: Icon(icon, size: 18, color: _gold),
-        ),
-      ),
-    );
-
-    return Container(
-      padding: const EdgeInsets.all(7),
-      decoration: BoxDecoration(
-        color: _bg,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: AppPalette.muted,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-            ),
-          ),
-          const SizedBox(height: 4),
-          TextFormField(
-            controller: controller,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppPalette.text,
-              fontWeight: FontWeight.bold,
-              fontSize: 14.5,
-            ),
-            decoration: InputDecoration(
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 6,
-                vertical: 6,
-              ),
-              suffixText: 'م',
-              suffixStyle: TextStyle(
-                color: AppPalette.cyan,
-                fontSize: 12.5,
-              ),
-              filled: true,
-              fillColor: _panel,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(6),
-                borderSide: BorderSide(color: AppPalette.line),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(6),
-                borderSide: BorderSide(color: AppPalette.cyan),
-              ),
-            ),
-            onChanged: (text) {
-              _rebuild(() {
-                item.syncPartsFromSides();
-              });
-              _triggerAutoSave();
-            },
-          ),
-          const SizedBox(height: 5),
-          Row(
-            children: [
-              stepBtn(Icons.add_rounded, 0.05),
-              const SizedBox(width: 4),
-              stepBtn(Icons.remove_rounded, -0.05),
-            ],
-          ),
-          const SizedBox(height: 5),
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            decoration: BoxDecoration(
-              color: val > 0
-                  ? AppPalette.amber.withValues(alpha: 0.12)
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              val > 0 ? '${_toArabic(avez)} أفيز' : '—',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: val > 0 ? AppPalette.amber : AppPalette.text.withValues(alpha: 0.24),
-                fontSize: 12.5,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================================
   // الرسم الهندسي التفاعلي الحي للبلكونة
   // ============================================================================
-  Widget _buildLiveBalconySketch(_Balcony item) {
+  Widget _buildLiveBalconySketch(_Balcony item, {int selectedSide = 0}) {
     return Container(
       height: 120,
       decoration: BoxDecoration(
@@ -663,6 +295,7 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                 avez2: _calcAvez(item.side2Val),
                 avez3: _calcAvez(item.side3Val),
                 avez4: _calcAvez(item.side4Val),
+                selectedSide: selectedSide,
               ),
             ),
           ),
@@ -746,6 +379,9 @@ class _BalconyCanvasPainter extends CustomPainter {
   final int avez3;
   final int avez4;
 
+  /// رقم الضلع (١–٤) اللي بيتعدّل دلوقتي وبيتلوّن، أو ٠ لو مفيش
+  final int selectedSide;
+
   _BalconyCanvasPainter({
     required this.sidesCount,
     required this.s1,
@@ -756,6 +392,7 @@ class _BalconyCanvasPainter extends CustomPainter {
     required this.avez2,
     required this.avez3,
     required this.avez4,
+    this.selectedSide = 0,
   });
 
   @override
@@ -790,6 +427,7 @@ class _BalconyCanvasPainter extends CustomPainter {
         canvas.drawLine(p1, p2, wallPaint);
 
         // علامات الأفيز
+        if (selectedSide == 1) _highlight(canvas, p1, p2);
         _drawAvezDots(canvas, p1, p2, avez1, pointPaint);
 
         // النص
@@ -809,11 +447,13 @@ class _BalconyCanvasPainter extends CustomPainter {
         // الجانب (س2)
         canvas.drawLine(pA, pCorner, wallGlowPaint);
         canvas.drawLine(pA, pCorner, wallPaint);
+        if (selectedSide == 2) _highlight(canvas, pA, pCorner);
         _drawAvezDots(canvas, pA, pCorner, avez2, pointPaint);
 
         // الواجهة (س1)
         canvas.drawLine(pCorner, pB, wallGlowPaint);
         canvas.drawLine(pCorner, pB, wallPaint);
+        if (selectedSide == 1) _highlight(canvas, pCorner, pB);
         _drawAvezDots(canvas, pCorner, pB, avez1, pointPaint);
 
         _drawText(
@@ -839,16 +479,19 @@ class _BalconyCanvasPainter extends CustomPainter {
         // ضلع الشمال (س3)
         canvas.drawLine(pLeftTop, pLeftBottom, wallGlowPaint);
         canvas.drawLine(pLeftTop, pLeftBottom, wallPaint);
+        if (selectedSide == 3) _highlight(canvas, pLeftTop, pLeftBottom);
         _drawAvezDots(canvas, pLeftTop, pLeftBottom, avez3, pointPaint);
 
         // ضلع الواجهة (س1)
         canvas.drawLine(pLeftBottom, pRightBottom, wallGlowPaint);
         canvas.drawLine(pLeftBottom, pRightBottom, wallPaint);
+        if (selectedSide == 1) _highlight(canvas, pLeftBottom, pRightBottom);
         _drawAvezDots(canvas, pLeftBottom, pRightBottom, avez1, pointPaint);
 
         // ضلع اليمين (س2)
         canvas.drawLine(pRightTop, pRightBottom, wallGlowPaint);
         canvas.drawLine(pRightTop, pRightBottom, wallPaint);
+        if (selectedSide == 2) _highlight(canvas, pRightTop, pRightBottom);
         _drawAvezDots(canvas, pRightTop, pRightBottom, avez2, pointPaint);
 
         // التسميات
@@ -879,6 +522,11 @@ class _BalconyCanvasPainter extends CustomPainter {
 
         canvas.drawRRect(rRect, wallGlowPaint);
         canvas.drawRRect(rRect, wallPaint);
+
+        if (selectedSide == 1) _highlight(canvas, rect.bottomLeft, rect.bottomRight);
+        if (selectedSide == 2) _highlight(canvas, rect.topRight, rect.bottomRight);
+        if (selectedSide == 3) _highlight(canvas, rect.topLeft, rect.bottomLeft);
+        if (selectedSide == 4) _highlight(canvas, rect.topLeft, rect.topRight);
 
         _drawAvezDots(
           canvas,
@@ -921,6 +569,22 @@ class _BalconyCanvasPainter extends CustomPainter {
         );
         break;
     }
+  }
+
+  // تلوين الضلع اللي بيتعدّل
+  void _highlight(Canvas canvas, Offset a, Offset b) {
+    final glow = Paint()
+      ..color = AppPalette.amber.withValues(alpha: 0.35)
+      ..strokeWidth = 11
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    final line = Paint()
+      ..color = AppPalette.amber
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(a, b, glow);
+    canvas.drawLine(a, b, line);
   }
 
   void _drawAvezDots(
@@ -1004,6 +668,7 @@ class _BalconyCanvasPainter extends CustomPainter {
         oldDelegate.avez1 != avez1 ||
         oldDelegate.avez2 != avez2 ||
         oldDelegate.avez3 != avez3 ||
-        oldDelegate.avez4 != avez4;
+        oldDelegate.avez4 != avez4 ||
+        oldDelegate.selectedSide != selectedSide;
   }
 }

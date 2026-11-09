@@ -72,7 +72,11 @@ class LocalBackupService {
       onProgress?.call('بقرا $name...');
       final snap = await db.collection(name).get(_serverOnly);
       for (final doc in snap.docs) {
-        add(doc.reference.path, doc.data());
+        final data = doc.data();
+        // أمان: ملف النسخة بيتبعت واتساب/إيميل، فمنحطش فيه توكن بوت تليجرام.
+        // لو اتسرّب التوكن أي حد يتحكم في البوت والقناة. بتدخّله تاني بعد الاسترجاع.
+        if (name == 'settings') data.remove('bot_token');
+        add(doc.reference.path, data);
       }
 
       if (_withDetails.contains(name)) {

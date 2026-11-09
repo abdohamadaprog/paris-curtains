@@ -22,6 +22,19 @@ if (hasReleaseKeystore) {
     println("WARNING: android/key.properties غير موجود - الإصدار هيتوقّع بمفتاح debug (غير صالح للنشر).")
 }
 
+// أمان: بناء release من غير مفتاح التوقيع بيفشل، بدل ما يطلع APK موقّع بـ debug بالغلط.
+// للتجربة المحلية بس: flutter run --release -PallowDebugSigning=true
+val allowDebugSigning = (findProperty("allowDebugSigning") as String?) == "true"
+val isReleaseBuild = gradle.startParameter.taskNames.any {
+    it.contains("release", ignoreCase = true)
+}
+if (isReleaseBuild && !hasReleaseKeystore && !allowDebugSigning) {
+    throw GradleException(
+        "android/key.properties مش موجود: مينفعش تبني release من غير مفتاح التوقيع. " +
+            "(للتجربة المحلية بس: -PallowDebugSigning=true)"
+    )
+}
+
 android {
     namespace = "com.pariscurtains.app"
     compileSdk = flutter.compileSdkVersion
@@ -65,6 +78,13 @@ android {
 
     buildTypes {
         release {
+            // تصغير وتشويش الكود وحذف الموارد غير المستخدمة (APK أصغر وأصعب في الفك)
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             signingConfig = if (hasReleaseKeystore) {
                 signingConfigs.getByName("release")
             } else {

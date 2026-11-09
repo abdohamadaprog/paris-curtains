@@ -492,3 +492,117 @@ Color get _muted => AppPalette.muted;
 // ويظهر معاه التعديل، ولما تقفله بيصغر ويرجع مكانه.
 // ============================================================================
 const double _compactZoom = 0.76;
+
+// ============================================================================
+// قوالب المقاسات: إعدادات جاهزة بتتضاف بضغطة (بتتحفظ على الجهاز)
+// ============================================================================
+class _MeasurementTemplate {
+  const _MeasurementTemplate({
+    required this.name,
+    required this.width,
+    required this.height,
+    required this.method,
+    required this.ceiling,
+    required this.velvetSides,
+    required this.lightLayers,
+    required this.lightSides,
+  });
+
+  final String name;
+  final String width;
+  final String height;
+  final _WorkMethod method;
+  final _CeilingType ceiling;
+  final int velvetSides;
+  final int lightLayers;
+  final int lightSides;
+
+  factory _MeasurementTemplate.fromItem(_Measurement m, String name) =>
+      _MeasurementTemplate(
+        name: name,
+        width: m.width.text,
+        height: m.height.text,
+        method: m.method,
+        ceiling: m.ceiling,
+        velvetSides: m.velvetSides,
+        lightLayers: m.lightLayers,
+        lightSides: m.lightSides,
+      );
+
+  Map<String, dynamic> toMap() => {
+    'name': name,
+    'width': width,
+    'height': height,
+    'method': method.name,
+    'ceiling': ceiling.name,
+    'velvet_sides': velvetSides,
+    'light_layers': lightLayers,
+    'light_sides': lightSides,
+  };
+
+  static _MeasurementTemplate? fromMap(dynamic raw) {
+    if (raw is! Map) return null;
+    final name = (raw['name'] ?? '').toString().trim();
+    if (name.isEmpty) return null;
+    int intOf(dynamic v, int fallback) => v is num ? v.toInt() : fallback;
+    return _MeasurementTemplate(
+      name: name,
+      width: (raw['width'] ?? '3.00').toString(),
+      height: (raw['height'] ?? '2.95').toString(),
+      method: _WorkMethod.values.firstWhere(
+        (v) => v.name == raw['method'],
+        orElse: () => _WorkMethod.wave,
+      ),
+      ceiling: _CeilingType.values.firstWhere(
+        (v) => v.name == raw['ceiling'],
+        orElse: () => _CeilingType.kaboli,
+      ),
+      velvetSides: intOf(raw['velvet_sides'], 2).clamp(1, 2).toInt(),
+      lightLayers: intOf(raw['light_layers'], 1).clamp(0, 1).toInt(),
+      lightSides: intOf(raw['light_sides'], 2).clamp(1, 2).toInt(),
+    );
+  }
+
+  void applyTo(_Measurement m) {
+    m.name.text = name;
+    m.width.text = width;
+    m.height.text = height;
+    m.method = method;
+    m.ceiling = ceiling;
+    m.velvetSides = velvetSides;
+    m.lightLayers = lightLayers;
+    m.lightSides = lightSides;
+  }
+}
+
+class _TemplateStore {
+  _TemplateStore._();
+
+  static const String _key = 'measurement_templates_v1';
+
+  static Future<List<_MeasurementTemplate>> load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_key);
+      if (raw == null || raw.isEmpty) return [];
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return [];
+      return decoded
+          .map(_MeasurementTemplate.fromMap)
+          .whereType<_MeasurementTemplate>()
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<void> save(List<_MeasurementTemplate> list) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _key,
+        jsonEncode(list.map((t) => t.toMap()).toList()),
+      );
+    } catch (_) {}
+  }
+}

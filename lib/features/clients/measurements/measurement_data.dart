@@ -33,8 +33,7 @@ extension _MeasurementData on _ParisClientMeasurementsPageState {
       if (!_loaded) {
         _applyDetails(fresh);
       } else if (fresh.signature != _loadedSignature &&
-          !_userEdited &&
-          _expandedId == null) {
+          !_userEdited) {
         // السيرفر عنده نسخة أحدث ومفيش تعديل شغال دلوقتي
         _applyDetails(fresh);
       }
@@ -268,6 +267,7 @@ extension _MeasurementData on _ParisClientMeasurementsPageState {
     });
     _triggerAutoSave();
     _scrollToEnd(_balcScroll);
+    _openBalconyEditor(b);
   }
 
   void _scrollToEnd(ScrollController c) {
@@ -311,6 +311,8 @@ extension _MeasurementData on _ParisClientMeasurementsPageState {
       copy.name.text = '${item.name.text} (نسخة)';
       copy.parts.text = item.parts.text;
       copy.syncSidesFromParts();
+      copy.height.text = item.height.text;
+      copy.customAvez = item.customAvez;
       copy.enabled = item.enabled;
       _balconies.add(copy);
     });
@@ -348,6 +350,168 @@ extension _MeasurementData on _ParisClientMeasurementsPageState {
       _trash.insert(0, _DeletedCard.balcony(item));
     });
     _triggerAutoSave();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('تم نقل البلكونة إلى المحذوفات'),
+        action: SnackBarAction(
+          label: 'تراجع',
+          onPressed: () {
+            if (_trash.isNotEmpty && _trash.first.isBalcony) {
+              _rebuild(() {
+                final restored = _trash.removeAt(0);
+                _balconies.insert(
+                  index.clamp(0, _balconies.length).toInt(),
+                  restored.toBalcony(),
+                );
+              });
+              _triggerAutoSave();
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  // ==========================================================================
+  // قوالب المقاسات (بتتحفظ على الجهاز)
+  // ==========================================================================
+  Future<void> _saveAsTemplate(_Measurement item) async {
+    final c = TextEditingController(text: item.name.text.trim());
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          backgroundColor: _panel,
+          title: Text('حفظ كقالب', style: TextStyle(color: AppPalette.text)),
+          content: TextField(
+            controller: c,
+            autofocus: true,
+            style: TextStyle(color: AppPalette.text),
+            decoration: const InputDecoration(hintText: 'اسم القالب (مثال: شباك صالون)'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text('إلغاء', style: TextStyle(color: _muted)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(c.text.trim()),
+              child: Text('حفظ', style: TextStyle(color: _gold)),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (name == null || name.isEmpty || !mounted) return;
+    final list = await _TemplateStore.load();
+    list.removeWhere((t) => t.name == name);
+    list.insert(0, _MeasurementTemplate.fromItem(item, name));
+    await _TemplateStore.save(list);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('تم حفظ القالب "$name"'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _addFromTemplate(_MeasurementTemplate t) {
+    final item = _Measurement();
+    t.applyTo(item);
+    _rebuild(() => _measurements.add(item));
+    _triggerAutoSave();
+    _scrollToEnd(_aptScroll);
+    _openCard(item);
+  }
+
+  Future<void> _pickTemplate() async {
+    final list = await _TemplateStore.load();
+    if (!mounted) return;
+    if (list.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('مفيش قوالب لسه. افتح أي مقاس واضغط "حفظ كقالب".'),
+        ),
+      );
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: _panel,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                  child: Text(
+                    'إضافة من قالب',
+                    style: TextStyle(
+                      color: AppPalette.text,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final t in List<_MeasurementTemplate>.of(list))
+                        ListTile(
+                          title: Text(
+                            t.name,
+                            style: TextStyle(
+                              color: AppPalette.text,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '${_toArabic(_Measurement.toDouble(t.width).toStringAsFixed(2))} × '
+                            '${_toArabic(_Measurement.toDouble(t.height).toStringAsFixed(2))} م • '
+                            '${t.method.label} • ${t.ceiling.label}',
+                            style: TextStyle(color: _muted, fontSize: 12.5),
+                          ),
+                          trailing: IconButton(
+                            tooltip: 'حذف القالب',
+                            icon: Icon(
+                              Icons.delete_outline,
+                              color: AppPalette.redStrong,
+                            ),
+                            onPressed: () async {
+                              list.remove(t);
+                              await _TemplateStore.save(list);
+                              setSheet(() {});
+                              if (list.isEmpty && ctx.mounted) {
+                                Navigator.of(ctx).pop();
+                              }
+                            },
+                          ),
+                          onTap: () {
+                            Navigator.of(ctx).pop();
+                            _addFromTemplate(t);
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _pickInstallationDate() async {

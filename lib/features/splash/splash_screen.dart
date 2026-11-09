@@ -31,7 +31,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1100),
+      duration: const Duration(milliseconds: 2000),
     );
 
     _logoFade = CurvedAnimation(
@@ -63,7 +63,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    _navigationTimer = Timer(const Duration(milliseconds: 1400), () {
+    _navigationTimer = Timer(const Duration(milliseconds: 2500), () {
       if (!mounted) return;
 
       Navigator.of(context).pushReplacement(
@@ -73,7 +73,7 @@ class _SplashScreenState extends State<SplashScreen>
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(opacity: animation, child: child);
           },
-          transitionDuration: const Duration(milliseconds: 300),
+          transitionDuration: const Duration(milliseconds: 450),
         ),
       );
     });

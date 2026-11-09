@@ -59,7 +59,7 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
         children: [
           // النقر المتكرر (3 نقرات) يكرر الكارت، والنقر الفردي يفتح التعديل
           InkWell(
-            onTap: () => popup ? _closeCard() : _openCard(item),
+            onTap: () => _openCard(item),
             borderRadius: BorderRadius.circular(14),
             child: Opacity(
               opacity: disabled ? 0.45 : 1.0,
@@ -136,7 +136,7 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                               color: _neon,
                               size: 21,
                             ),
-                            onPressed: () => popup ? _closeCard() : _openCard(item),
+                            onPressed: () => _openCard(item),
                           ),
                           IconButton(
                             visualDensity: VisualDensity.compact,
@@ -148,18 +148,7 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                               color: AppPalette.redStrong,
                               size: 18,
                             ),
-                            onPressed: () {
-                              if (popup) {
-                                final i = _measurements.indexOf(item);
-                                _rebuild(() {
-                                  _expandedId = null;
-                                  _closing = false;
-                                });
-                                if (i >= 0) _deleteMeasurement(i);
-                              } else {
-                                _deleteMeasurement(index);
-                              }
-                            },
+                            onPressed: () => _deleteMeasurement(index),
                           ),
                           popup
                               ? const SizedBox(width: 22)

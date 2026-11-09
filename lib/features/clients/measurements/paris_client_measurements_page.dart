@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -10,6 +11,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/services/sync_status_service.dart';
 import '../../../core/widgets/sync_status_banner.dart';
 import '../../../core/services/telegram_backup_service.dart';
@@ -21,6 +23,7 @@ part 'measurement_card_hero.dart';
 part 'measurement_card_shell.dart';
 part 'measurement_data.dart';
 part 'measurement_edit_panel.dart';
+part 'measurement_editor.dart';
 part 'measurement_header.dart';
 part 'measurement_image_page.dart';
 part 'measurement_models.dart';
@@ -232,51 +235,38 @@ class _ParisClientMeasurementsPageState
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // يعيد البناء عند تغيير الثيم
-    return PopScope(
-      canPop: _expandedId == null,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && _expandedId != null) {
-          _closeCard();
-        }
-      },
-      child: Scaffold(
-        backgroundColor: _bg,
-        resizeToAvoidBottomInset: true,
-        appBar: _buildAppBar(),
-        body: SafeArea(
-          child: Stack(
-            children: [
-              Column(
+    return Scaffold(
+      backgroundColor: _bg,
+      resizeToAvoidBottomInset: true,
+      appBar: _buildAppBar(),
+      body: SafeArea(
+        child: Column(
+          children: [
+            const SyncStatusBanner(),
+            _clientInfoBar(),
+            _measureTabsBar(),
+            if (_showTrash)
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.35,
+                ),
+                child: SingleChildScrollView(child: _trashPanel()),
+              ),
+            Expanded(
+              child: Stack(
                 children: [
-                  const SyncStatusBanner(),
-                  _clientInfoBar(),
-                  _measureTabsBar(),
-                  if (_showTrash)
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxHeight: MediaQuery.of(context).size.height * 0.35,
-                      ),
-                      child: SingleChildScrollView(child: _trashPanel()),
+                  _buildBody(),
+                  if (_loaded)
+                    PositionedDirectional(
+                      start: 14,
+                      bottom: 14,
+                      child: _addButton(),
                     ),
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        _buildBody(),
-                        if (_loaded && _expandedId == null)
-                          PositionedDirectional(
-                            start: 14,
-                            bottom: 14,
-                            child: _addButton(),
-                          ),
-                      ],
-                    ),
-                  ),
-                  if (_loaded) _bottomBar(),
                 ],
               ),
-              if (_expandedId != null) _expandedOverlay(),
-            ],
-          ),
+            ),
+            if (_loaded) _bottomBar(),
+          ],
         ),
       ),
     );
@@ -509,7 +499,7 @@ class _ParisClientMeasurementsPageState
   /// زرار الإضافة العائم: بيضيف مقاس (تبويب الشقة) أو بلكونة (تبويب البلكونات)
   Widget _addButton() {
     final isBalcony = _tabs.index == 1;
-    return FloatingActionButton.extended(
+    final main = FloatingActionButton.extended(
       heroTag: 'add-measurement-fab',
       onPressed: isBalcony ? _addBalcony : _addMeasurement,
       backgroundColor: _gold,
@@ -521,8 +511,23 @@ class _ParisClientMeasurementsPageState
         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
       ),
     );
+    if (isBalcony) return main;
+    // زرار القوالب: إضافة مقاس بإعدادات محفوظة بضغطة
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FloatingActionButton.small(
+          heroTag: 'template-fab',
+          tooltip: 'إضافة من قالب',
+          onPressed: _pickTemplate,
+          backgroundColor: _panel,
+          foregroundColor: _gold,
+          child: const Icon(Icons.bookmarks_rounded),
+        ),
+        const SizedBox(width: 10),
+        main,
+      ],
+    );
   }
 
-  int? _expandedId; // الكارت المكبّر حاليًا
-  bool _closing = false;
 }
