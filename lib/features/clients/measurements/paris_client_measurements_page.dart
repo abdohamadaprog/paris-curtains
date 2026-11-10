@@ -27,6 +27,7 @@ part 'measurement_editor.dart';
 part 'measurement_header.dart';
 part 'measurement_image_page.dart';
 part 'measurement_models.dart';
+part 'measurement_quick_add.dart';
 
 /// ============================================================================
 /// شاشة مقاسات العميل الفاخرة لتطبيق ستائر باريس — Paris Curtains
@@ -176,13 +177,20 @@ class _ParisClientMeasurementsPageState
           lines: [
             'المقاس: ${_fmtAr(w)} × ${_fmtAr(h)} م',
             'الطريقة: ${m.method.label} • السقف: ${m.ceiling.label}',
-            'قماش ثقيل: ${_fmtAr(c.heavyMeters)} م'
-                '${m.lightLayers > 0 ? ' • خفيف: ${_fmtAr(c.lightMeters)} م' : ''}',
-            'عجل: ${c.heavyWheelsLabel}'
-                '${m.lightLayers > 0 ? ' • خفيف: ${_toArabic(c.lightWheels)}' : ''}'
-                ' • شريط: ${_fmtAr(c.heavyTapeMeters)} م',
-            'ارتفاع القص: ${_fmtAr(c.heavyHeight)} م'
-                '${m.lightLayers > 0 ? ' • خفيف: ${_fmtAr(c.lightHeight)} م' : ''}',
+            if (m.heavyEnabled)
+              'قماش ثقيل: ${_fmtAr(c.heavyMeters)} م'
+            else
+              'قماش ثقيل: بدون',
+            if (m.lightLayers > 0) 'قماش خفيف: ${_fmtAr(c.lightMeters)} م',
+            if (m.blackoutEnabled) 'بلاك أوت: ${_fmtAr(c.blackoutMeters)} م',
+            if (m.heavyEnabled)
+              'عجل: ${c.heavyWheelsLabel}'
+                  '${m.lightLayers > 0 ? ' • خفيف: ${_toArabic(c.lightWheels)}' : ''}'
+                  ' • شريط: ${_fmtAr(c.heavyTapeMeters)} م',
+            if (m.heavyEnabled)
+              'ارتفاع القص: ${_fmtAr(c.heavyHeight)} م'
+                  '${m.lightLayers > 0 ? ' • خفيف: ${_fmtAr(c.lightHeight)} م' : ''}',
+            if (m.hasException) m.exceptionSummary,
           ],
         ),
       );
@@ -206,9 +214,7 @@ class _ParisClientMeasurementsPageState
 
     if (rows.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('مفيش مقاسات لسه — ضيف مقاس الأول'),
-        ),
+        const SnackBar(content: Text('مفيش مقاسات لسه — ضيف مقاس الأول')),
       );
       return;
     }
@@ -239,34 +245,33 @@ class _ParisClientMeasurementsPageState
       backgroundColor: _bg,
       resizeToAvoidBottomInset: true,
       appBar: _buildAppBar(),
-      body: SafeArea(
-        child: Column(
-          children: [
-            const SyncStatusBanner(),
-            _clientInfoBar(),
-            _measureTabsBar(),
-            if (_showTrash)
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.35,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: AppPalette.isDark
+                ? const [Color(0xFF0F172A), Color(0xFF0B1220)]
+                : const [Color(0xFFFDFCF8), Color(0xFFF7F1E6)],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              const SyncStatusBanner(),
+              _clientInfoBar(),
+              _measureTabsBar(),
+              if (_showTrash)
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.35,
+                  ),
+                  child: SingleChildScrollView(child: _trashPanel()),
                 ),
-                child: SingleChildScrollView(child: _trashPanel()),
-              ),
-            Expanded(
-              child: Stack(
-                children: [
-                  _buildBody(),
-                  if (_loaded)
-                    PositionedDirectional(
-                      start: 14,
-                      bottom: 14,
-                      child: _addButton(),
-                    ),
-                ],
-              ),
-            ),
-            if (_loaded) _bottomBar(),
-          ],
+              Expanded(child: _buildBody()),
+              if (_loaded) _actionDock(),
+            ],
+          ),
         ),
       ),
     );
@@ -274,34 +279,79 @@ class _ParisClientMeasurementsPageState
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: _panel,
+      backgroundColor: Colors.transparent,
+      flexibleSpace: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: AppPalette.isDark
+                ? const [Color(0xFF22304A), Color(0xFF1B2637)]
+                : const [Color(0xFFFFFFFF), Color(0xFFFBF7EF)],
+          ),
+        ),
+      ),
       elevation: 0,
+      surfaceTintColor: Colors.transparent,
+      titleSpacing: 10,
+      toolbarHeight: 60,
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Container(
+          height: 1,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                _gold.withValues(alpha: 0.0),
+                _gold.withValues(alpha: 0.35),
+                _gold.withValues(alpha: 0.0),
+              ],
+            ),
+          ),
+        ),
+      ),
       title: Row(
         children: [
           Expanded(
-            child: Text(
-              widget.clientName,
-              style: TextStyle(
-                color: AppPalette.text,
-                fontSize: 19,
-                fontWeight: FontWeight.w900,
-              ),
-              overflow: TextOverflow.ellipsis,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'مقاسات العميل',
+                  style: TextStyle(
+                    color: _gold.withValues(alpha: 0.85),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                Text(
+                  widget.clientName,
+                  style: TextStyle(
+                    color: AppPalette.cream,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    height: 1.15,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ),
           // مؤشر الحفظ التلقائي
           if (_isAutoSaving || _savedSuccess)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: (_isAutoSaving || _savedLocalOnly)
-                    ? AppPalette.amberStrong.withValues(alpha: 0.15)
-                    : AppPalette.green.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
+                    ? AppPalette.amberStrong.withValues(alpha: 0.12)
+                    : AppPalette.green.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: (_isAutoSaving || _savedLocalOnly)
-                      ? AppPalette.amberStrong
-                      : AppPalette.green,
+                      ? AppPalette.amberStrong.withValues(alpha: 0.5)
+                      : AppPalette.green.withValues(alpha: 0.5),
                   width: 0.8,
                 ),
               ),
@@ -320,12 +370,19 @@ class _ParisClientMeasurementsPageState
                     const SizedBox(width: 4),
                     Text(
                       'جاري الحفظ...',
-                      style: TextStyle(color: AppPalette.amberStrong, fontSize: 10),
+                      style: TextStyle(
+                        color: AppPalette.amberStrong,
+                        fontSize: 10,
+                      ),
                     ),
                   ] else ...[
                     Icon(
-                      _savedLocalOnly ? Icons.phone_android_rounded : Icons.check,
-                      color: _savedLocalOnly ? AppPalette.amberStrong : AppPalette.mint,
+                      _savedLocalOnly
+                          ? Icons.phone_android_rounded
+                          : Icons.check,
+                      color: _savedLocalOnly
+                          ? AppPalette.amberStrong
+                          : AppPalette.mint,
                       size: 12,
                     ),
                     const SizedBox(width: 3),
@@ -348,7 +405,7 @@ class _ParisClientMeasurementsPageState
         IconButton(
           tooltip: 'صورة المقاسات',
           onPressed: _openMeasurementsImage,
-          icon: Icon(Icons.image_rounded, color: AppPalette.text.withValues(alpha: 0.7)),
+          icon: Icon(Icons.image_rounded, color: AppPalette.textSoft),
         ),
         IconButton(
           tooltip: 'المحذوفات',
@@ -358,7 +415,7 @@ class _ParisClientMeasurementsPageState
             label: Text(_toArabic(_trash.length)),
             child: Icon(
               _showTrash ? Icons.close : Icons.delete_outline_rounded,
-              color: _trash.isNotEmpty ? AppPalette.amber : AppPalette.text.withValues(alpha: 0.54),
+              color: _trash.isNotEmpty ? AppPalette.amber : _muted,
             ),
           ),
         ),
@@ -368,7 +425,10 @@ class _ParisClientMeasurementsPageState
               ? SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: _gold),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: _gold,
+                  ),
                 )
               : Icon(Icons.save_rounded, color: _gold),
           onPressed: () => _performSave(isAuto: false),
@@ -381,30 +441,74 @@ class _ParisClientMeasurementsPageState
     if (!_loaded) {
       if (_loadFailed) {
         return Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.cloud_off_rounded, color: AppPalette.text.withValues(alpha: 0.38), size: 46),
-              const SizedBox(height: 10),
-              Text(
-                'تعذر تحميل المقاسات. تأكد من الاتصال.',
-                style: TextStyle(color: AppPalette.text.withValues(alpha: 0.7)),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () {
-                  setState(() => _loadFailed = false);
-                  _loadSavedData();
-                },
-                style: OutlinedButton.styleFrom(foregroundColor: _gold),
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('إعادة المحاولة'),
-              ),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 76,
+                  height: 76,
+                  decoration: BoxDecoration(
+                    color: _panel,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: _line),
+                  ),
+                  child: Icon(Icons.cloud_off_rounded, color: _muted, size: 34),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'تعذر تحميل المقاسات',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppPalette.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'اتأكد من الاتصال بالإنترنت وجرّب تاني',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: _muted, fontSize: 12.5),
+                ),
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() => _loadFailed = false);
+                    _loadSavedData();
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _gold,
+                    side: BorderSide(color: _gold.withValues(alpha: 0.45)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text(
+                    'إعادة المحاولة',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       }
-      return Center(child: CircularProgressIndicator(color: _gold));
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: _gold, strokeWidth: 2.4),
+            const SizedBox(height: 12),
+            Text(
+              'بنحمّل المقاسات...',
+              style: TextStyle(color: _muted, fontSize: 12.5),
+            ),
+          ],
+        ),
+      );
     }
     return TabBarView(
       controller: _tabs,
@@ -421,12 +525,14 @@ class _ParisClientMeasurementsPageState
               ? _emptyTab(
                   Icons.window_outlined,
                   'مفيش مقاسات لسه',
-                  'اضغط "إضافة مقاس" وابدأ',
+                  'ابدأ بإضافة أول مقاس للعميل',
+                  onAction: _addMeasurement,
+                  actionLabel: 'إضافة أول مقاس',
                 )
               : ReorderableListView.builder(
                   key: const PageStorageKey<String>('apartment-list'),
                   scrollController: _aptScroll,
-                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 90),
+                  padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
                   itemCount: _measurements.length,
                   onReorderItem: (oldIndex, newIndex) {
                     // onReorderItem بيمرر فهرس الوجهة النهائي بعد النقل
@@ -456,12 +562,14 @@ class _ParisClientMeasurementsPageState
               ? _emptyTab(
                   Icons.balcony_rounded,
                   'مفيش بلكونات لسه',
-                  'اضغط "إضافة بلكونة" وابدأ',
+                  'أضف بلكونة وحدد عدد أضلاعها',
+                  onAction: _addBalcony,
+                  actionLabel: 'إضافة بلكونة',
                 )
               : ListView.builder(
                   key: const PageStorageKey<String>('balcony-list'),
                   controller: _balcScroll,
-                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 90),
+                  padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
                   itemCount: _balconies.length,
                   itemBuilder: (context, index) => _balconyCard(
                     _balconies[index],
@@ -474,60 +582,74 @@ class _ParisClientMeasurementsPageState
     );
   }
 
-  Widget _emptyTab(IconData icon, String text, String hint) {
+  Widget _emptyTab(
+    IconData icon,
+    String text,
+    String hint, {
+    VoidCallback? onAction,
+    String? actionLabel,
+  }) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: _line, size: 52),
-          const SizedBox(height: 10),
-          Text(
-            text,
-            style: TextStyle(
-              color: AppPalette.text,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 84,
+              height: 84,
+              decoration: BoxDecoration(
+                color: _gold.withValues(alpha: 0.07),
+                shape: BoxShape.circle,
+                border: Border.all(color: _gold.withValues(alpha: 0.22)),
+              ),
+              child: Icon(icon, color: _gold, size: 36),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(hint, style: TextStyle(color: _muted, fontSize: 13)),
-        ],
-      ),
-    );
-  }
-
-  /// زرار الإضافة العائم: بيضيف مقاس (تبويب الشقة) أو بلكونة (تبويب البلكونات)
-  Widget _addButton() {
-    final isBalcony = _tabs.index == 1;
-    final main = FloatingActionButton.extended(
-      heroTag: 'add-measurement-fab',
-      onPressed: isBalcony ? _addBalcony : _addMeasurement,
-      backgroundColor: _gold,
-      foregroundColor: Colors.black,
-      elevation: 4,
-      icon: const Icon(Icons.add_rounded, size: 24),
-      label: Text(
-        isBalcony ? 'إضافة بلكونة' : 'إضافة مقاس',
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
-      ),
-    );
-    if (isBalcony) return main;
-    // زرار القوالب: إضافة مقاس بإعدادات محفوظة بضغطة
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        FloatingActionButton.small(
-          heroTag: 'template-fab',
-          tooltip: 'إضافة من قالب',
-          onPressed: _pickTemplate,
-          backgroundColor: _panel,
-          foregroundColor: _gold,
-          child: const Icon(Icons.bookmarks_rounded),
+            const SizedBox(height: 16),
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppPalette.text,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              hint,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _muted, fontSize: 13, height: 1.45),
+            ),
+            if (onAction != null && actionLabel != null) ...[
+              const SizedBox(height: 18),
+              SizedBox(
+                height: 46,
+                child: FilledButton.icon(
+                  onPressed: onAction,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _gold,
+                    foregroundColor: _bg,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: const Icon(Icons.add_rounded, size: 20),
+                  label: Text(
+                    actionLabel,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
-        const SizedBox(width: 10),
-        main,
-      ],
+      ),
     );
   }
-
 }

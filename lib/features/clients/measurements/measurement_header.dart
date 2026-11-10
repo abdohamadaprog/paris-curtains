@@ -2,55 +2,85 @@ part of 'paris_client_measurements_page.dart';
 
 extension _MeasurementHeader on _ParisClientMeasurementsPageState {
   // ============================================================================
-  // شريط معلومات العميل (التليفون + موعد التركيب)
+  // شريط معلومات العميل: رقم الهاتف + موعد التركيب في بطاقتين صغيرتين واضحتين
   // ============================================================================
   Widget _clientInfoBar() {
-    final hasPhone = widget.phone != null && widget.phone!.isNotEmpty;
+    final phone = (widget.phone ?? '').trim();
+    final address = (widget.address ?? '').trim();
+    final hasPhone = phone.isNotEmpty;
+    final hasAddress = address.isNotEmpty;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       decoration: BoxDecoration(
-        color: _panel,
-        border: Border(bottom: BorderSide(color: _line)),
+        color: AppPalette.isDark
+            ? const Color(0xFF16202F)
+            : const Color(0xFFFBF8F2),
+        border: Border(
+          bottom: BorderSide(color: _gold.withValues(alpha: 0.16)),
+        ),
       ),
       child: Row(
         children: [
-          if (hasPhone) ...[
-            Icon(Icons.phone_rounded, color: _gold, size: 16),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                _toArabic(widget.phone),
-                style: TextStyle(color: AppPalette.text.withValues(alpha: 0.7), fontSize: 14.5),
-                overflow: TextOverflow.ellipsis,
-              ),
+          Expanded(
+            child: _infoTile(
+              icon: Icons.phone_rounded,
+              label: 'الهاتف',
+              value: hasPhone
+                  ? _toArabic(phone)
+                  : (hasAddress ? address : 'مفيش رقم مسجل'),
+              strong: hasPhone,
             ),
-          ] else
-            const Spacer(),
-          InkWell(
-            onTap: _pickInstallationDate,
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: _gold.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _gold.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.event, color: _gold, size: 15),
-                  const SizedBox(width: 5),
-                  Text(
-                    _date(_installationDate),
-                    style: TextStyle(
-                      color: _neon,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.bold,
-                    ),
+          ),
+          const SizedBox(width: 8),
+          _installationTile(),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoTile({
+    required IconData icon,
+    required String label,
+    required String value,
+    required bool strong,
+  }) {
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppPalette.insetAlt,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _line.withValues(alpha: 0.8)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: _gold),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: _muted,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w600,
                   ),
-                ],
-              ),
+                ),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: strong ? AppPalette.text : _muted,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -58,31 +88,106 @@ extension _MeasurementHeader on _ParisClientMeasurementsPageState {
     );
   }
 
+  Widget _installationTile() {
+    final hasDate = _installationDate != null;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: _pickInstallationDate,
+        child: Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [
+                _gold.withValues(alpha: 0.12),
+                _gold.withValues(alpha: 0.04),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _gold.withValues(alpha: 0.28)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.event_rounded, size: 16, color: _gold),
+              const SizedBox(width: 7),
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'موعد التركيب',
+                    style: TextStyle(
+                      color: _muted,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    _date(_installationDate),
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: hasDate ? _gold : _muted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ============================================================================
-  // تبويبات (الشقة / البلكونات) — نفس فكرة تبويبات الفاتورة
+  // تبويبات (الشقة / البلكونات)
   // ============================================================================
   Widget _measureTabsBar() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-      padding: const EdgeInsets.all(4),
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 2),
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: _panel,
+        color: AppPalette.insetAlt,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _line),
+        border: Border.all(color: _line.withValues(alpha: 0.8)),
       ),
       child: TabBar(
         controller: _tabs,
         dividerColor: Colors.transparent,
         indicatorSize: TabBarIndicatorSize.tab,
         indicator: BoxDecoration(
-          color: _gold,
-          borderRadius: BorderRadius.circular(10),
+          gradient: LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [_gold, AppPalette.goldLight],
+          ),
+          borderRadius: BorderRadius.circular(11),
+          boxShadow: [
+            BoxShadow(
+              color: _gold.withValues(alpha: 0.22),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         labelColor: _bg,
         unselectedLabelColor: _muted,
-        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
-        unselectedLabelStyle: const TextStyle(fontSize: 14.5),
-        splashBorderRadius: BorderRadius.circular(10),
+        labelStyle: const TextStyle(
+          fontWeight: FontWeight.w900,
+          fontSize: 13.5,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 13.5,
+        ),
+        splashBorderRadius: BorderRadius.circular(11),
+        overlayColor: WidgetStateProperty.all(Colors.transparent),
         tabs: [
           _tabLabel(Icons.window_rounded, 'الشقة', _measurements.length),
           _tabLabel(Icons.balcony_rounded, 'البلكونات', _balconies.length),
@@ -97,24 +202,32 @@ extension _MeasurementHeader on _ParisClientMeasurementsPageState {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18),
+          Icon(icon, size: 17),
           const SizedBox(width: 6),
-          Text('$label (${_toArabic(count)})'),
+          Text(label),
+          const SizedBox(width: 5),
+          Text(
+            '(${_toArabic(count)})',
+            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
+          ),
         ],
       ),
     );
   }
 
   // ============================================================================
-  // الشريط السفلي: ملخص التبويب الحالي + زرار الفاتورة (ظاهر دايمًا)
+  // شريط الإجراءات السفلي (Dock):
+  //   • ملخص سريع للتبويب الحالي في سطر واحد قابل للسحب.
+  //   • إضافة + قالب + فاتورة في سطر واحد مريح، بدل الـ FAB والشريط المزدوج.
   // ============================================================================
-  Widget _bottomBar() {
+  Widget _actionDock() {
     final isBalcony = _tabs.index == 1;
     final pills = <Widget>[];
 
     if (!isBalcony) {
       var heavy = 0.0;
       var light = 0.0;
+      var blackout = 0.0;
       var wheels = 0;
       var count = 0;
       for (final m in _measurements) {
@@ -123,14 +236,23 @@ extension _MeasurementHeader on _ParisClientMeasurementsPageState {
         final c = m.calculation;
         heavy += c.heavyMeters;
         light += c.lightMeters;
+        blackout += c.blackoutMeters;
         wheels += c.heavyWheels + c.lightWheels;
       }
-      pills.addAll([
-        _summaryPill('مقاسات', _toArabic(count), _gold),
-        _summaryPill('ثقيل', '${_fmtAr(heavy)} م', AppPalette.amber),
-        _summaryPill('خفيف', '${_fmtAr(light)} م', AppPalette.skyLight),
-        _summaryPill('عجل', _toArabic(wheels), AppPalette.onAccent),
-      ]);
+      if (count > 0) {
+        pills.addAll([
+          _summaryPill('مقاسات', _toArabic(count), _gold),
+          _summaryPill('ثقيل', '${_fmtAr(heavy)} م', AppPalette.amber),
+          _summaryPill('خفيف', '${_fmtAr(light)} م', AppPalette.skyLight),
+          if (blackout > 0)
+            _summaryPill(
+              'بلاك أوت',
+              '${_fmtAr(blackout)} م',
+              AppPalette.violet,
+            ),
+          _summaryPill('عجل', _toArabic(wheels), AppPalette.mint),
+        ]);
+      }
     } else {
       var width = 0.0;
       var fabric = 0.0;
@@ -143,38 +265,160 @@ extension _MeasurementHeader on _ParisClientMeasurementsPageState {
         fabric += b.fabricMeters;
         avez += b.totalAvez;
       }
-      pills.addAll([
-        _summaryPill('بلكونات', _toArabic(count), _gold),
-        _summaryPill('عرض', '${_fmtAr(width)} م', AppPalette.amber),
-        _summaryPill('قماش', '${_fmtAr(fabric)} م', AppPalette.skyLight),
-        _summaryPill('أفيز', _toArabic(avez), AppPalette.onAccent),
-      ]);
+      if (count > 0) {
+        pills.addAll([
+          _summaryPill('بلكونات', _toArabic(count), _gold),
+          _summaryPill('عرض', '${_fmtAr(width)} م', AppPalette.amber),
+          _summaryPill('قماش', '${_fmtAr(fabric)} م', AppPalette.skyLight),
+          _summaryPill('أفيز', _toArabic(avez), AppPalette.mint),
+        ]);
+      }
+    }
+
+    if (pills.isEmpty) {
+      pills.add(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: _bg.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: _line),
+          ),
+          child: Text(
+            'لسه مفيش مقاسات مفعّلة',
+            style: TextStyle(color: _muted, fontSize: 11.5),
+          ),
+        ),
+      );
     }
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       decoration: BoxDecoration(
-        color: _panel,
-        border: Border(top: BorderSide(color: _line, width: 1.5)),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: AppPalette.isDark
+              ? const [Color(0xFF1E293B), Color(0xFF17202E)]
+              : const [Color(0xFFFFFFFF), Color(0xFFFBF7EF)],
+        ),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border(top: BorderSide(color: _gold.withValues(alpha: 0.22))),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(
+              alpha: AppPalette.isDark ? 0.26 : 0.06,
+            ),
+            blurRadius: 18,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(child: Wrap(spacing: 6, runSpacing: 5, children: pills)),
-          const SizedBox(width: 10),
-          FilledButton.icon(
-            onPressed: _openInvoice,
-            style: FilledButton.styleFrom(
-              backgroundColor: _gold,
-              foregroundColor: Colors.black,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 9, 12, 0),
+            child: SizedBox(
+              height: 31,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: pills.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 6),
+                itemBuilder: (_, i) =>
+                    Align(alignment: Alignment.centerLeft, child: pills[i]),
               ),
             ),
-            icon: const Icon(Icons.receipt_long_rounded, size: 20),
-            label: const Text(
-              'الفاتورة',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 9, 12, 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 52,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topRight,
+                          end: Alignment.bottomLeft,
+                          colors: [_gold, AppPalette.goldLight],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _gold.withValues(alpha: 0.25),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: FilledButton.icon(
+                        onPressed: isBalcony ? _addBalcony : _addMeasurement,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: _bg,
+                          shadowColor: Colors.transparent,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        icon: const Icon(Icons.add_rounded, size: 21),
+                        label: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            isBalcony ? 'إضافة بلكونة' : 'إضافة مقاس',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 14.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (!isBalcony) ...[
+                  const SizedBox(width: 8),
+                  _dockIconButton(
+                    icon: Icons.playlist_add_rounded,
+                    tooltip: 'إضافة سريعة (مجموعة مقاسات)',
+                    onTap: _openQuickAdd,
+                  ),
+                  const SizedBox(width: 8),
+                  _dockIconButton(
+                    icon: Icons.bookmarks_rounded,
+                    tooltip: 'إضافة من قالب',
+                    onTap: _pickTemplate,
+                  ),
+                ],
+                const SizedBox(width: 8),
+                SizedBox(
+                  height: 52,
+                  child: OutlinedButton.icon(
+                    onPressed: _openInvoice,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _gold,
+                      backgroundColor: _gold.withValues(alpha: 0.06),
+                      side: BorderSide(color: _gold.withValues(alpha: 0.30)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    icon: const Icon(Icons.receipt_long_rounded, size: 19),
+                    label: const Text(
+                      'الفاتورة',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -182,27 +426,58 @@ extension _MeasurementHeader on _ParisClientMeasurementsPageState {
     );
   }
 
+  Widget _dockIconButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: AppPalette.insetAlt,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _line.withValues(alpha: 0.8)),
+            ),
+            child: Icon(icon, color: _gold, size: 21),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _summaryPill(String label, String value, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
       decoration: BoxDecoration(
-        color: _bg,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.16)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            '$label: ',
-            style: TextStyle(color: _muted, fontSize: 12.5),
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
+          const SizedBox(width: 6),
+          Text(label, style: TextStyle(color: _muted, fontSize: 11)),
+          const SizedBox(width: 5),
           Text(
             value,
             style: TextStyle(
               color: color,
               fontSize: 12.5,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ],
@@ -218,29 +493,34 @@ extension _TrashPanelUi on _ParisClientMeasurementsPageState {
   Widget _trashPanel() {
     if (_trash.isEmpty) {
       return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
         decoration: BoxDecoration(
-          color: Colors.black38,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppPalette.text.withValues(alpha: 0.12)),
+          color: _panel,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _line),
         ),
-        child: Center(
-          child: Text(
-            'سلة المحذوفات فارغة',
-            style: TextStyle(color: AppPalette.text.withValues(alpha: 0.54), fontSize: 13),
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.delete_outline_rounded, color: _muted, size: 17),
+            const SizedBox(width: 7),
+            Text(
+              'سلة المحذوفات فاضية',
+              style: TextStyle(color: _muted, fontSize: 12.5),
+            ),
+          ],
         ),
       );
     }
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
       decoration: BoxDecoration(
         color: _panel,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppPalette.redStrong.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppPalette.redStrong.withValues(alpha: 0.28)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -250,15 +530,15 @@ extension _TrashPanelUi on _ParisClientMeasurementsPageState {
               Icon(
                 Icons.delete_sweep_rounded,
                 color: AppPalette.redStrong,
-                size: 16,
+                size: 17,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 7),
               Text(
                 'المحذوفات (${_toArabic(_trash.length)})',
                 style: TextStyle(
                   color: AppPalette.redStrong,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13.5,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13,
                 ),
               ),
               const Spacer(),
@@ -267,40 +547,63 @@ extension _TrashPanelUi on _ParisClientMeasurementsPageState {
                   _rebuild(() => _trash.clear());
                   _triggerAutoSave();
                 },
-                child: Text(
-                  'تفريغ السلة',
-                  style: TextStyle(color: AppPalette.text.withValues(alpha: 0.54), fontSize: 12.5),
+                style: TextButton.styleFrom(
+                  foregroundColor: _muted,
+                  minimumSize: const Size(0, 32),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  textStyle: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
+                child: const Text('تفريغ السلة'),
               ),
             ],
           ),
+          const SizedBox(height: 2),
           ..._trash.map(
-            (item) => Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    item.name.isEmpty ? 'عنصر محذوف' : item.name,
-                    style: TextStyle(color: AppPalette.text.withValues(alpha: 0.7), fontSize: 13),
+            (item) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.name.isEmpty ? 'عنصر محذوف' : item.name,
+                      style: TextStyle(
+                        color: AppPalette.textSoft,
+                        fontSize: 12.5,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    _rebuild(() {
-                      _trash.remove(item);
-                      if (item.isBalcony) {
-                        _balconies.add(item.toBalcony());
-                      } else {
-                        _measurements.add(item.toMeasurement());
-                      }
-                    });
-                    _triggerAutoSave();
-                  },
-                  child: Text(
-                    'استرجاع',
-                    style: TextStyle(color: _gold, fontSize: 12.5),
+                  TextButton.icon(
+                    onPressed: () {
+                      _rebuild(() {
+                        _trash.remove(item);
+                        if (item.isBalcony) {
+                          _balconies.add(item.toBalcony());
+                        } else {
+                          _measurements.add(item.toMeasurement());
+                        }
+                      });
+                      _triggerAutoSave();
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: _gold,
+                      minimumSize: const Size(0, 32),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    icon: const Icon(Icons.undo_rounded, size: 15),
+                    label: const Text(
+                      'استرجاع',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

@@ -2,11 +2,12 @@ part of 'paris_client_measurements_page.dart';
 
 extension _MeasurementEditPanel on _ParisClientMeasurementsPageState {
   // ============================================================================
-  // قائمة منبثقة سريعة بلمسة واحدة للاختيار المباشر
+  // قائمة منبثقة سريعة بلمسة واحدة للاختيار المباشر (طراز الشغل / السقف)
   // ============================================================================
   Widget _quickSelectMenu<T>({
     required String label,
-    required String icon,
+    required IconData icon,
+    required Color color,
     required List<T> items,
     required String Function(T) itemLabel,
     required ValueChanged<T> onSelected,
@@ -16,57 +17,52 @@ extension _MeasurementEditPanel on _ParisClientMeasurementsPageState {
     return PopupMenuButton<T>(
       tooltip: 'تغيير سريع',
       color: _panel,
-      elevation: 6,
+      elevation: 8,
+      shadowColor: Colors.black.withValues(alpha: 0.3),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: _gold.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: _line),
       ),
       onSelected: onSelected,
       itemBuilder: (context) => items
           .map(
             (e) => PopupMenuItem<T>(
               value: e,
-              height: 38,
+              height: 40,
               child: Text(
                 itemLabel(e),
                 style: TextStyle(
                   color: AppPalette.text,
                   fontSize: 14,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
           )
           .toList(),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
         decoration: BoxDecoration(
-          color: AppPalette.successBg,
-          borderRadius: BorderRadius.circular(5),
-          border: Border.all(
-            color: const Color(0xFF28A745).withValues(alpha: 0.4),
-          ),
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.22)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('✅ $icon ', style: const TextStyle(fontSize: 12.5)),
+            Icon(icon, size: 12, color: color),
+            const SizedBox(width: 4),
             Text(
               label,
               style: TextStyle(
-                color: AppPalette.mintSoft,
-                fontWeight: FontWeight.bold,
-                fontSize: 13.5,
+                color: color,
+                fontWeight: FontWeight.w800,
+                fontSize: 12.5,
                 decoration: cardDecoration,
                 decorationColor: cardDecorColor,
               ),
             ),
-            const SizedBox(width: 2),
-            Icon(
-              Icons.arrow_drop_down,
-              color: AppPalette.mintSoft,
-              size: 16,
-            ),
+            Icon(Icons.arrow_drop_down_rounded, color: color, size: 14),
           ],
         ),
       ),

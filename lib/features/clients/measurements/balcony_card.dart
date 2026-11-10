@@ -23,24 +23,23 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
 
     return Container(
       key: key,
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: _panel,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: disabled
-              ? AppPalette.onAccent.withValues(alpha: 0.24)
-              : AppPalette.cyan.withValues(alpha: 0.45),
-          width: 1.3,
+              ? _line
+              : AppPalette.cyan.withValues(alpha: 0.30),
+          width: 1,
         ),
         boxShadow: disabled
             ? const []
             : [
                 BoxShadow(
-                  color: AppPalette.cyanDeep.withValues(alpha: 0.12),
-                  blurRadius: 10,
-                  spreadRadius: 0.5,
-                  offset: const Offset(0, 3),
+                  color: AppPalette.cyanDeep.withValues(alpha: 0.08),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
                 ),
               ],
       ),
@@ -54,36 +53,60 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
             // ==================================================================
             InkWell(
               borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(13),
+                top: Radius.circular(18),
               ),
               onTap: () => _openBalconyEditor(item),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
+                  horizontal: 14,
                   vertical: 10,
                 ),
                 child: Row(
                   children: [
                     // زر تفعيل / تعطيل الكارت
                     InkWell(
+                      borderRadius: BorderRadius.circular(20),
                       onTap: () {
                         _rebuild(() => item.enabled = !item.enabled);
                         _triggerAutoSave();
                       },
-                      child: Icon(
-                        item.enabled
-                            ? Icons.check_circle_rounded
-                            : Icons.radio_button_unchecked,
-                        color: item.enabled
-                            ? AppPalette.cyan
-                            : AppPalette.onAccent.withValues(alpha: 0.3),
-                        size: 22,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          color: item.enabled ? AppPalette.cyan : Colors.transparent,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: item.enabled
+                                ? AppPalette.cyan
+                                : AppPalette.text.withValues(alpha: 0.30),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.check_rounded,
+                          size: 16,
+                          color: item.enabled ? _bg : Colors.transparent,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
 
                     // أيقونة البلكونة
-                    const Text('🚪', style: TextStyle(fontSize: 18)),
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: AppPalette.cyan.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: Icon(
+                        Icons.balcony_rounded,
+                        color: AppPalette.cyan,
+                        size: 16,
+                      ),
+                    ),
                     const SizedBox(width: 8),
 
                     // اسم البلكونة (تسمية افتراضية متسلسلة وقابلة للتعديل)
@@ -95,7 +118,7 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                                   : item.name.text,
                               style: TextStyle(
                                 color: AppPalette.cyan,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w900,
                                 fontSize: 15.5,
                                 decoration: cardDecoration,
                                 decorationColor: cardDecorColor,
@@ -119,8 +142,8 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                       ),
                       decoration: BoxDecoration(
                         color: AppPalette.insetAlt,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppPalette.cyan.withValues(alpha: 0.27)),
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(color: AppPalette.cyan.withValues(alpha: 0.22)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -160,8 +183,8 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                     IconButton(
                       visualDensity: VisualDensity.compact,
                       constraints: const BoxConstraints.tightFor(
-                        width: 32,
-                        height: 32,
+                        width: 34,
+                        height: 34,
                       ),
                       padding: EdgeInsets.zero,
                       tooltip: 'تكرار البلكونة',
@@ -177,8 +200,8 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                     IconButton(
                       visualDensity: VisualDensity.compact,
                       constraints: const BoxConstraints.tightFor(
-                        width: 30,
-                        height: 32,
+                        width: 32,
+                        height: 34,
                       ),
                       padding: EdgeInsets.zero,
                       tooltip: 'حذف',
@@ -205,14 +228,14 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
             // جسم الكارت المختصر: رسمة + ملخص. التعديل بيتم في المحرر (لمسة)
             // ==================================================================
             if (!disabled) ...[
-              Divider(color: AppPalette.cyan.withValues(alpha: 0.2), height: 1),
+              Divider(color: AppPalette.cyan.withValues(alpha: 0.16), height: 1),
               InkWell(
                 borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(13),
+                  bottom: Radius.circular(18),
                 ),
                 onTap: () => _openBalconyEditor(item),
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -249,13 +272,24 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        'اضغط للتعديل',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppPalette.text.withValues(alpha: 0.45),
-                          fontSize: 12,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.touch_app_rounded,
+                            size: 13,
+                            color: _muted,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            'اضغط للتعديل',
+                            style: TextStyle(
+                              color: AppPalette.textSoft,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -274,11 +308,11 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
   // ============================================================================
   Widget _buildLiveBalconySketch(_Balcony item, {int selectedSide = 0}) {
     return Container(
-      height: 120,
+      height: 116,
       decoration: BoxDecoration(
         color: AppPalette.inset,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppPalette.cyan.withValues(alpha: 0.2)),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppPalette.cyan.withValues(alpha: 0.18)),
       ),
       child: Stack(
         children: [
@@ -346,7 +380,11 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
       children: [
         Text(
           title,
-          style: TextStyle(color: AppPalette.muted, fontSize: 12.5),
+          style: TextStyle(
+            color: AppPalette.muted,
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: 2),
         Text(
@@ -354,7 +392,7 @@ extension _BalconyCardUi on _ParisClientMeasurementsPageState {
           style: TextStyle(
             color: color,
             fontWeight: FontWeight.w900,
-            fontSize: 14,
+            fontSize: 14.5,
           ),
         ),
       ],

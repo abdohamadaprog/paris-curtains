@@ -67,6 +67,16 @@ extension _MeasurementData on _ParisClientMeasurementsPageState {
       m.lightSides = (raw['light_sides'] as num?)?.toInt() ?? 2;
       m.wheels.text = (raw['wheels'] ?? '').toString();
       m.enabled = raw['enabled'] != false;
+      // استثناءات القماش (اختيارية — القيم الغايبة = الافتراضي)
+      m.heavyEnabled = raw['heavy_enabled'] != false;
+      m.heavyWidthOverride = (raw['heavy_width'] as num?)?.toDouble();
+      m.heavyRatioOverride = (raw['heavy_ratio'] as num?)?.toDouble();
+      m.lightWidthOverride = (raw['light_width'] as num?)?.toDouble();
+      m.lightRatioOverride = (raw['light_ratio'] as num?)?.toDouble();
+      m.blackoutEnabled = raw['blackout_enabled'] == true;
+      m.blackoutType = (raw['blackout_type'] ?? 'fabric_blackout3d').toString();
+      m.blackoutWidthOverride = (raw['blackout_width'] as num?)?.toDouble();
+      m.blackoutRatioOverride = (raw['blackout_ratio'] as num?)?.toDouble();
       loadedMeasurements.add(m);
     }
 
@@ -146,10 +156,22 @@ extension _MeasurementData on _ParisClientMeasurementsPageState {
           'light_layers': m.lightLayers,
           'light_sides': m.lightSides,
           'wheels': m.wheels.text.trim(),
+          // استثناءات القماش: بتتحفظ بس لو موجودة (null = القاعدة الافتراضية)
+          'heavy_enabled': m.heavyEnabled,
+          'heavy_width': m.heavyWidthOverride,
+          'heavy_ratio': m.heavyRatioOverride,
+          'light_width': m.lightWidthOverride,
+          'light_ratio': m.lightRatioOverride,
+          'blackout_enabled': m.blackoutEnabled,
+          'blackout_type': m.blackoutType,
+          'blackout_width': m.blackoutWidthOverride,
+          'blackout_ratio': m.blackoutRatioOverride,
           'heavy_meters': c.heavyMeters,
           'light_meters': c.lightMeters,
+          'blackout_meters': c.blackoutMeters,
           'heavy_height': c.heavyHeight,
           'light_height': c.lightHeight,
+          'blackout_height': c.blackoutHeight,
           'heavy_wheels': c.heavyWheels,
           'light_wheels': c.lightWheels,
           'heavy_tape_meters': c.heavyTapeMeters,
@@ -229,8 +251,8 @@ extension _MeasurementData on _ParisClientMeasurementsPageState {
   // ============================================================================
   // الإضافة السريعة: المقاس الجديد بياخد نفس نوع الستارة والارتفاع بتوع آخر مقاس
   // (غالبًا الشبابيك في نفس الشقة شبه بعض)، وبعدها بيفتح للتعديل على طول.
-  void _addMeasurement() {
-    final last = _measurements.isEmpty ? null : _measurements.last;
+  _Measurement _buildMeasurement({_Measurement? like}) {
+    final last = like ?? (_measurements.isEmpty ? null : _measurements.last);
     final item = _Measurement();
     item.name.text = 'شباك ${_toArabic(_measurements.length + 1)}';
     item.width.text = '3.00';
@@ -244,10 +266,24 @@ extension _MeasurementData on _ParisClientMeasurementsPageState {
       item.lightLayers = last.lightLayers;
       item.lightSides = last.lightSides;
     }
+    return item;
+  }
+
+  void _addMeasurement() {
+    final item = _buildMeasurement();
     _rebuild(() => _measurements.add(item));
     _triggerAutoSave();
     _scrollToEnd(_aptScroll);
     _openCard(item);
+  }
+
+  // بتتنادى من المحرر: تضيف مقاس جديد بنفس إعدادات الحالي وتفضل جوه المحرر.
+  _Measurement _appendMeasurementLike(_Measurement like) {
+    final item = _buildMeasurement(like: like);
+    _rebuild(() => _measurements.add(item));
+    _triggerAutoSave();
+    _scrollToEnd(_aptScroll);
+    return item;
   }
 
   // البلكونة الجديدة بتفتح مفتوحة، وباقي البلكونات بتتطوي عشان المساحة
@@ -294,6 +330,16 @@ extension _MeasurementData on _ParisClientMeasurementsPageState {
       copy.lightSides = item.lightSides;
       copy.wheels.text = item.wheels.text;
       copy.enabled = item.enabled;
+      // التكرار بينسخ الاستثناءات كمان (نسخة مطابقة للمقاس الأصلي)
+      copy.heavyEnabled = item.heavyEnabled;
+      copy.heavyWidthOverride = item.heavyWidthOverride;
+      copy.heavyRatioOverride = item.heavyRatioOverride;
+      copy.lightWidthOverride = item.lightWidthOverride;
+      copy.lightRatioOverride = item.lightRatioOverride;
+      copy.blackoutEnabled = item.blackoutEnabled;
+      copy.blackoutType = item.blackoutType;
+      copy.blackoutWidthOverride = item.blackoutWidthOverride;
+      copy.blackoutRatioOverride = item.blackoutRatioOverride;
       _measurements.add(copy);
     });
     ScaffoldMessenger.of(context).showSnackBar(

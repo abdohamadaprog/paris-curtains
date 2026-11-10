@@ -5,7 +5,7 @@ extension _MeasurementCardHero on _ParisClientMeasurementsPageState {
   Widget _measurementCard(_Measurement item, int index) {
     return Padding(
       key: ValueKey('measurement-${item.id}'),
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: 3),
       child: RepaintBoundary(
         child: _cardShell(
           item,

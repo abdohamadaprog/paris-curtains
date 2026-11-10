@@ -483,15 +483,37 @@ extension _InvoiceSectionsUi on _InvoicePageState {
                   Expanded(
                     child:
                         nameWidget ??
-                        Text(
-                          line.label,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: AppPalette.text,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                          ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              line.label,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: AppPalette.text,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                            ),
+                            // ملاحظة الاستثناء بتظهر صريحة تحت اسم البند
+                            if (line.note != null &&
+                                line.note!.contains('استثناء'))
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  line.note!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: _kMuted,
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                   ),
                   const SizedBox(width: 6),

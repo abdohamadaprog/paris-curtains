@@ -102,8 +102,13 @@ extension _InvoiceShare on _InvoicePageState {
     final combined = _combinedTotal;
     final remaining = roundMoney(combined - _depositPaid);
 
-    String fmt(InvoiceLine l) =>
-        '• ${l.label}: ${_fmtQty(l.qty)} ${l.unit} × ${_money(l.unitPrice)} = ${_money(l.total)} ج';
+    String fmt(InvoiceLine l) {
+      final tag = (l.note != null && l.note!.contains('استثناء'))
+          ? ' (${l.note})'
+          : '';
+      return '• ${l.label}$tag: ${_fmtQty(l.qty)} ${l.unit} × '
+          '${_money(l.unitPrice)} = ${_money(l.total)} ج';
+    }
 
     // الإكسسوارات الأول وبعدها القماش — والبنود المستبعدة مش بتظهر
     List<InvoiceLine> picked(

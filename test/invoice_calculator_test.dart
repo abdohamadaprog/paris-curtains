@@ -125,4 +125,120 @@ void main() {
     expect(calcWaveHoldersForWindow(4), 5);
     expect(calcWaveHoldersForWindow(5), 6);
   });
+
+  // ===================== استثناءات القماش =====================
+
+  test('استثناء: إلغاء الثقيل + ويفي خفيف + بلاك أوت تحته', () {
+    const windows = [
+      WindowSpec(
+        title: 'شباك',
+        width: 3,
+        curtainType: 'wave',
+        hasHeavy: false,
+        hasLight: true,
+        hasBlackout: true,
+        blackoutType: 'fabric_blackout3d',
+      ),
+    ];
+
+    final invoice = calculateApartmentInvoice(windows: windows);
+
+    expect(_line(invoice, 'fabric_linen').qty, 6);
+    expect(_line(invoice, 'fabric_blackout3d').qty, 3);
+    expect(_line(invoice, 'sew_blackout').qty, 3);
+    // تراك واحد بس (الخفيف) + شريط ويفي يتبع الخفيف + مفيش كسرات
+    expect(_line(invoice, 'track').qty, 3);
+    expect(_line(invoice, 'wave_tape').qty, 6);
+    expect(_line(invoice, 'holder_wave').qty, 4);
+    expect(() => _line(invoice, 'fabric_velvet'), throwsStateError);
+    expect(() => _line(invoice, 'kasrat'), throwsStateError);
+  });
+
+  test('استثناء: عرض/نسبة مخصصين لكل طبقة + بلاك أوت عازل', () {
+    const windows = [
+      WindowSpec(
+        width: 4,
+        curtainType: 'wave',
+        hasHeavy: true,
+        hasLight: true,
+        heavyWidth: 3,
+        heavyRatio: 2,
+        lightWidth: 4,
+        lightRatio: 3,
+        hasBlackout: true,
+        blackoutType: 'fabric_blackout_sun',
+        blackoutWidth: 2.8,
+      ),
+    ];
+
+    final invoice = calculateApartmentInvoice(windows: windows);
+
+    expect(_line(invoice, 'fabric_velvet').qty, 6); // 3 × 2
+    expect(_line(invoice, 'fabric_linen').qty, 12); // 4 × 3
+    expect(_line(invoice, 'fabric_blackout_sun').qty, 3); // 2.8 → 3
+    expect(_line(invoice, 'sew_blackout').qty, 3);
+    expect(_line(invoice, 'track').qty, 7); // 3 + 4
+    expect(_line(invoice, 'wave_tape').qty, 6); // يتبع الثقيل
+    expect(_line(invoice, 'kasrat').qty, 12); // يتبع الخفيف
+    expect(_line(invoice, 'holder_wave').qty, 5); // أوسع طبقة 4م
+    expect(_line(invoice, 'fabric_velvet').note, contains('استثناء'));
+    expect(_line(invoice, 'fabric_blackout_sun').note, contains('استثناء'));
+  });
+
+  test('استثناء: كبس خفيف بدون ثقيل', () {
+    const windows = [
+      WindowSpec(
+        width: 2,
+        curtainType: 'press',
+        hasHeavy: false,
+        hasLight: true,
+      ),
+    ];
+
+    final invoice = calculateApartmentInvoice(windows: windows);
+
+    expect(_line(invoice, 'fabric_linen').qty, 4);
+    expect(_line(invoice, 'pipe_press').qty, 2);
+    expect(_line(invoice, 'cantilever_forgia').qty, 2);
+    expect(_line(invoice, 'qamqam_forgia').qty, 2);
+    expect(_line(invoice, 'press_tape').qty, 4);
+    expect(_line(invoice, 'ring_unit').qty, 28);
+    expect(() => _line(invoice, 'fabric_velvet'), throwsStateError);
+  });
+
+  test('استثناء: بلاك أوت لوحده من غير ثقيل ولا خفيف', () {
+    const windows = [
+      WindowSpec(
+        width: 2.8,
+        curtainType: 'wave',
+        hasHeavy: false,
+        hasLight: false,
+        hasBlackout: true,
+      ),
+    ];
+
+    final invoice = calculateApartmentInvoice(windows: windows);
+
+    expect(_line(invoice, 'fabric_blackout3d').qty, 3);
+    expect(_line(invoice, 'sew_blackout').qty, 3);
+    expect(_line(invoice, 'track').qty, 2.8);
+    expect(() => _line(invoice, 'wave_tape'), throwsStateError);
+  });
+
+  test('القراءة من البيانات المحفوظة: القيم الغايبة = الافتراضي', () {
+    final spec = WindowSpec.fromMap({
+      'width': 3,
+      'method': 'wave',
+      'light_layers': 1,
+      'velvet_sides': 2,
+    });
+
+    expect(spec.hasHeavy, true);
+    expect(spec.hasLight, true);
+    expect(spec.heavyWidth, isNull);
+    expect(spec.lightWidth, isNull);
+    expect(spec.hasBlackout, false);
+    expect(spec.heavyWidthValue, 3);
+    expect(spec.lightWidthValue, 3);
+  });
 }

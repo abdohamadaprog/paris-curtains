@@ -114,6 +114,7 @@ const List<_Group> _kGroups = [
   _Group('الخياطة والتركيب', Icons.content_cut_rounded, [
     'sew_light',
     'sew_heavy',
+    'sew_blackout',
     'install_window',
     'kobsha',
     'transport',

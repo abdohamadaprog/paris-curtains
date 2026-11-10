@@ -24,6 +24,12 @@ String _fmt(double val) {
 
 String _fmtAr(double val) => _toArabic(_fmt(val));
 
+/// تقريب أمتار القماش لأعلى لأقرب متر كامل (نفس قاعدة الفاتورة).
+int _ceilMeters(double v) {
+  if (v <= 0 || v.isNaN || v.isInfinite) return 0;
+  return ((v * 100).round() / 100).ceil();
+}
+
 // ============================================================================
 // نماذج البيانات والحسابات الهندسية الدقيقة
 // ============================================================================
@@ -44,16 +50,69 @@ class _Measurement {
   int lightSides = 2;
   bool enabled = true;
 
+  // ===== استثناءات القماش (اختيارية) =====
+  // كل قيمة null = القاعدة الافتراضية (عرض الشباك + النسبة حسب الطراز).
+  // أي قيمة مش null = استثناء صريح بيتحفظ ويتنقل للفاتورة وصورة المقاسات.
+  bool heavyEnabled = true;
+  double? heavyWidthOverride;
+  double? heavyRatioOverride;
+  double? lightWidthOverride;
+  double? lightRatioOverride;
+  bool blackoutEnabled = false;
+  String blackoutType = 'fabric_blackout3d';
+  double? blackoutWidthOverride;
+  double? blackoutRatioOverride;
+
+  double get baseWidth => toDouble(width.text);
+  bool get hasLight => lightLayers > 0;
+
+  double get heavyWidth => heavyWidthOverride ?? baseWidth;
+  double get lightWidth => lightWidthOverride ?? baseWidth;
+  double get blackoutWidth => blackoutWidthOverride ?? baseWidth;
+
+  double get defaultHeavyRatio => method == _WorkMethod.press ? 2.5 : 3.0;
+  double get defaultLightRatio => method == _WorkMethod.doubleWave ? 3.0 : 2.0;
+
+  double get heavyRatio => heavyRatioOverride ?? defaultHeavyRatio;
+  double get lightRatio => lightRatioOverride ?? defaultLightRatio;
+  double get blackoutRatio => blackoutRatioOverride ?? 1.0;
+
+  /// ملخص مقروء للاستثناءات (بيظهر في صورة المقاسات والكارت).
+  String get exceptionSummary {
+    final parts = <String>[];
+    if (!heavyEnabled) parts.add('بدون ثقيل');
+    if (heavyEnabled &&
+        (heavyWidthOverride != null || heavyRatioOverride != null)) {
+      parts.add('ثقيل ${_fmtAr(heavyWidth)}×${_fmtAr(heavyRatio)}');
+    }
+    if (hasLight &&
+        (lightWidthOverride != null || lightRatioOverride != null)) {
+      parts.add('خفيف ${_fmtAr(lightWidth)}×${_fmtAr(lightRatio)}');
+    }
+    if (blackoutEnabled) {
+      parts.add('بلاك أوت ${_fmtAr(blackoutWidth)}×${_fmtAr(blackoutRatio)}');
+    }
+    return parts.isEmpty ? '' : 'استثناء: ${parts.join(' • ')}';
+  }
+
+  /// هل فيه أي استثناء شغّال على المقاس ده؟
+  bool get hasException =>
+      !heavyEnabled ||
+      blackoutEnabled ||
+      heavyWidthOverride != null ||
+      lightWidthOverride != null ||
+      blackoutWidthOverride != null ||
+      heavyRatioOverride != null ||
+      lightRatioOverride != null ||
+      blackoutRatioOverride != null;
+
   _Calculation get calculation {
-    final w = toDouble(width.text);
     final h = toDouble(height.text);
 
-    // مضاعفات القماش المعتمدة:
-    // الويفي العادي: ثقيل (قطيفة) = عرض × 3 ، خفيف (كتان) = عرض × 2
-    // دابل ويفي: ثقيل وخفيف كلاهما 3 أضعاف (عرض × 3)
-    // حلقات كبس: ثقيل = عرض × 2.5 ، خفيف = عرض × 2
-    final heavyMultiplier = method == _WorkMethod.press ? 2.5 : 3.0;
-    final lightMultiplier = method == _WorkMethod.doubleWave ? 3.0 : 2.0;
+    // عرض كل طبقة: الافتراضي = عرض الشباك، أو الاستثناء لو موجود.
+    final hw = heavyEnabled ? heavyWidth : 0.0;
+    final lw = hasLight ? lightWidth : 0.0;
+    final bw = blackoutEnabled ? blackoutWidth : 0.0;
 
     // خصومات الارتفاع بالسنتيمتر بناءً على السقف ونوع التعليق
     double heavyOffset = 0;
@@ -83,44 +142,75 @@ class _Measurement {
     final isWave = method != _WorkMethod.press;
     var heavySides = 1;
     var heavyWheels = 0;
-    double heavyMeters;
+    var lightWheels = 0;
 
     if (isWave) {
-      if (w > 0) {
-        heavySides = _sidesForWidth(w);
-        final auto = heavySides == 2
-            ? 2 * wheelsForSide(w / 2)
-            : wheelsForSide(w);
-        final manual = manualWheels;
-        if (manual != null) {
-          // الرقم اليدوي لازم يبقى زوجي، ولو جنبين لازم يتقسم على 2 زوجي
-          final step = heavySides == 2 ? 4 : 2;
-          heavyWheels = ((manual + step - 1) ~/ step) * step;
+      final manual = manualWheels;
+
+      // العجل التلقائي لعرض معين (نفس القاعدة القديمة بالحرف)
+      int autoWheelsFor(double width) {
+        final sides = _sidesForWidth(width);
+        return sides == 2 ? 2 * wheelsForSide(width / 2) : wheelsForSide(width);
+      }
+
+      // الرقم اليدوي لازم يبقى زوجي، ولو جنبين لازم يتقسم على 2 زوجي
+      int manualWheelsFor(double width) {
+        final step = _sidesForWidth(width) == 2 ? 4 : 2;
+        return ((manual! + step - 1) ~/ step) * step;
+      }
+
+      if (hw > 0) {
+        heavySides = _sidesForWidth(hw);
+        heavyWheels = manual != null ? manualWheelsFor(hw) : autoWheelsFor(hw);
+      }
+      if (lw > 0) {
+        if (manual != null && !heavyEnabled) {
+          // الثقيل متلغي: الرقم اليدوي بيتطبق على الخفيف
+          lightWheels = manualWheelsFor(lw);
+        } else if (manual != null && (lw - hw).abs() < 0.001) {
+          lightWheels = heavyWheels;
         } else {
-          heavyWheels = auto;
+          lightWheels = autoWheelsFor(lw);
         }
       }
-      heavyMeters = w > 0 ? (w * heavyMultiplier) : 0;
-    } else {
-      heavyWheels = 0; // الحلقات (كبس) مفيهاش عجل
-      heavyMeters = w > 0 ? (w * heavyMultiplier) : 0;
     }
 
-    final lightWheels = (lightLayers > 0 && w > 0) ? heavyWheels : 0;
-    final heavyTape = w > 0 ? (w * 1.33) : 0.0;
-    final lightTape = (lightLayers > 0 && w > 0) ? heavyTape : 0.0;
+    // القماش: عرض الطبقة × نسبتها (النسبة الافتراضية حسب الطراز).
+    final heavyMeters = hw > 0 ? (hw * heavyRatio) : 0.0;
+    final lightMeters = lw > 0 ? (lw * lightRatio) : 0.0;
+    // البلاك أوت: عرض × 1 (أو نسبة مخصصة) مقرّب لأعلى لكل شباك على حدة.
+    final blackoutMeters = bw > 0
+        ? _ceilMeters(bw * blackoutRatio).toDouble()
+        : 0.0;
+
+    final heavyTape = hw > 0 ? (hw * 1.33) : 0.0;
+    final lightTape = lw > 0 ? (lw * 1.33) : 0.0;
 
     return _Calculation(
       heavyMeters: heavyMeters,
-      lightMeters: (lightLayers > 0 && w > 0) ? (w * lightMultiplier) : 0,
+      lightMeters: lightMeters,
+      blackoutMeters: blackoutMeters,
       heavyHeight: h > 0 ? (h + heavyOffset) : 0,
-      lightHeight: (lightLayers > 0 && h > 0) ? (h + lightOffset) : 0,
+      lightHeight: (lw > 0 && h > 0) ? (h + lightOffset) : 0,
+      blackoutHeight: (bw > 0 && h > 0)
+          ? (h + (lw > 0 ? lightOffset : heavyOffset))
+          : 0,
       heavyWheels: heavyWheels,
       lightWheels: lightWheels,
       heavySides: heavySides,
-      wheelsFabricMeters: heavyWheels * _fabricPerWheel,
+      wheelsFabricMeters:
+          (heavyEnabled ? heavyWheels : lightWheels) * _fabricPerWheel,
       heavyTapeMeters: heavyTape,
       lightTapeMeters: lightTape,
+      heavyWidth: hw,
+      lightWidth: lw,
+      blackoutWidth: bw,
+      heavyRatio: heavyRatio,
+      lightRatio: lightRatio,
+      blackoutRatio: blackoutRatio,
+      hasBlackout: bw > 0,
+      heavyEnabled: heavyEnabled,
+      lightEnabled: lw > 0,
     );
   }
 
@@ -216,7 +306,9 @@ class _Balcony {
   // يجمع الأضلاع الظاهرة في النص المحفوظ (parts) مثل: 3+2.5+1.2
   void syncPartsFromSides() {
     final vals = <double>[side1Val, side2Val, side3Val, side4Val];
-    final visible = vals.take(sidesCount.clamp(1, 4).toInt()).where((v) => v > 0);
+    final visible = vals
+        .take(sidesCount.clamp(1, 4).toInt())
+        .where((v) => v > 0);
     parts.text = visible.map(_fmt).join('+');
   }
 
@@ -302,20 +394,33 @@ class _Calculation {
   const _Calculation({
     required this.heavyMeters,
     required this.lightMeters,
+    required this.blackoutMeters,
     required this.heavyHeight,
     required this.lightHeight,
+    required this.blackoutHeight,
     required this.heavyWheels,
     required this.lightWheels,
     required this.heavySides,
     required this.wheelsFabricMeters,
     required this.heavyTapeMeters,
     required this.lightTapeMeters,
+    required this.heavyWidth,
+    required this.lightWidth,
+    required this.blackoutWidth,
+    required this.heavyRatio,
+    required this.lightRatio,
+    required this.blackoutRatio,
+    required this.hasBlackout,
+    required this.heavyEnabled,
+    required this.lightEnabled,
   });
 
   final double heavyMeters;
   final double lightMeters;
+  final double blackoutMeters;
   final double heavyHeight;
   final double lightHeight;
+  final double blackoutHeight;
   final int heavyWheels;
   final int lightWheels;
   final int heavySides;
@@ -334,6 +439,17 @@ class _Calculation {
 
   final double heavyTapeMeters;
   final double lightTapeMeters;
+
+  // بيانات العرض: عروض الطبقات والنسب الفعلية بعد الاستثناءات
+  final double heavyWidth;
+  final double lightWidth;
+  final double blackoutWidth;
+  final double heavyRatio;
+  final double lightRatio;
+  final double blackoutRatio;
+  final bool hasBlackout;
+  final bool heavyEnabled;
+  final bool lightEnabled;
 }
 
 class _DeletedCard {
@@ -351,6 +467,15 @@ class _DeletedCard {
     this.parts = '',
     this.customAvez,
     this.enabled = true,
+    this.heavyEnabled = true,
+    this.heavyWidth,
+    this.heavyRatio,
+    this.lightWidth,
+    this.lightRatio,
+    this.blackoutEnabled = false,
+    this.blackoutType = 'fabric_blackout3d',
+    this.blackoutWidth,
+    this.blackoutRatio,
   });
 
   factory _DeletedCard.measurement(_Measurement m) => _DeletedCard(
@@ -365,6 +490,15 @@ class _DeletedCard {
     lightSides: m.lightSides,
     wheels: m.wheels.text,
     enabled: m.enabled,
+    heavyEnabled: m.heavyEnabled,
+    heavyWidth: m.heavyWidthOverride,
+    heavyRatio: m.heavyRatioOverride,
+    lightWidth: m.lightWidthOverride,
+    lightRatio: m.lightRatioOverride,
+    blackoutEnabled: m.blackoutEnabled,
+    blackoutType: m.blackoutType,
+    blackoutWidth: m.blackoutWidthOverride,
+    blackoutRatio: m.blackoutRatioOverride,
   );
 
   factory _DeletedCard.balcony(_Balcony b) => _DeletedCard(
@@ -390,6 +524,15 @@ class _DeletedCard {
     parts: (map['parts'] ?? '').toString(),
     customAvez: (map['custom_avez'] as num?)?.toInt(),
     enabled: map['enabled'] != false,
+    heavyEnabled: map['heavy_enabled'] != false,
+    heavyWidth: (map['heavy_width'] as num?)?.toDouble(),
+    heavyRatio: (map['heavy_ratio'] as num?)?.toDouble(),
+    lightWidth: (map['light_width'] as num?)?.toDouble(),
+    lightRatio: (map['light_ratio'] as num?)?.toDouble(),
+    blackoutEnabled: map['blackout_enabled'] == true,
+    blackoutType: (map['blackout_type'] ?? 'fabric_blackout3d').toString(),
+    blackoutWidth: (map['blackout_width'] as num?)?.toDouble(),
+    blackoutRatio: (map['blackout_ratio'] as num?)?.toDouble(),
   );
 
   final bool isBalcony;
@@ -405,6 +548,15 @@ class _DeletedCard {
   final String parts;
   final int? customAvez;
   final bool enabled;
+  final bool heavyEnabled;
+  final double? heavyWidth;
+  final double? heavyRatio;
+  final double? lightWidth;
+  final double? lightRatio;
+  final bool blackoutEnabled;
+  final String blackoutType;
+  final double? blackoutWidth;
+  final double? blackoutRatio;
 
   Map<String, dynamic> toMap() => {
     'is_balcony': isBalcony,
@@ -420,6 +572,15 @@ class _DeletedCard {
     'parts': parts,
     'custom_avez': customAvez,
     'enabled': enabled,
+    'heavy_enabled': heavyEnabled,
+    'heavy_width': heavyWidth,
+    'heavy_ratio': heavyRatio,
+    'light_width': lightWidth,
+    'light_ratio': lightRatio,
+    'blackout_enabled': blackoutEnabled,
+    'blackout_type': blackoutType,
+    'blackout_width': blackoutWidth,
+    'blackout_ratio': blackoutRatio,
   };
 
   _Measurement toMeasurement() {
@@ -440,6 +601,15 @@ class _DeletedCard {
     m.lightSides = lightSides;
     m.wheels.text = wheels;
     m.enabled = enabled;
+    m.heavyEnabled = heavyEnabled;
+    m.heavyWidthOverride = heavyWidth;
+    m.heavyRatioOverride = heavyRatio;
+    m.lightWidthOverride = lightWidth;
+    m.lightRatioOverride = lightRatio;
+    m.blackoutEnabled = blackoutEnabled;
+    m.blackoutType = blackoutType;
+    m.blackoutWidthOverride = blackoutWidth;
+    m.blackoutRatioOverride = blackoutRatio;
     return m;
   }
 
@@ -491,7 +661,7 @@ Color get _muted => AppPalette.muted;
 // كارت المقاس: مصغّر في القائمة، وبلمسة واحدة نفس الكارت يكبر (Pop-up)
 // ويظهر معاه التعديل، ولما تقفله بيصغر ويرجع مكانه.
 // ============================================================================
-const double _compactZoom = 0.76;
+const double _compactZoom = 0.80;
 
 // ============================================================================
 // قوالب المقاسات: إعدادات جاهزة بتتضاف بضغطة (بتتحفظ على الجهاز)
@@ -506,6 +676,15 @@ class _MeasurementTemplate {
     required this.velvetSides,
     required this.lightLayers,
     required this.lightSides,
+    this.heavyEnabled = true,
+    this.heavyWidth,
+    this.heavyRatio,
+    this.lightWidth,
+    this.lightRatio,
+    this.blackoutEnabled = false,
+    this.blackoutType = 'fabric_blackout3d',
+    this.blackoutWidth,
+    this.blackoutRatio,
   });
 
   final String name;
@@ -516,6 +695,15 @@ class _MeasurementTemplate {
   final int velvetSides;
   final int lightLayers;
   final int lightSides;
+  final bool heavyEnabled;
+  final double? heavyWidth;
+  final double? heavyRatio;
+  final double? lightWidth;
+  final double? lightRatio;
+  final bool blackoutEnabled;
+  final String blackoutType;
+  final double? blackoutWidth;
+  final double? blackoutRatio;
 
   factory _MeasurementTemplate.fromItem(_Measurement m, String name) =>
       _MeasurementTemplate(
@@ -527,6 +715,15 @@ class _MeasurementTemplate {
         velvetSides: m.velvetSides,
         lightLayers: m.lightLayers,
         lightSides: m.lightSides,
+        heavyEnabled: m.heavyEnabled,
+        heavyWidth: m.heavyWidthOverride,
+        heavyRatio: m.heavyRatioOverride,
+        lightWidth: m.lightWidthOverride,
+        lightRatio: m.lightRatioOverride,
+        blackoutEnabled: m.blackoutEnabled,
+        blackoutType: m.blackoutType,
+        blackoutWidth: m.blackoutWidthOverride,
+        blackoutRatio: m.blackoutRatioOverride,
       );
 
   Map<String, dynamic> toMap() => {
@@ -538,6 +735,15 @@ class _MeasurementTemplate {
     'velvet_sides': velvetSides,
     'light_layers': lightLayers,
     'light_sides': lightSides,
+    'heavy_enabled': heavyEnabled,
+    'heavy_width': heavyWidth,
+    'heavy_ratio': heavyRatio,
+    'light_width': lightWidth,
+    'light_ratio': lightRatio,
+    'blackout_enabled': blackoutEnabled,
+    'blackout_type': blackoutType,
+    'blackout_width': blackoutWidth,
+    'blackout_ratio': blackoutRatio,
   };
 
   static _MeasurementTemplate? fromMap(dynamic raw) {
@@ -545,6 +751,7 @@ class _MeasurementTemplate {
     final name = (raw['name'] ?? '').toString().trim();
     if (name.isEmpty) return null;
     int intOf(dynamic v, int fallback) => v is num ? v.toInt() : fallback;
+    double? dblOf(dynamic v) => v is num ? v.toDouble() : null;
     return _MeasurementTemplate(
       name: name,
       width: (raw['width'] ?? '3.00').toString(),
@@ -560,6 +767,15 @@ class _MeasurementTemplate {
       velvetSides: intOf(raw['velvet_sides'], 2).clamp(1, 2).toInt(),
       lightLayers: intOf(raw['light_layers'], 1).clamp(0, 1).toInt(),
       lightSides: intOf(raw['light_sides'], 2).clamp(1, 2).toInt(),
+      heavyEnabled: raw['heavy_enabled'] != false,
+      heavyWidth: dblOf(raw['heavy_width']),
+      heavyRatio: dblOf(raw['heavy_ratio']),
+      lightWidth: dblOf(raw['light_width']),
+      lightRatio: dblOf(raw['light_ratio']),
+      blackoutEnabled: raw['blackout_enabled'] == true,
+      blackoutType: (raw['blackout_type'] ?? 'fabric_blackout3d').toString(),
+      blackoutWidth: dblOf(raw['blackout_width']),
+      blackoutRatio: dblOf(raw['blackout_ratio']),
     );
   }
 
@@ -572,6 +788,15 @@ class _MeasurementTemplate {
     m.velvetSides = velvetSides;
     m.lightLayers = lightLayers;
     m.lightSides = lightSides;
+    m.heavyEnabled = heavyEnabled;
+    m.heavyWidthOverride = heavyWidth;
+    m.heavyRatioOverride = heavyRatio;
+    m.lightWidthOverride = lightWidth;
+    m.lightRatioOverride = lightRatio;
+    m.blackoutEnabled = blackoutEnabled;
+    m.blackoutType = blackoutType;
+    m.blackoutWidthOverride = blackoutWidth;
+    m.blackoutRatioOverride = blackoutRatio;
   }
 }
 

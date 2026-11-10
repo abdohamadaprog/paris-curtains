@@ -99,6 +99,7 @@ const List<PriceDef> kPriceDefs = [
   PriceDef('press_drill', 'تخريم وتثبيت الحلقة', 'حلقة', 1.5),
   PriceDef('sew_light', 'خياطة خفيف', 'متر', 25),
   PriceDef('sew_heavy', 'خياطة ثقيل', 'متر', 30),
+  PriceDef('sew_blackout', 'خياطة بلاك أوت', 'متر', 25),
   PriceDef('install_window', 'تركيب الشباك', 'شباك', 100),
   PriceDef('rings_per_m_apartment', 'حلقات كل متر شريط (الشقة)', 'حلقة', 7),
   PriceDef('rings_per_m_balcony', 'حلقات كل متر شريط (البلكونة)', 'حلقة', 6),
@@ -153,6 +154,19 @@ class WindowSpec {
   final bool hasLight;
   final bool enabled;
 
+  // ===== استثناءات القماش (اختيارية) =====
+  // null = القاعدة الافتراضية (عرض الشباك + النسبة حسب الطراز).
+  final double? heavyWidth;
+  final double? lightWidth;
+  final double? heavyRatio;
+  final double? lightRatio;
+
+  // بلاك أوت: طبقة إضافية (قماش + خياطة فقط، وبتشارك نفس التراك).
+  final bool hasBlackout;
+  final String blackoutType; // 'fabric_blackout3d' | 'fabric_blackout_sun'
+  final double? blackoutWidth;
+  final double? blackoutRatio;
+
   const WindowSpec({
     this.title = '',
     required this.width,
@@ -161,18 +175,43 @@ class WindowSpec {
     this.hasHeavy = true,
     this.hasLight = false,
     this.enabled = true,
+    this.heavyWidth,
+    this.lightWidth,
+    this.heavyRatio,
+    this.lightRatio,
+    this.hasBlackout = false,
+    this.blackoutType = 'fabric_blackout3d',
+    this.blackoutWidth,
+    this.blackoutRatio,
   });
+
+  double get heavyWidthValue => heavyWidth ?? width;
+  double get lightWidthValue => lightWidth ?? width;
+  double get blackoutWidthValue => blackoutWidth ?? width;
+
+  bool get heavyActive => hasHeavy && heavyWidthValue > 0;
+  bool get lightActive => hasLight && lightWidthValue > 0;
+  bool get blackoutActive => hasBlackout && blackoutWidthValue > 0;
 
   factory WindowSpec.fromMap(Map<dynamic, dynamic> map) {
     final lightLayers = parseNumber(map['light_layers']).toInt();
+    double? dbl(dynamic v) => v is num ? v.toDouble() : null;
     return WindowSpec(
       title: (map['title'] ?? '').toString(),
       width: parseNumber(map['width']),
       height: parseNumber(map['height'] ?? 2.8),
       curtainType: (map['curtainType'] ?? map['method'] ?? 'wave').toString(),
-      hasHeavy: map['hasHeavy'] != false,
+      hasHeavy: map['hasHeavy'] != false && map['heavy_enabled'] != false,
       hasLight: map['hasLight'] == true || lightLayers > 0,
       enabled: map['enabled'] != false,
+      heavyWidth: dbl(map['heavy_width']),
+      lightWidth: dbl(map['light_width']),
+      heavyRatio: dbl(map['heavy_ratio']),
+      lightRatio: dbl(map['light_ratio']),
+      hasBlackout: map['blackout_enabled'] == true,
+      blackoutType: (map['blackout_type'] ?? 'fabric_blackout3d').toString(),
+      blackoutWidth: dbl(map['blackout_width']),
+      blackoutRatio: dbl(map['blackout_ratio']),
     );
   }
 }
@@ -302,6 +341,12 @@ ApartmentInvoice calculateApartmentInvoice({
 
   double rawLinen = 0;
   double rawVelvet = 0;
+  double rawBlackout3d = 0;
+  double rawBlackoutSun = 0;
+
+  // هل فيه استثناء صريح على طبقة معينة؟ (بيظهر كملاحظة في الفاتورة)
+  bool heavyException = false;
+  bool lightException = false;
 
   double trackMeters = 0;
   int waveHolders = 0;
@@ -335,66 +380,94 @@ ApartmentInvoice calculateApartmentInvoice({
               rawType.contains('double'))
         ? 'double_wave'
         : 'wave';
-    final wM = w.width;
+
+    // عروض الطبقات الفعلية بعد الاستثناءات (الافتراضي = عرض الشباك)
+    final hw = w.heavyActive ? w.heavyWidthValue : 0.0;
+    final lw = w.lightActive ? w.lightWidthValue : 0.0;
+    final bw = w.blackoutActive ? w.blackoutWidthValue : 0.0;
+
+    // النسب: استثناء صريح، أو الافتراضي حسب الطراز (نفس القواعد القديمة)
+    final heavyRatio = w.heavyRatio ?? (type == 'press' ? 2.5 : 3.0);
+    final lightRatio = w.lightRatio ?? (type == 'double_wave' ? 3.0 : 2.0);
+    final blackoutRatio = w.blackoutRatio ?? 1.0;
+
+    if (hw > 0 && (w.heavyWidth != null || w.heavyRatio != null)) {
+      heavyException = true;
+    }
+    if (lw > 0 && (w.lightWidth != null || w.lightRatio != null)) {
+      lightException = true;
+    }
+
+    // أوسع طبقة شغّالة = مرجع الحوامل/الكوابيل
+    double widest = hw;
+    if (lw > widest) widest = lw;
+    if (bw > widest) widest = bw;
+
+    // التراك/المواسير: مجموع عروض الطبقات اللي ليها تراك.
+    // البلاك أوت بيشارك تراك الطبقات التانية، ولوحده بياخد تراك بعرضه.
+    final layeredTrack = hw + lw;
+    final trackWidth = layeredTrack > 0 ? layeredTrack : bw;
+
+    // بلاك أوت: قماش + خياطة فقط، مقرّب لأعلى لكل شباك على حدة.
+    if (bw > 0) {
+      final meters = ceilMeters(bw * blackoutRatio).toDouble();
+      if (w.blackoutType == 'fabric_blackout_sun') {
+        rawBlackoutSun += meters;
+      } else {
+        rawBlackout3d += meters;
+      }
+    }
 
     if (type == 'wave') {
-      // ويفي عادي:
-      // كتان خفيف (خلفي) = عرض × 2
-      // قطيفة ثقيل (أمامي) = عرض × 3
-      if (w.hasLight) rawLinen += wM * 2.0;
-      if (w.hasHeavy) rawVelvet += wM * 3.0;
+      // ويفي عادي: كتان خفيف (خلفي) = عرض × 2 • قطيفة ثقيل (أمامي) = عرض × 3
+      if (lw > 0) rawLinen += lw * lightRatio;
+      if (hw > 0) rawVelvet += hw * heavyRatio;
 
-      // المسار: مسارين لو في طبقتين (مسار ويفي أمامي ومسار كسرات خلفي)
-      final trackCount = (w.hasLight && w.hasHeavy) ? 2 : 1;
-      trackMeters += wM * trackCount;
+      // المسار: مسار لكل طبقة (مسار ويفي أمامي ومسار كسرات خلفي)
+      trackMeters += trackWidth;
 
-      // حوامل الويفي (40 ج للحامل): حتى 1م: 2 • حتى 2.5م: 3 • أكبر: +1 لكل متر
-      waveHolders += calcWaveHoldersForWindow(wM);
+      // حوامل الويفي: حتى 1م: 2 • حتى 2.5م: 3 • أكبر: +1 لكل متر
+      waveHolders += calcWaveHoldersForWindow(widest);
 
-      // شريط وتجهيز الويفي: قد قماش الويفي (التقيل فقط)
-      if (w.hasHeavy) {
-        waveTapeMeters += wM * 3.0;
+      // شريط وتجهيز الويفي: يتبع الثقيل، ولو مفيش ثقيل يتبع الخفيف
+      if (hw > 0) {
+        waveTapeMeters += hw * heavyRatio;
+      } else if (lw > 0) {
+        waveTapeMeters += lw * lightRatio;
       }
 
-      // شريط تجميع الكسرات: على الطبقة الخفيفة الخلفية فقط
-      if (w.hasLight) {
-        kasratMeters += wM * 2.0;
+      // شريط تجميع الكسرات: للخفيف الخلفي بس لما يكون فيه ثقيل أمامي
+      if (hw > 0 && lw > 0) {
+        kasratMeters += lw * lightRatio;
       }
     } else if (type == 'double_wave') {
-      // دابل ويفي:
-      // كتان خفيف = عرض × 3
-      // قطيفة ثقيل = عرض × 3
-      if (w.hasLight) rawLinen += wM * 3.0;
-      if (w.hasHeavy) rawVelvet += wM * 3.0;
+      // دابل ويفي: كتان خفيف = عرض × 3 • قطيفة ثقيل = عرض × 3
+      if (lw > 0) rawLinen += lw * lightRatio;
+      if (hw > 0) rawVelvet += hw * heavyRatio;
 
-      final trackCount = (w.hasLight && w.hasHeavy) ? 2 : 1;
-      trackMeters += wM * trackCount;
+      trackMeters += trackWidth;
 
-      // حوامل دابل ويفي (55 ج للحامل المتين الطويل): حتى 1م: 2 • حتى 2.5م: 3 • أكبر: +1 لكل متر
-      doubleHolders += calcWaveHoldersForWindow(wM);
+      // حوامل دابل ويفي: حتى 1م: 2 • حتى 2.5م: 3 • أكبر: +1 لكل متر
+      doubleHolders += calcWaveHoldersForWindow(widest);
 
       // شريط وتجهيز الويفي: على التقيل والخفيف كلاهما ويفي
-      double waveM = 0;
-      if (w.hasHeavy) waveM += wM * 3.0;
-      if (w.hasLight) waveM += wM * 3.0;
-      waveTapeMeters += waveM;
+      if (hw > 0) waveTapeMeters += hw * heavyRatio;
+      if (lw > 0) waveTapeMeters += lw * lightRatio;
     } else if (type == 'press') {
-      // حلقات كبس:
-      // قطيفة ثقيل = عرض × 2.5
-      // كتان خفيف = عرض × 2
-      if (w.hasLight) rawLinen += wM * 2.0;
-      if (w.hasHeavy) rawVelvet += wM * 2.5;
+      // حلقات كبس: قطيفة ثقيل = عرض × 2.5 • كتان خفيف = عرض × 2
+      if (lw > 0) rawLinen += lw * lightRatio;
+      if (hw > 0) rawVelvet += hw * heavyRatio;
 
-      final pipeCount = (w.hasLight && w.hasHeavy) ? 2 : 1;
-      pressPipeMeters += wM * pipeCount;
+      pressPipeMeters += trackWidth;
 
       // كابولي فورجية: أقل من أو يساوي 3م = 2 كابولي • أكبر = 3
-      cantilevers += wM > 3 ? 3 : 2;
-      qamqams += 2 * pipeCount;
+      cantilevers += widest > 3 ? 3 : 2;
+      final pipeCount = (hw > 0 ? 1 : 0) + (lw > 0 ? 1 : 0);
+      qamqams += 2 * (pipeCount == 0 ? 1 : pipeCount);
 
-      // شريط الكبس: على قد قماش المواسير كمقاس
-      if (w.hasHeavy) pressTapeMeters += wM * 2.5;
-      if (w.hasLight) pressTapeMeters += wM * 2.0;
+      // شريط الكبس: على قد قماش كل طبقة
+      if (hw > 0) pressTapeMeters += hw * heavyRatio;
+      if (lw > 0) pressTapeMeters += lw * lightRatio;
     }
   }
 
@@ -417,6 +490,7 @@ ApartmentInvoice calculateApartmentInvoice({
         qty: finalLinen,
         unitPrice: prices['fabric_linen'] ?? 130,
         isFabric: true,
+        note: lightException ? 'استثناء على عرض/نسبة الطبقة الخفيفة' : null,
       ),
     );
   }
@@ -429,6 +503,34 @@ ApartmentInvoice calculateApartmentInvoice({
         qty: finalVelvet,
         unitPrice: prices['fabric_velvet'] ?? 150,
         isFabric: true,
+        note: heavyException ? 'استثناء على عرض/نسبة الطبقة الثقيلة' : null,
+      ),
+    );
+  }
+  // بلاك أوت: الأمتار متقرّبة لأعلى لكل شباك على حدة، وبنضمها هنا.
+  if (rawBlackout3d > 0) {
+    fabricLines.add(
+      InvoiceLine(
+        key: 'fabric_blackout3d',
+        label: 'بلاك أوت 3D',
+        unit: 'متر',
+        qty: rawBlackout3d,
+        unitPrice: prices['fabric_blackout3d'] ?? 110,
+        isFabric: true,
+        note: 'طبقة إضافية (استثناء) — مقرّب لأعلى لمتر كامل',
+      ),
+    );
+  }
+  if (rawBlackoutSun > 0) {
+    fabricLines.add(
+      InvoiceLine(
+        key: 'fabric_blackout_sun',
+        label: 'بلاك أوت عازل للشمس',
+        unit: 'متر',
+        qty: rawBlackoutSun,
+        unitPrice: prices['fabric_blackout_sun'] ?? 170,
+        isFabric: true,
+        note: 'طبقة إضافية (استثناء) — مقرّب لأعلى لمتر كامل',
       ),
     );
   }
@@ -571,6 +673,7 @@ ApartmentInvoice calculateApartmentInvoice({
         unit: 'متر',
         qty: finalLinen,
         unitPrice: prices['sew_light'] ?? 25,
+        note: lightException ? 'استثناء على عرض/نسبة الطبقة الخفيفة' : null,
       ),
     );
   }
@@ -582,6 +685,20 @@ ApartmentInvoice calculateApartmentInvoice({
         unit: 'متر',
         qty: finalVelvet,
         unitPrice: prices['sew_heavy'] ?? 30,
+        note: heavyException ? 'استثناء على عرض/نسبة الطبقة الثقيلة' : null,
+      ),
+    );
+  }
+  // خياطة البلاك أوت: على قد أمتار قماش البلاك أوت بالظبط (من غير تقريب تاني)
+  final blackoutMeters = rawBlackout3d + rawBlackoutSun;
+  if (blackoutMeters > 0) {
+    accLines.add(
+      InvoiceLine(
+        key: 'sew_blackout',
+        label: 'خياطة بلاك أوت',
+        unit: 'متر',
+        qty: blackoutMeters,
+        unitPrice: prices['sew_blackout'] ?? 25,
       ),
     );
   }
