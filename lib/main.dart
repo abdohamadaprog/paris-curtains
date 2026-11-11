@@ -9,6 +9,7 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
 import 'app.dart';
+import 'card_probe.dart';
 import 'core/services/sync_status_service.dart';
 import 'core/theme/theme_manager.dart';
 
@@ -23,7 +24,8 @@ Future<void> main() async {
   // متابعة حالة النت والتعديلات اللي لسه ماترفعتش (للشغل بدون نت)
   SyncStatus.instance.start();
   await themeManager.loadTheme();
-  runApp(const ParisCurtainsApp());
+  // TODO(probe): تشخيص مؤقت لكارت المقاس — يترجع لـ ParisCurtainsApp بعد الاختبار.
+  runApp(const CardProbeApp());
 }
 
 /// Firebase App Check: بيثبت إن الطلبات جاية من تطبيقك الأصلي مش من سكربت.
