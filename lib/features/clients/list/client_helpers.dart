@@ -39,10 +39,7 @@ extension _ClientHelpers on _ClientsListPageState {
     return null;
   }
 
-  String _ar(Object? n) => (n ?? '').toString().replaceAllMapped(
-    RegExp(r'[0-9]'),
-    (m) => '٠١٢٣٤٥٦٧٨٩'[int.parse(m[0]!)],
-  );
+  String _ar(Object? n) => toArabicDigits(n);
 
   // آخر 10 أرقام من التليفون للمقارنة (بيتجاهل 0 / +20 / المسافات)
   String _phoneKey(String phone) {

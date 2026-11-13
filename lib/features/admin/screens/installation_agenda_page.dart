@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../../core/constants/work_stage.dart';
+import '../../../core/utils/digits.dart';
 import '../../../core/widgets/stage_widgets.dart';
 
 // نفس ألوان الفاتورة والمقاسات والعملاء
@@ -20,10 +21,7 @@ const Map<int, String> _stageLabels = WorkStage.labels;
 
 int _stageOf(Map<String, dynamic> data) => WorkStage.fromData(data);
 
-String _ar(Object? n) => (n ?? '').toString().replaceAllMapped(
-  RegExp(r'[0-9]'),
-  (m) => '٠١٢٣٤٥٦٧٨٩'[int.parse(m[0]!)],
-);
+String _ar(Object? n) => toArabicDigits(n);
 
 typedef _ClientDoc = QueryDocumentSnapshot<Map<String, dynamic>>;
 

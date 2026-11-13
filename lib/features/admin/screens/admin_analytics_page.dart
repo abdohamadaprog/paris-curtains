@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:fl_chart/fl_chart.dart'; // ✅ مكتبة الرسوم
 import '../../../core/constants/work_stage.dart';
+import '../../../core/utils/digits.dart';
 
 // نفس ألوان الفاتورة والمقاسات والعملاء
 Color get _bg => AppPalette.bg;
@@ -21,10 +22,7 @@ const Map<int, String> _stageLabels = {
   5: 'ملغي',
 };
 
-String _ar(Object? n) => (n ?? '').toString().replaceAllMapped(
-  RegExp(r'[0-9]'),
-  (m) => '٠١٢٣٤٥٦٧٨٩'[int.parse(m[0]!)],
-);
+String _ar(Object? n) => toArabicDigits(n);
 
 class AdminAnalyticsPage extends StatefulWidget {
   const AdminAnalyticsPage({super.key});

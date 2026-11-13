@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/work_stage.dart';
 import '../../../core/services/sync_status_service.dart';
+import '../../../core/utils/digits.dart';
 import '../../../core/widgets/stage_widgets.dart';
 import '../../../core/widgets/sync_status_banner.dart';
 import '../../../core/theme/theme_manager.dart';
@@ -64,6 +65,7 @@ class ClientsListPage extends StatefulWidget {
     super.key,
     this.initialStage = 0,
     this.autoAdd = false,
+    this.initialQuery = '',
   });
 
   /// يفتح نافذة "إضافة عميل" أول ما الصفحة تفتح (من الزرار العايم في الداشبورد)
@@ -71,6 +73,9 @@ class ClientsListPage extends StatefulWidget {
 
   /// فلتر مرحلة مبدئي (١-٤) — ٠ يعني كل المراحل
   final int initialStage;
+
+  /// كلمة بحث مبدئية (من بحث الداشبورد) — بتتحط في خانة البحث على طول
+  final String initialQuery;
 
   @override
   State<ClientsListPage> createState() => _ClientsListPageState();
@@ -105,6 +110,8 @@ class _ClientsListPageState extends State<ClientsListPage>
   void initState() {
     super.initState();
     _stageFilter = widget.initialStage.clamp(0, WorkStage.cancelled);
+    _search = widget.initialQuery.trim();
+    _searchController.text = _search;
     _tabs = TabController(length: 2, vsync: this);
     _loadFromCache();
     _listen();

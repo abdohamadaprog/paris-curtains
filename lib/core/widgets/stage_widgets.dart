@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../constants/work_stage.dart';
+import '../utils/digits.dart';
 
-const String _arabicDigits = '٠١٢٣٤٥٦٧٨٩';
-
-String _arabicNumber(int n) => n.toString().replaceAllMapped(
-  RegExp(r'[0-9]'),
-  (m) => _arabicDigits[int.parse(m[0]!)],
-);
+String _arabicNumber(int n) => toArabicDigits(n);
 
 /// الشكل اللي بيظهر جوه دايرة المرحلة: رقم المرحلة (١–٤)، وعلامة ✕ لو ملغي.
 Widget stageMark(int stage, Color color, {double size = 18}) {

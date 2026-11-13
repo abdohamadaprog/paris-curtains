@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/constants/work_stage.dart';
 import '../../../core/services/sync_status_service.dart';
+import '../../../core/utils/digits.dart';
 import '../../../core/widgets/stage_widgets.dart';
 import '../data/client_details_repository.dart';
 import 'invoice_calculator.dart';
@@ -33,22 +34,7 @@ Color get _kGreen => AppPalette.green;
 const Map<int, Color> _kStageColors = WorkStage.colors;
 
 /// دالة مساعدة لتحويل أي نص أو رقم إلى أرقام عربية مشرقية (٠١٢٣٤٥٦٧٨٩)
-String _arNum(dynamic value) {
-  if (value == null) return '٠';
-  final s = value.toString();
-  const en = '0123456789';
-  const ar = '٠١٢٣٤٥٦٧٨٩';
-  final buffer = StringBuffer();
-  for (final char in s.split('')) {
-    final idx = en.indexOf(char);
-    if (idx != -1) {
-      buffer.write(ar[idx]);
-    } else {
-      buffer.write(char);
-    }
-  }
-  return buffer.toString();
-}
+String _arNum(dynamic value) => toArabicDigits(value);
 
 /// قراءة الأرقام بأمان من أي نوع (double, int, String, null)
 /// تحل مشكلة type 'Null' is not a subtype of type 'String'
