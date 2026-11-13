@@ -255,13 +255,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             _violet,
                             const InstallationAgendaPage(),
                           ),
-                          tile(
-                            'التقارير',
-                            'أرقام الشغل',
-                            Icons.insights_rounded,
-                            _green,
-                            const AdminAnalyticsPage(),
-                          ),
+                          if (AdminAuthService.role.canSeeAnalytics)
+                            tile(
+                              'التقارير',
+                              'أرقام الشغل',
+                              Icons.insights_rounded,
+                              _green,
+                              const AdminAnalyticsPage(),
+                            ),
                         ],
                       );
                     },
@@ -270,36 +271,40 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   _sectionTitle('إدارة', Icons.settings_rounded),
                   const SizedBox(height: 12),
                   _buildGroup([
-                    _GroupRow(
-                      title: 'المعرض والمحتوى',
-                      subtitle: 'رفع الصور والترتيب والسلايدر',
-                      icon: Icons.photo_library_rounded,
-                      color: _gold,
-                      onTap: () => _navTo(const GalleryHubPage()),
-                    ),
-                    _GroupRow(
-                      title: 'ثوابت الحساب',
-                      subtitle: 'أسعار الفواتير',
-                      icon: Icons.price_change_rounded,
-                      color: _sky,
-                      onTap: () => _navTo(const PriceSettingsPage()),
-                    ),
-                    _GroupRow(
-                      title: 'النسخ الاحتياطي والأرشيف',
-                      subtitle: AppFeatures.cloudFunctionsEnabled
-                          ? 'نسخة تلقائية يوميًا واسترجاع العملاء المحذوفين'
-                          : 'نسخة احتياطية يدوية واسترجاع العملاء المحذوفين',
-                      icon: Icons.cloud_done_rounded,
-                      color: _green,
-                      onTap: () => _navTo(const BackupPage()),
-                    ),
-                    _GroupRow(
-                      title: 'نسخة تليجرام',
-                      subtitle: 'صور المعرض والمقاسات والفواتير على قناتك',
-                      icon: Icons.send_rounded,
-                      color: _sky,
-                      onTap: () => _navTo(const TelegramBackupPage()),
-                    ),
+                    if (AdminAuthService.role.canManageGallery)
+                      _GroupRow(
+                        title: 'المعرض والمحتوى',
+                        subtitle: 'رفع الصور والترتيب والسلايدر',
+                        icon: Icons.photo_library_rounded,
+                        color: _gold,
+                        onTap: () => _navTo(const GalleryHubPage()),
+                      ),
+                    if (AdminAuthService.role.canManagePrices)
+                      _GroupRow(
+                        title: 'ثوابت الحساب',
+                        subtitle: 'أسعار الفواتير',
+                        icon: Icons.price_change_rounded,
+                        color: _sky,
+                        onTap: () => _navTo(const PriceSettingsPage()),
+                      ),
+                    if (AdminAuthService.role.canManageBackup) ...[
+                      _GroupRow(
+                        title: 'النسخ الاحتياطي والأرشيف',
+                        subtitle: AppFeatures.cloudFunctionsEnabled
+                            ? 'نسخة تلقائية يوميًا واسترجاع العملاء المحذوفين'
+                            : 'نسخة احتياطية يدوية واسترجاع العملاء المحذوفين',
+                        icon: Icons.cloud_done_rounded,
+                        color: _green,
+                        onTap: () => _navTo(const BackupPage()),
+                      ),
+                      _GroupRow(
+                        title: 'نسخة تليجرام',
+                        subtitle: 'صور المعرض والمقاسات والفواتير على قناتك',
+                        icon: Icons.send_rounded,
+                        color: _sky,
+                        onTap: () => _navTo(const TelegramBackupPage()),
+                      ),
+                    ],
                   ]),
                   const SizedBox(height: 18),
                   const Center(
@@ -564,15 +569,43 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'أهلاً بك، $_adminName',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.bold,
-                    color: _white,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'أهلاً بك، $_adminName',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.bold,
+                          color: _white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _gold.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: _gold.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Text(
+                        AdminAuthService.role.label,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: _gold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 SizedBox(height: 3),
                 Text(

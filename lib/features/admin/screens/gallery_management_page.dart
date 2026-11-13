@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/cloudinary_service.dart';
 import '../../../core/utils/image_url.dart';
+import '../../auth/admin_auth_service.dart';
 
 class GalleryManagementPage extends StatefulWidget {
   const GalleryManagementPage({super.key});
@@ -483,21 +484,25 @@ class _GalleryManagementPageState extends State<GalleryManagementPage> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
-                                InkWell(
-                                  onTap: () => _deleteImage(d.id),
-                                  child: const Icon(
-                                    Icons.delete_outline,
-                                    color: AppColors.neonRed,
-                                    size: 20,
+                                if (AdminAuthService.role.canDeleteGallery) ...[
+                                  InkWell(
+                                    onTap: () => _deleteImage(d.id),
+                                    child: const Icon(
+                                      Icons.delete_outline,
+                                      color: AppColors.neonRed,
+                                      size: 20,
+                                    ),
                                   ),
-                                ),
-                                Container(
-                                  width: 1,
-                                  color: AppPalette.text.withValues(alpha: 0.12),
-                                  margin: const EdgeInsets.symmetric(
-                                    vertical: 8,
+                                  Container(
+                                    width: 1,
+                                    color: AppPalette.text.withValues(
+                                      alpha: 0.12,
+                                    ),
+                                    margin: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                    ),
                                   ),
-                                ),
+                                ],
                                 InkWell(
                                   onTap: () => _showEditDialog(d),
                                   child: const Icon(

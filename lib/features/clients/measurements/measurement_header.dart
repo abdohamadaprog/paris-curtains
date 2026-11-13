@@ -394,30 +394,32 @@ extension _MeasurementHeader on _ParisClientMeasurementsPageState {
                     onTap: _pickTemplate,
                   ),
                 ],
-                const SizedBox(width: 8),
-                SizedBox(
-                  height: 52,
-                  child: OutlinedButton.icon(
-                    onPressed: _openInvoice,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: _gold,
-                      backgroundColor: _gold.withValues(alpha: 0.06),
-                      side: BorderSide(color: _gold.withValues(alpha: 0.30)),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                if (AdminAuthService.role.canSeeInvoice) ...[
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 52,
+                    child: OutlinedButton.icon(
+                      onPressed: _openInvoice,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _gold,
+                        backgroundColor: _gold.withValues(alpha: 0.06),
+                        side: BorderSide(color: _gold.withValues(alpha: 0.30)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                       ),
-                    ),
-                    icon: const Icon(Icons.receipt_long_rounded, size: 19),
-                    label: const Text(
-                      'الفاتورة',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 13.5,
+                      icon: const Icon(Icons.receipt_long_rounded, size: 19),
+                      label: const Text(
+                        'الفاتورة',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13.5,
+                        ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

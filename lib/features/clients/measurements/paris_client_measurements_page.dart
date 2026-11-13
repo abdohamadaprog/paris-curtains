@@ -16,6 +16,7 @@ import '../../../core/services/sync_status_service.dart';
 import '../../../core/widgets/sync_status_banner.dart';
 import '../../../core/services/telegram_backup_service.dart';
 import 'package:paris_curtains/features/clients/invoice/invoice_page.dart';
+import '../../auth/admin_auth_service.dart';
 import '../data/client_details_repository.dart';
 
 part 'balcony_card.dart';
