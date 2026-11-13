@@ -11,8 +11,6 @@ import '../../home/home_screen.dart';
 
 import '../../auth/admin_auth_service.dart';
 import '../../clients/invoice/price_settings_page.dart';
-import '../../../core/config/app_features.dart';
-import '../../../core/services/notification_service.dart';
 import '../../../core/services/sync_status_service.dart';
 import '../../../core/utils/digits.dart';
 import '../services/local_backup_service.dart';
@@ -138,12 +136,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final status = await AdminAuthService.check();
     if (!mounted) return;
     if (AdminAuthService.canEnter(status)) {
-      if (AppFeatures.cloudFunctionsEnabled) {
-        // تسجيل جهاز الأدمن لتنبيهات الأجندة (بيطلب إذن الإشعارات أول مرة)
-        NotificationService.registerAdminDevice();
-      } else {
-        _maybeRemindBackup();
-      }
+      _maybeRemindBackup();
       return;
     }
     Navigator.of(context).pushReplacement(
@@ -290,9 +283,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     if (AdminAuthService.role.canManageBackup) ...[
                       _GroupRow(
                         title: 'النسخ الاحتياطي والأرشيف',
-                        subtitle: AppFeatures.cloudFunctionsEnabled
-                            ? 'نسخة تلقائية يوميًا واسترجاع العملاء المحذوفين'
-                            : 'نسخة احتياطية يدوية واسترجاع العملاء المحذوفين',
+                        subtitle: 'نسخة احتياطية يدوية واسترجاع العملاء المحذوفين',
                         icon: Icons.cloud_done_rounded,
                         color: _green,
                         onTap: () => _navTo(const BackupPage()),

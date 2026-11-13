@@ -15,9 +15,7 @@ dependencies:
   firebase_core: ^4.15.0
   firebase_auth: ^6.7.0
   cloud_firestore: ^6.10.0
-  cloud_functions: ^6.5.1
   firebase_app_check: ^0.4.9
-  firebase_messaging: ^16.7.1
 
   # Images and networking
   image_picker: ^1.2.3

@@ -1,11 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_palette.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:share_plus/share_plus.dart';
 
-import '../../../core/config/app_features.dart';
 import '../services/local_backup_service.dart';
 import 'telegram_backup_page.dart';
 
@@ -20,8 +18,8 @@ Color get _kOrange => AppPalette.orange;
 
 /// النسخ الاحتياطي + أرشيف العملاء المحذوفين.
 ///
-/// • النسخة التلقائية بتتعمل كل يوم 3 الفجر من Cloud Function (dailyBackup).
-/// • "نسخة الآن" بيشغّل نفس الدالة فورًا (runBackupNow).
+/// • "تصدير نسخة احتياطية الآن" بيجهّز ملف على الجهاز ويتشاركه (تليجرام/درايف)
+///   — شغال على خطة Spark ومش محتاج أي سيرفر.
 /// • حذف العميل مبقاش نهائي: بيتنقل لـ clients_archive وتقدر ترجّعه من هنا.
 class BackupPage extends StatefulWidget {
   const BackupPage({super.key});
@@ -32,8 +30,6 @@ class BackupPage extends StatefulWidget {
 
 class _BackupPageState extends State<BackupPage> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  bool _backingUp = false;
-  bool _testingAgenda = false;
   bool _exporting = false;
   String _exportStatus = '';
   DateTime? _lastLocalBackup;
@@ -62,33 +58,7 @@ class _BackupPageState extends State<BackupPage> {
     );
   }
 
-  // ============================ نسخة الآن ============================
-
-  Future<void> _backupNow() async {
-    if (_backingUp) return;
-    setState(() => _backingUp = true);
-    try {
-      final callable = FirebaseFunctions.instanceFor(region: 'europe-west1')
-          .httpsCallable(
-            'runBackupNow',
-            options: HttpsCallableOptions(timeout: const Duration(minutes: 9)),
-          );
-      final res = await callable.call();
-      final data = res.data is Map ? Map<String, dynamic>.from(res.data) : {};
-      _toast(
-        'تمت النسخة الاحتياطية ✨ (${data['total_docs'] ?? '?'} مستند)',
-        color: _kGreen,
-      );
-    } on FirebaseFunctionsException catch (e) {
-      _toast(e.message ?? 'فشلت النسخة الاحتياطية', color: _kRed);
-    } catch (e) {
-      _toast('فشلت النسخة الاحتياطية: $e', color: _kRed);
-    } finally {
-      if (mounted) setState(() => _backingUp = false);
-    }
-  }
-
-  // ============================ نسخة يدوية (الوضع المجاني) ============================
+  // ============================ نسخة يدوية ============================
 
   Future<void> _exportBackup() async {
     if (_exporting) return;
@@ -211,36 +181,6 @@ class _BackupPageState extends State<BackupPage> {
     );
   }
 
-  // ============================ تجربة تنبيه الأجندة ============================
-
-  Future<void> _testAgendaAlert() async {
-    if (_testingAgenda) return;
-    setState(() => _testingAgenda = true);
-    try {
-      final callable = FirebaseFunctions.instanceFor(
-        region: 'europe-west1',
-      ).httpsCallable('sendAgendaNow');
-      final res = await callable.call(<String, dynamic>{'day': 'tomorrow'});
-      final data = res.data is Map ? Map<String, dynamic>.from(res.data) : {};
-      final devices = (data['devices'] as num?)?.toInt() ?? 0;
-      final sent = (data['sent'] as num?)?.toInt() ?? 0;
-      if (devices == 0) {
-        _toast(
-          'مفيش جهاز متسجّل. افتح لوحة الإدارة واسمح بالإشعارات الأول.',
-          color: _kOrange,
-        );
-      } else {
-        _toast('اتبعت التنبيه لـ $sent من $devices جهاز ✨', color: _kGreen);
-      }
-    } on FirebaseFunctionsException catch (e) {
-      _toast(e.message ?? 'تعذّر إرسال التنبيه', color: _kRed);
-    } catch (e) {
-      _toast('تعذّر إرسال التنبيه: $e', color: _kRed);
-    } finally {
-      if (mounted) setState(() => _testingAgenda = false);
-    }
-  }
-
   // ============================ استرجاع عميل من الأرشيف ============================
 
   Future<void> _restore(String id, String name) async {
@@ -338,63 +278,10 @@ class _BackupPageState extends State<BackupPage> {
         body: ListView(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 30),
           children: [
-            if (!AppFeatures.cloudFunctionsEnabled) ...[
-              _sectionTitle('نسخة احتياطية يدوية', Icons.ios_share_rounded),
-              const SizedBox(height: 10),
-              _manualBackupCard(),
-              const SizedBox(height: 26),
-            ],
-            if (AppFeatures.cloudFunctionsEnabled) ...[
-              _sectionTitle('النسخ الاحتياطي', Icons.cloud_done_rounded),
-              const SizedBox(height: 10),
-              _backupCard(),
-              const SizedBox(height: 26),
-              _sectionTitle(
-                'تنبيهات الأجندة',
-                Icons.notifications_active_rounded,
-              ),
-              const SizedBox(height: 10),
-              _box(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'بيجيلك إشعار الساعة ٧ مساءً بتركيبات بكرة، والساعة ٨ '
-                      'صباحًا بتركيبات النهاردة (من غير اللي خلصت).',
-                      style: TextStyle(
-                        color: _kMuted,
-                        fontSize: 12,
-                        height: 1.6,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _testingAgenda ? null : _testAgendaAlert,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: _kGold,
-                          side: BorderSide(color: _kGold),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        icon: _testingAgenda
-                            ? SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: _kGold,
-                                ),
-                              )
-                            : const Icon(Icons.send_rounded, size: 18),
-                        label: const Text('جرّب التنبيه الآن'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 26),
-            ],
+            _sectionTitle('نسخة احتياطية يدوية', Icons.ios_share_rounded),
+            const SizedBox(height: 10),
+            _manualBackupCard(),
+            const SizedBox(height: 26),
             _sectionTitle('نسخة صور المعرض على تليجرام', Icons.cloud_upload_rounded),
             const SizedBox(height: 10),
             _box(
@@ -460,144 +347,6 @@ class _BackupPageState extends State<BackupPage> {
       ],
     );
   }
-
-  // ----------------------------- كارت حالة النسخ -----------------------------
-
-  Widget _backupCard() {
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: _db.collection('app_meta').doc('last_backup').snapshots(),
-      builder: (context, snap) {
-        if (snap.hasError) {
-          return _box(
-            child: Text(
-              'مش قادر أقرا حالة النسخ الاحتياطي. اتأكد إنك نشرت قواعد '
-              'Firestore الجديدة.',
-              style: TextStyle(color: _kRed, height: 1.6),
-            ),
-          );
-        }
-        final d = snap.data?.data();
-        final status = (d?['status'] ?? 'none').toString();
-        final finishedAt = (d?['finished_at'] as Timestamp?)?.toDate();
-        final failedAt = (d?['failed_at'] as Timestamp?)?.toDate();
-        final stale =
-            status == 'ok' &&
-            finishedAt != null &&
-            DateTime.now().difference(finishedAt) > const Duration(hours: 36);
-
-        late final Color color;
-        late final String title;
-        late final IconData icon;
-        switch (status) {
-          case 'ok':
-            color = stale ? _kOrange : _kGreen;
-            title = stale
-                ? 'آخر نسخة قديمة (أكتر من يوم ونص)'
-                : 'آخر نسخة ناجحة';
-            icon = stale ? Icons.warning_amber_rounded : Icons.check_circle;
-            break;
-          case 'running':
-            color = _kGold;
-            title = 'نسخة شغالة دلوقتي...';
-            icon = Icons.sync_rounded;
-            break;
-          case 'failed':
-            color = _kRed;
-            title = 'آخر محاولة نسخ فشلت';
-            icon = Icons.error_rounded;
-            break;
-          default:
-            color = _kMuted;
-            title = 'لسه مفيش نسخة';
-            icon = Icons.hourglass_empty_rounded;
-        }
-
-        final when = status == 'failed' ? failedAt : finishedAt;
-        final counts = d?['counts'];
-
-        return _box(
-          borderColor: color.withValues(alpha: 0.5),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(icon, color: color),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: TextStyle(
-                        color: color,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14.5,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              if (when != null) ...[
-                const SizedBox(height: 10),
-                _kv('التاريخ', _dateFmt.format(when.toLocal())),
-              ],
-              if (status == 'ok') ...[
-                _kv('عدد المستندات', '${d?['total_docs'] ?? '-'}'),
-                _kv('الحجم', _fmtBytes(d?['bytes'])),
-                if (counts is Map)
-                  _kv(
-                    'التفاصيل',
-                    counts.entries
-                        .map((e) => '${e.key}: ${e.value}')
-                        .join(' • '),
-                  ),
-              ],
-              if (status == 'failed' && d?['error'] != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  d!['error'].toString(),
-                  style: TextStyle(color: _kRed, fontSize: 12),
-                ),
-              ],
-              const SizedBox(height: 12),
-              Text(
-                'بتتعمل نسخة تلقائية كل يوم الساعة 3 الفجر، وكل نسخة بتتحفظ '
-                'ومبتتمسحش.',
-                style: TextStyle(color: _kMuted, fontSize: 12, height: 1.6),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _backingUp ? null : _backupNow,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _kGold,
-                    foregroundColor: _kBg,
-                    disabledBackgroundColor: _kLine,
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                  ),
-                  icon: _backingUp
-                      ? SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: _kBg,
-                          ),
-                        )
-                      : const Icon(Icons.cloud_upload_rounded, size: 19),
-                  label: Text(
-                    _backingUp ? 'جاري النسخ...' : 'نسخة احتياطية الآن',
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   Widget _kv(String k, String v) {
     return Padding(
       padding: const EdgeInsets.only(top: 6),
@@ -620,13 +369,6 @@ class _BackupPageState extends State<BackupPage> {
         ],
       ),
     );
-  }
-
-  String _fmtBytes(dynamic b) {
-    final n = (b is num) ? b.toDouble() : 0.0;
-    if (n <= 0) return '-';
-    if (n < 1024 * 1024) return '${(n / 1024).toStringAsFixed(1)} KB';
-    return '${(n / (1024 * 1024)).toStringAsFixed(2)} MB';
   }
 
   Widget _box({required Widget child, Color? borderColor}) {

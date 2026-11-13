@@ -119,19 +119,9 @@ service cloud.firestore {
       }
     }
 
-    // أجهزة الأدمن لتنبيهات الأجندة: التطبيق بيسجّل توكن الجهاز بس،
-    // والقراءة والتنظيف من Cloud Functions.
-    match /admin_devices/{tokenId} {
-      allow create, update: if isAdmin()
-        && request.resource.data.keys().hasOnly(['token', 'uid', 'platform', 'updated_at']);
-      allow read, delete: if false;
-    }
-
-    // حالة آخر نسخة احتياطية: بتتكتب من Cloud Function بس، والأدمن يقرا.
-    match /app_meta/{docId} {
-      allow read: if isAdmin();
-      allow write: if false;
-    }
+    // أجهزة الأدمن لتنبيهات الأجندة اتشالت مع Cloud Functions/FCM.
+    // (القاعدة القديمة كانت match /admin_devices/{tokenId} — مساحة مستخدمة
+    // وهيتمسح مستنداتها يدويًا من الـ Console لو موجودة.)
 
     // إعدادات التطبيق: settings/prices (الأسعار) و settings/telegram_backup
     // (بوت نسخة الصور على تليجرام). الاتنين للأدمن فقط.

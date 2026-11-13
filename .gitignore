@@ -47,6 +47,7 @@ app.*.map.json
 # Android build outputs
 android/build/
 android/.gradle/
+android/.kotlin/
 
 # Release signing (متضافش على Git)
 android/key.properties

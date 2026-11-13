@@ -2,9 +2,14 @@
 
 > الترتيب مهم. لو نشرت الـ Rules قبل ما تعمل مستند الأدمن (الخطوة 1)، هتتقفل برا بياناتك لحد ما ترجّع القواعد القديمة.
 
+> **تحديث:** تم شيل Cloud Functions من التطبيق. الخطوات اللي بتتكلم عن
+> `cd functions` أو توقيع رفع الصور **مش مطلوبة**؛ الرفع بيتم مباشرة على
+> Cloudinary بـ unsigned preset. بدل كده ظبّط الـ preset نفسه من Cloudinary
+> Console: folder إجباري `paris_curtains` + أقصى حجم + الأنواع المسموحة.
+
 ## 0) تجهيز
 ```bash
-flutter pub get          # firebase_app_check وcloud_functions متضافين في pubspec.yaml أصلًا
+flutter pub get          # firebase_app_check متضاف في pubspec.yaml (مفيش Cloud Functions)
 npm install -g firebase-tools
 firebase login
 ```

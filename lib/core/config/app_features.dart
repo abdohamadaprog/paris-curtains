@@ -1,13 +1,10 @@
-/// مفاتيح تشغيل/إيقاف الميزات اللي محتاجة خطة Blaze (Cloud Functions).
+/// إعدادات الخدمات الخارجية اللي التطبيق بيستخدمها مباشرة.
 ///
-/// لو `false` (خطة Spark): مفيش تنبيهات ولا نسخ احتياطي على السيرفر،
-/// والرفع بيتم مباشرة على Cloudinary بـ unsigned preset.
-/// لو `true` (بعد ترقية Blaze ورفع الدوال): توقيع الرفع + حذف الصور + التنبيهات.
+/// التطبيق شغال على خطة Firebase Spark (مفيش Cloud Functions)، لكل الخدمات
+/// هنا بتشتغل من غير سيرفر: رفع الصور على Cloudinary بـ unsigned preset،
+/// والنسخ الاحتياطي/تنبيهات تليجرام بـ HTTP مباشر.
 class AppFeatures {
   AppFeatures._();
-
-  /// لازم تكون `true` بعد `firebase deploy --only functions`.
-  static const bool cloudFunctionsEnabled = false;
 
   /// اسم حساب Cloudinary (Cloud name) — مطلوب للرفع المباشر.
   /// تلاقيه في Cloudinary Console فوق على الشمال.

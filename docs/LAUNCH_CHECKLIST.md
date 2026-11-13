@@ -2,7 +2,7 @@
 
 ## 🔴 يوقّف البيلد أو الرفع لو مااتعملش
 1. **google-services.json لسه بالمعرّف القديم.** `build.gradle.kts` على `com.pariscurtains.app` لكن `android/app/google-services.json` فيه `com.example.paris_curtian_app` (وكمان `lib/firebase_options.dart` و`firebase.json` appId القديم). بيلد أندرويد هيفشل. نفّذ خطوات 1–3 من `docs/APP_ID_CHANGE.md` (Add app في Firebase ← نزّل google-services.json الجديد ← `flutterfire configure`).
-2. **رفع الصور وحذفها محتاجين Cloud Functions (خطة Blaze).** `CloudinaryService` بينادي `getCloudinarySignature` دايمًا، و`docs/FREE_MODE.md` بيقول المشروع على Spark. من غير Blaze + نشر الدوال، رفع صور المعرض/العروض مش هيشتغل. اترقّى لـ Blaze وانفّذ `docs/SECURITY_SETUP.md` (خطوة 4) و`docs/BACKUP_SETUP.md`، وبعدها غيّر `AppFeatures.cloudFunctionsEnabled = true`.
+2. **رفع الصور شغال بـ unsigned preset — ظبّط حمايته في Cloudinary Console.** التطبيق بقى بيرفع مباشرة (بدون Cloud Functions)، فمن Console: خلّي الـ preset `curtains_upload` unsigned مع **folder إجباري** `paris_curtains` + أقصى حجم + الأنواع المسموحة. من غير كده أي حد عارف اسم الـ preset يقدر يرفع.
 3. **مفتاح التوقيع.** من غير `android/key.properties` الإصدار بيتوقّع بمفتاح debug ومينفعش للمتجر (`docs/SECURITY_SETUP.md` خطوة 7).
 
 ## 🟠 ترتيب النشر (مهم)
