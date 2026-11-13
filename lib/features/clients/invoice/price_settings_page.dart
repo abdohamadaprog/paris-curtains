@@ -1,8 +1,13 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_palette.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/services/sync_status_service.dart';
 import 'invoice_calculator.dart';
 
 // ألوان الصفحة (نفس هوية صفحة الفاتورة)
@@ -25,18 +30,79 @@ class PricesRepository {
   static DocumentReference<Map<String, dynamic>> get _doc =>
       FirebaseFirestore.instance.collection('settings').doc('prices');
 
-  static bool _loaded = false;
+  /// نسخة من الأسعار محفوظة على الجهاز نفسه. الهدف: لو فتحت التطبيق
+  /// وإنت في مكان مفيش نت خالص، الأسعار اللي ظبطتها تفضل زي ما هي
+  /// بدل ما التطبيق يرجع للأسعار الأصلية ويطلع فاتورة بأرقام غلط.
+  static const String _prefsKey = 'price_overrides_v1';
 
-  /// بتحمّل الأسعار العامة مرة واحدة (أو تاني لو force). مبترميش خطأ:
-  /// لو النت أو الصلاحية مش متاحة بنكمّل بآخر قيم معروفة / الأسعار الأصلية.
+  static bool _loaded = false; // الكاش المحلي اتحمّل
+  static bool _serverSynced = false; // السيرفر رد في الجلسة دي
+
+  /// أقصى وقت نستنى فيه السيرفر. بعد كده بنكمّل بأسعار الجهاز —
+  /// الشغل في الميدان أهم من الاستنى.
+  static const Duration _serverWait = Duration(milliseconds: 1500);
+  static const Duration _serverWaitForce = Duration(seconds: 4);
+
+  /// بتحمّل الأسعار العامة: الكاش المحلي فورًا، وبعدين السيرفر لو رد
+  /// في وقت قصير. مبترميش خطأ أبدًا.
   static Future<void> ensureLoaded({bool force = false}) async {
-    if (_loaded && !force) return;
+    if (!_loaded) await _loadLocal();
+    if (_serverSynced && !force) return;
+
     try {
-      final snap = await _doc.get();
-      PriceOverrides.set(_parse(snap.data()));
+      final snap = await _doc.get().timeout(
+        force ? _serverWaitForce : _serverWait,
+      );
+      final overrides = _parse(snap.data());
+      PriceOverrides.set(overrides);
+      _serverSynced = true;
       _loaded = true;
+      // تحديث نسخة الجهاز باللي جه من السيرفر
+      unawaited(_saveLocal(overrides));
     } catch (e) {
+      // مفيش نت أو السيرفر اتأخر: بنكمّل بآخر أسعار محفوظة على الجهاز
       debugPrint('Prices load failed: $e');
+    }
+  }
+
+  /// حفظ ثوابت الحساب. بيتكتب على السيرفر (وبيتخزّن على الجهاز للأوفلاين)،
+  /// وبيرجع `queued` لو مفيش نت — زي أي حفظ تاني في التطبيق.
+  static Future<WriteOutcome> save(Map<String, double> overrides) async {
+    PriceOverrides.set(overrides);
+    _loaded = true;
+    await _saveLocal(overrides);
+
+    final outcome = await SyncStatus.instance.settle(
+      _doc.set({
+        'prices': overrides,
+        'updated_at': FieldValue.serverTimestamp(),
+      }),
+    );
+    if (outcome == WriteOutcome.synced) _serverSynced = true;
+    return outcome;
+  }
+
+  // ============================ الكاش المحلي ============================
+
+  static Future<void> _loadLocal() async {
+    _loaded = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_prefsKey);
+      if (raw == null || raw.isEmpty) return;
+      final decoded = jsonDecode(raw);
+      PriceOverrides.set(_parse({'prices': decoded}));
+    } catch (e) {
+      debugPrint('Prices local load failed: $e');
+    }
+  }
+
+  static Future<void> _saveLocal(Map<String, double> overrides) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefsKey, jsonEncode(overrides));
+    } catch (e) {
+      debugPrint('Prices local save failed: $e');
     }
   }
 
@@ -57,13 +123,12 @@ class PricesRepository {
     return out;
   }
 
-  static Future<void> save(Map<String, double> overrides) async {
-    await _doc.set({
-      'prices': overrides,
-      'updated_at': FieldValue.serverTimestamp(),
-    });
-    PriceOverrides.set(overrides);
-    _loaded = true;
+  /// للاختبارات بس: نرجّع الحالة كأن التطبيق اتفتح من جديد.
+  @visibleForTesting
+  static void resetForTest() {
+    _loaded = false;
+    _serverSynced = false;
+    PriceOverrides.clear();
   }
 }
 
@@ -190,16 +255,18 @@ class _PriceSettingsPageState extends State<PriceSettingsPage> {
         final v = _valueOf(d.key)!;
         if (v != d.value) overrides[d.key] = v;
       }
-      await PricesRepository.save(overrides);
+      final outcome = await PricesRepository.save(overrides);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'تم حفظ ثوابت الحساب ✨',
+            outcome == WriteOutcome.queued
+                ? 'اتحفظت على الجهاز، وهتترفع لما النت يرجع ✨'
+                : 'تم حفظ ثوابت الحساب ✨',
             textAlign: TextAlign.center,
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
-          backgroundColor: _kGreen,
+          backgroundColor: outcome == WriteOutcome.queued ? _kGold : _kGreen,
         ),
       );
       Navigator.of(context).pop(true);
