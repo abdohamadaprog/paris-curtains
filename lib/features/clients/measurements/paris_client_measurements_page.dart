@@ -186,7 +186,7 @@ class _ParisClientMeasurementsPageState
             if (m.heavyEnabled)
               'عجل: ${c.heavyWheelsLabel}'
                   '${m.lightLayers > 0 ? ' • خفيف: ${_toArabic(c.lightWheels)}' : ''}'
-                  ' • شريط: ${_fmtAr(c.heavyTapeMeters)} م',
+                  ' • شريط العجل: ${_fmtAr(c.heavyTapeMeters)} م',
             if (m.heavyEnabled)
               'ارتفاع القص: ${_fmtAr(c.heavyHeight)} م'
                   '${m.lightLayers > 0 ? ' • خفيف: ${_fmtAr(c.lightHeight)} م' : ''}',

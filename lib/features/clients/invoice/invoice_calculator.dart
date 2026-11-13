@@ -10,8 +10,15 @@
 //  • أفيز البلكونة: لكل ضلع أقل من 3م = 2 أفيز • أكبر من أو = 3م = 3 أفيز
 //  • شريط وتجهيز الويفي: على قماش الويفي (التقيل في العادي، والطبقتين في الدابل)
 //  • شريط تجميع الكسرات: على الكتان الخلفي فقط في الويفي العادي
+//  • الكوبشة: بند يدوي بعدد الشبابيك اللي فيها طبقة خلفية (في كل الأنظمة)
 //  • تقريب أمتار قماش الشقة لأعلى لأقرب متر كامل
 //  • قماش البلكونة = إجمالي المقاسات × 1.5 (بدون تقريب)
+//
+// استثناءات شائعة (لكل شباك على حدة، مش القاعدة الأساسية):
+//  • ويفي/دابل ويفي بنسبة 2.5 بدل 3 — بعض العملاء بيطلبوها.
+//  • كبس بنسبة 2 للطبقتين (تقيل وخفيف) بدل 2.5 / 2.
+//  • البلاك أوت دايماً × 1 (أو نسبة مخصصة) ومقرّب لأعلى لكل شباك.
+//  الاستثناءات بتتحفظ مع المقاس في heavy_ratio / light_ratio / blackout_ratio.
 
 /// تقريب لأعلى لأقرب متر كامل بعد تنظيف أخطاء الفاصلة العشرية
 int ceilMeters(dynamic v) {
@@ -110,7 +117,7 @@ const List<PriceDef> kPriceDefs = [
   PriceDef('balc_tape', 'شريط كبس (بلكونة)', 'متر', 15),
   PriceDef('balc_avez', 'أفيز', 'قطعة', 20),
   PriceDef('balc_sew', 'خياطة بلكونة', 'متر', 30),
-  PriceDef('kobsha', 'كوبشة', 'قطعة', 0),
+  PriceDef('kobsha', 'كوبشة', 'قطعة', 50),
   PriceDef('transport', 'موصلات ونقل', 'مرة', 0),
   PriceDef('balc_install', 'تركيب بلكونة', 'بلكونة', 0),
 ];
@@ -348,6 +355,9 @@ ApartmentInvoice calculateApartmentInvoice({
   bool heavyException = false;
   bool lightException = false;
 
+  // الكوبشة بتتحسب لكل شباك فيه طبقة خلفية (كتان/خفيف)، في كل الأنظمة.
+  int kobshaCount = 0;
+
   double trackMeters = 0;
   int waveHolders = 0;
   int doubleHolders = 0;
@@ -397,6 +407,9 @@ ApartmentInvoice calculateApartmentInvoice({
     if (lw > 0 && (w.lightWidth != null || w.lightRatio != null)) {
       lightException = true;
     }
+
+    // طبقة خلفية موجودة → كوبشة للشباك ده (بغض النظر عن النظام)
+    if (lw > 0) kobshaCount++;
 
     // أوسع طبقة شغّالة = مرجع الحوامل/الكوابيل
     double widest = hw;
@@ -716,17 +729,20 @@ ApartmentInvoice calculateApartmentInvoice({
   }
 
   // بنود يدوية
-  accLines.add(
-    InvoiceLine(
-      key: 'kobsha',
-      label: 'كوبشة',
-      unit: 'قطعة',
-      qty: 1,
-      unitPrice: prices['kobsha'] ?? 0,
-      note: 'السعر يدوي',
-      manual: true,
-    ),
-  );
+  // كوبشة: لكل شباك فيه طبقة خلفية — 50ج للمقاس (قابل للتعديل).
+  if (kobshaCount > 0) {
+    accLines.add(
+      InvoiceLine(
+        key: 'kobsha',
+        label: 'كوبشة',
+        unit: 'قطعة',
+        qty: kobshaCount.toDouble(),
+        unitPrice: prices['kobsha'] ?? 50,
+        note: 'لكل شباك فيه طبقة خلفية',
+        manual: true,
+      ),
+    );
+  }
   accLines.add(
     InvoiceLine(
       key: 'transport',
@@ -865,17 +881,20 @@ BalconyInvoice calculateBalconyInvoice({
     );
   }
 
-  accLines.add(
-    InvoiceLine(
-      key: 'balc_install',
-      label: 'تركيب بلكونة',
-      unit: 'بلكونة',
-      qty: 1,
-      unitPrice: prices['balc_install'] ?? 0,
-      note: 'السعر يدوي',
-      manual: true,
-    ),
-  );
+  if (active.isNotEmpty) {
+    accLines.add(
+      InvoiceLine(
+        key: 'balc_install',
+        label: 'تركيب بلكونة',
+        unit: 'بلكونة',
+        // التركيب لكل بلكونة شغالة (كان كمية 1 ثابتة مهما كان العدد)
+        qty: active.length.toDouble(),
+        unitPrice: prices['balc_install'] ?? 0,
+        note: 'السعر يدوي',
+        manual: true,
+      ),
+    );
+  }
 
   return BalconyInvoice(fabricLines: fabricLines, accessoryLines: accLines);
 }

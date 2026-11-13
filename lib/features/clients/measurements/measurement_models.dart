@@ -183,6 +183,8 @@ class _Measurement {
         ? _ceilMeters(bw * blackoutRatio).toDouble()
         : 0.0;
 
+    // شريط العجل: عرض × ١٫٣٣ — حساب ورشة (تنبيه للمقاس) فقط،
+    // ومش داخل في الفاتورة خالص. الفاتورة بتحسب "شريط ويفي" = أمتار القماش.
     final heavyTape = hw > 0 ? (hw * 1.33) : 0.0;
     final lightTape = lw > 0 ? (lw * 1.33) : 0.0;
 

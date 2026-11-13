@@ -64,7 +64,13 @@ class WorkStage {
   /// إضافية بس.
   static int fromData(Map<String, dynamic> data) {
     final raw = data['work_stage'];
-    if (raw is num) return raw.toInt().clamp(started, cancelled);
+    if (raw is num) {
+      final v = raw.toInt();
+      // ٥ (ملغي) قيمة نهائية صريحة. أي رقم تاني برا ١–٤ بيتقصّ على مسار
+      // الشغل، عشان بيانات بايظة متحوّلش عميل لـ"ملغي" وتخفيه من الشغل.
+      if (v == cancelled) return cancelled;
+      return v.clamp(started, done);
+    }
     return data['installation_done'] == true ? done : started;
   }
 
@@ -84,7 +90,7 @@ class WorkStage {
     Object? doneAt,
     bool forCreate = false,
   }) {
-    final s = stage.clamp(started, cancelled);
+    final s = stage == cancelled ? cancelled : stage.clamp(started, done);
     return {
       'work_stage': s,
       'installation_done': s == done,

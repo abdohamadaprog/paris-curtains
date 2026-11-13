@@ -58,26 +58,16 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
                         : const [Color(0xFFFFFFFF), Color(0xFFFDFAF4)],
                   ),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border(
-                    top: BorderSide(
-                      color: disabled ? _line : _gold.withValues(alpha: 0.55),
-                      width: 1.2,
-                    ),
-                    left: BorderSide(
-                      color: disabled
-                          ? _line.withValues(alpha: 0.7)
-                          : _gold.withValues(alpha: 0.18),
-                    ),
-                    right: BorderSide(
-                      color: disabled
-                          ? _line.withValues(alpha: 0.7)
-                          : _gold.withValues(alpha: 0.18),
-                    ),
-                    bottom: BorderSide(
-                      color: disabled
-                          ? _line.withValues(alpha: 0.7)
-                          : _gold.withValues(alpha: 0.18),
-                    ),
+                  // مهم: لازم لون الحدود يكون موحّد لكل الأضلاع مع وجود
+                  // borderRadius، وإلا Flutter بيرمي استثناء وقت الرسم
+                  // (box_border.dart: "A borderRadius can only be given on
+                  // borders with uniform colors") والكارت بيترسم خلفيته بس
+                  // من غير أي محتوى. لمعة الحد العلوي بتترسم كطبقة داخلية.
+                  border: Border.all(
+                    color: disabled
+                        ? _line.withValues(alpha: 0.80)
+                        : _gold.withValues(alpha: 0.30),
+                    width: 1.2,
                   ),
                   boxShadow: disabled
                       ? const []
@@ -94,429 +84,469 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
           child: InkWell(
             onTap: () => _openCard(item),
             borderRadius: BorderRadius.circular(16),
-            child: Opacity(
-              opacity: disabled ? 0.5 : 1.0,
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: pv),
-                child: Directionality(
-                  textDirection: TextDirection.rtl,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // ========================================================
-                      // السطر ١: [تفعيل] [اسم المقاس] [شارة استثناء] [أدوات]
-                      // ========================================================
-                      Row(
-                        children: [
-                          // زر التفعيل / التعطيل السريع
-                          InkWell(
-                            borderRadius: BorderRadius.circular(20),
-                            onTap: () {
-                              _rebuild(() => item.enabled = !item.enabled);
-                              _triggerAutoSave();
-                            },
-                            child: Container(
-                              width: 22,
-                              height: 22,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: item.enabled
-                                    ? _gold.withValues(alpha: 0.14)
-                                    : Colors.transparent,
-                                border: Border.all(
-                                  color: item.enabled
-                                      ? _gold.withValues(alpha: 0.40)
-                                      : _line,
-                                ),
-                              ),
-                              child: Icon(
-                                item.enabled
-                                    ? Icons.check_rounded
-                                    : Icons.circle_outlined,
-                                color: item.enabled
-                                    ? _gold
-                                    : AppPalette.text.withValues(alpha: 0.30),
-                                size: 15,
-                              ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Stack(
+                children: [
+                  // لمعة ذهبية رفيعة على الحافة العلوية — بديل الحد العلوي
+                  // الملوّن اللي Flutter بيرفضه مع borderRadius.
+                  if (!disabled)
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: IgnorePointer(
+                        child: Container(
+                          height: 1.6,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                _gold.withValues(alpha: 0.0),
+                                _gold.withValues(alpha: 0.55),
+                                _gold.withValues(alpha: 0.0),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 8),
-
-                          // اسم المقاس
-                          Expanded(
-                            child: Row(
+                        ),
+                      ),
+                    ),
+                  Opacity(
+                    opacity: disabled ? 0.5 : 1.0,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: pv,
+                      ),
+                      child: Directionality(
+                        textDirection: TextDirection.rtl,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // ========================================================
+                            // السطر ١: [تفعيل] [اسم المقاس] [شارة استثناء] [أدوات]
+                            // ========================================================
+                            Row(
                               children: [
-                                const Text(
-                                  '🌟',
-                                  style: TextStyle(fontSize: 13),
-                                ),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    item.name.text.trim().isEmpty
-                                        ? 'مقاس بدون اسم'
-                                        : item.name.text.trim(),
-                                    style: TextStyle(
-                                      color: disabled
-                                          ? AppPalette.text.withValues(
-                                              alpha: 0.54,
-                                            )
-                                          : (AppPalette.isDark
-                                                ? AppPalette.goldLight
-                                                : _gold),
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w900,
-                                      decoration: cardDecoration,
-                                      decorationColor: cardDecorColor,
-                                      decorationThickness: 2,
+                                // زر التفعيل / التعطيل السريع
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(20),
+                                  onTap: () {
+                                    _rebuild(
+                                      () => item.enabled = !item.enabled,
+                                    );
+                                    _triggerAutoSave();
+                                  },
+                                  child: Container(
+                                    width: 22,
+                                    height: 22,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: item.enabled
+                                          ? _gold.withValues(alpha: 0.14)
+                                          : Colors.transparent,
+                                      border: Border.all(
+                                        color: item.enabled
+                                            ? _gold.withValues(alpha: 0.40)
+                                            : _line,
+                                      ),
                                     ),
-                                    overflow: TextOverflow.ellipsis,
+                                    child: Icon(
+                                      item.enabled
+                                          ? Icons.check_rounded
+                                          : Icons.circle_outlined,
+                                      color: item.enabled
+                                          ? _gold
+                                          : AppPalette.text.withValues(
+                                              alpha: 0.30,
+                                            ),
+                                      size: 15,
+                                    ),
                                   ),
                                 ),
-                                if (item.hasException) ...[
-                                  const SizedBox(width: 5),
-                                  Tooltip(
-                                    message: item.exceptionSummary,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 5,
-                                        vertical: 1,
+                                const SizedBox(width: 8),
+
+                                // اسم المقاس
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      const Text(
+                                        '🌟',
+                                        style: TextStyle(fontSize: 13),
                                       ),
-                                      decoration: BoxDecoration(
-                                        color: AppPalette.violet.withValues(
-                                          alpha: 0.15,
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          item.name.text.trim().isEmpty
+                                              ? 'مقاس بدون اسم'
+                                              : item.name.text.trim(),
+                                          style: TextStyle(
+                                            color: disabled
+                                                ? AppPalette.text.withValues(
+                                                    alpha: 0.54,
+                                                  )
+                                                : (AppPalette.isDark
+                                                      ? AppPalette.goldLight
+                                                      : _gold),
+                                            fontSize: 17,
+                                            fontWeight: FontWeight.w900,
+                                            decoration: cardDecoration,
+                                            decorationColor: cardDecorColor,
+                                            decorationThickness: 2,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                        borderRadius: BorderRadius.circular(5),
-                                        border: Border.all(
-                                          color: AppPalette.violet.withValues(
-                                            alpha: 0.5,
+                                      ),
+                                      if (item.hasException) ...[
+                                        const SizedBox(width: 5),
+                                        Tooltip(
+                                          message: item.exceptionSummary,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 5,
+                                              vertical: 1,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppPalette.violet
+                                                  .withValues(alpha: 0.15),
+                                              borderRadius:
+                                                  BorderRadius.circular(5),
+                                              border: Border.all(
+                                                color: AppPalette.violet
+                                                    .withValues(alpha: 0.5),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              'استثناء',
+                                              style: TextStyle(
+                                                color: AppPalette.violet,
+                                                fontSize: 10.5,
+                                                fontWeight: FontWeight.w900,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+
+                                // أدوات سريعة
+                                IconButton(
+                                  visualDensity: VisualDensity.compact,
+                                  constraints: BoxConstraints.tightFor(
+                                    width: 28,
+                                    height: btnH,
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  tooltip: popup
+                                      ? 'طي التعديل'
+                                      : 'تعديل تفصيلي',
+                                  icon: Icon(
+                                    popup
+                                        ? Icons.keyboard_arrow_up
+                                        : Icons.edit_note_rounded,
+                                    color: _neon,
+                                    size: 21,
+                                  ),
+                                  onPressed: () => _openCard(item),
+                                ),
+                                IconButton(
+                                  visualDensity: VisualDensity.compact,
+                                  constraints: BoxConstraints.tightFor(
+                                    width: 26,
+                                    height: btnH,
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  tooltip: 'حذف المقاس',
+                                  icon: Icon(
+                                    Icons.delete_outline,
+                                    color: AppPalette.redStrong,
+                                    size: 18,
+                                  ),
+                                  onPressed: () => _deleteMeasurement(index),
+                                ),
+                                popup
+                                    ? const SizedBox(width: 22)
+                                    : ReorderableDragStartListener(
+                                        index: index,
+                                        child: Padding(
+                                          padding: const EdgeInsets.only(
+                                            right: 2,
+                                          ),
+                                          child: Icon(
+                                            Icons.drag_indicator,
+                                            color: AppPalette.text.withValues(
+                                              alpha: 0.38,
+                                            ),
+                                            size: 20,
                                           ),
                                         ),
                                       ),
-                                      child: Text(
-                                        'استثناء',
+                              ],
+                            ),
+
+                            SizedBox(height: gap),
+
+                            // ========================================================
+                            // السطر ٢: [المقاس] ⬅️ [أمتار القماش]
+                            // ========================================================
+                            Row(
+                              children: [
+                                // بادج المقاس (العرض)
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: pb + 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topRight,
+                                      end: Alignment.bottomLeft,
+                                      colors: [
+                                        _gold.withValues(alpha: 0.20),
+                                        _gold.withValues(alpha: 0.07),
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: _gold.withValues(alpha: 0.38),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text(
+                                        '📌',
+                                        style: TextStyle(fontSize: 14),
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        _toArabic(
+                                          item.width.text.trim().isNotEmpty
+                                              ? item.width.text.trim()
+                                              : _fmt(wVal),
+                                        ),
                                         style: TextStyle(
-                                          color: AppPalette.violet,
-                                          fontSize: 10.5,
+                                          color: AppPalette.text,
                                           fontWeight: FontWeight.w900,
+                                          fontSize: 25,
+                                          height: 1.05,
+                                          decoration: cardDecoration,
+                                          decorationColor: cardDecorColor,
                                         ),
                                       ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-
-                          // أدوات سريعة
-                          IconButton(
-                            visualDensity: VisualDensity.compact,
-                            constraints: BoxConstraints.tightFor(
-                              width: 28,
-                              height: btnH,
-                            ),
-                            padding: EdgeInsets.zero,
-                            tooltip: popup ? 'طي التعديل' : 'تعديل تفصيلي',
-                            icon: Icon(
-                              popup
-                                  ? Icons.keyboard_arrow_up
-                                  : Icons.edit_note_rounded,
-                              color: _neon,
-                              size: 21,
-                            ),
-                            onPressed: () => _openCard(item),
-                          ),
-                          IconButton(
-                            visualDensity: VisualDensity.compact,
-                            constraints: BoxConstraints.tightFor(
-                              width: 26,
-                              height: btnH,
-                            ),
-                            padding: EdgeInsets.zero,
-                            tooltip: 'حذف المقاس',
-                            icon: Icon(
-                              Icons.delete_outline,
-                              color: AppPalette.redStrong,
-                              size: 18,
-                            ),
-                            onPressed: () => _deleteMeasurement(index),
-                          ),
-                          popup
-                              ? const SizedBox(width: 22)
-                              : ReorderableDragStartListener(
-                                  index: index,
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(right: 2),
-                                    child: Icon(
-                                      Icons.drag_indicator,
-                                      color: AppPalette.text.withValues(
-                                        alpha: 0.38,
+                                      Text(
+                                        ' م',
+                                        style: TextStyle(
+                                          color: _neon,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15.5,
+                                        ),
                                       ),
-                                      size: 20,
-                                    ),
+                                      const SizedBox(width: 3),
+                                      const Text(
+                                        '📌',
+                                        style: TextStyle(fontSize: 14),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                        ],
-                      ),
 
-                      SizedBox(height: gap),
+                                const SizedBox(width: 6),
 
-                      // ========================================================
-                      // السطر ٢: [المقاس] ⬅️ [أمتار القماش]
-                      // ========================================================
-                      Row(
-                        children: [
-                          // بادج المقاس (العرض)
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: pb + 2,
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topRight,
-                                end: Alignment.bottomLeft,
-                                colors: [
-                                  _gold.withValues(alpha: 0.20),
-                                  _gold.withValues(alpha: 0.07),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: _gold.withValues(alpha: 0.38),
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Text(
-                                  '📌',
-                                  style: TextStyle(fontSize: 14),
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  _toArabic(
-                                    item.width.text.trim().isNotEmpty
-                                        ? item.width.text.trim()
-                                        : _fmt(wVal),
+                                Expanded(
+                                  child: Wrap(
+                                    alignment: WrapAlignment.start,
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
+                                    spacing: 0,
+                                    runSpacing: 2,
+                                    children: [
+                                      const Text(
+                                        '⬅️',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                      const SizedBox(width: 5),
+                                      ..._fabricPills(
+                                        item,
+                                        calc,
+                                        pb,
+                                        cardDecoration,
+                                        cardDecorColor,
+                                      ),
+                                    ],
                                   ),
-                                  style: TextStyle(
-                                    color: AppPalette.text,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 25,
-                                    height: 1.05,
-                                    decoration: cardDecoration,
-                                    decorationColor: cardDecorColor,
-                                  ),
-                                ),
-                                Text(
-                                  ' م',
-                                  style: TextStyle(
-                                    color: _neon,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15.5,
-                                  ),
-                                ),
-                                const SizedBox(width: 3),
-                                const Text(
-                                  '📌',
-                                  style: TextStyle(fontSize: 14),
                                 ),
                               ],
                             ),
-                          ),
 
-                          const SizedBox(width: 6),
+                            SizedBox(height: gap),
 
-                          Expanded(
-                            child: Wrap(
-                              alignment: WrapAlignment.start,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              spacing: 0,
-                              runSpacing: 2,
-                              children: [
-                                const Text(
-                                  '⬅️',
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                                const SizedBox(width: 5),
-                                ..._fabricPills(
-                                  item,
-                                  calc,
-                                  pb,
-                                  cardDecoration,
-                                  cardDecorColor,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      SizedBox(height: gap),
-
-                      // ========================================================
-                      // السطر ٣: [الارتفاع] + [الطراز] + [السقف]
-                      // ========================================================
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Wrap(
-                          alignment: WrapAlignment.end,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 5,
-                          runSpacing: 2,
-                          children: [
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: pb,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppPalette.insetAlt,
-                                borderRadius: BorderRadius.circular(7),
-                                border: Border.all(
-                                  color: _line.withValues(alpha: 0.85),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
+                            // ========================================================
+                            // السطر ٣: [الارتفاع] + [الطراز] + [السقف]
+                            // ========================================================
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Wrap(
+                                alignment: WrapAlignment.end,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 5,
+                                runSpacing: 2,
                                 children: [
-                                  const Text(
-                                    '📩 ',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                  Text(
-                                    'ارتفاع ${_toArabic(item.height.text.trim().isNotEmpty ? item.height.text.trim() : _fmt(hVal))} م',
-                                    style: TextStyle(
-                                      color: AppPalette.text,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      decoration: cardDecoration,
-                                      decorationColor: cardDecorColor,
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: pb,
                                     ),
+                                    decoration: BoxDecoration(
+                                      color: AppPalette.insetAlt,
+                                      borderRadius: BorderRadius.circular(7),
+                                      border: Border.all(
+                                        color: _line.withValues(alpha: 0.85),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Text(
+                                          '📩 ',
+                                          style: TextStyle(fontSize: 12),
+                                        ),
+                                        Text(
+                                          'ارتفاع ${_toArabic(item.height.text.trim().isNotEmpty ? item.height.text.trim() : _fmt(hVal))} م',
+                                          style: TextStyle(
+                                            color: AppPalette.text,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            decoration: cardDecoration,
+                                            decorationColor: cardDecorColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  _quickSelectMenu<_WorkMethod>(
+                                    label: item.method.label,
+                                    icon: _methodIcon(item.method),
+                                    color: _gold,
+                                    items: _WorkMethod.values,
+                                    itemLabel: (v) => v.label,
+                                    onSelected: (val) {
+                                      _rebuild(() => item.method = val);
+                                      _triggerAutoSave();
+                                    },
+                                    cardDecoration: cardDecoration,
+                                    cardDecorColor: cardDecorColor,
+                                  ),
+                                  _quickSelectMenu<_CeilingType>(
+                                    label: item.ceiling.label,
+                                    icon: Icons.home_rounded,
+                                    color: _muted,
+                                    items: _CeilingType.values,
+                                    itemLabel: (v) => v.label,
+                                    onSelected: (val) {
+                                      _rebuild(() => item.ceiling = val);
+                                      _triggerAutoSave();
+                                    },
+                                    cardDecoration: cardDecoration,
+                                    cardDecorColor: cardDecorColor,
                                   ),
                                 ],
                               ),
                             ),
-                            _quickSelectMenu<_WorkMethod>(
-                              label: item.method.label,
-                              icon: _methodIcon(item.method),
-                              color: _gold,
-                              items: _WorkMethod.values,
-                              itemLabel: (v) => v.label,
-                              onSelected: (val) {
-                                _rebuild(() => item.method = val);
-                                _triggerAutoSave();
-                              },
-                              cardDecoration: cardDecoration,
-                              cardDecorColor: cardDecorColor,
+
+                            SizedBox(height: gap + 1),
+                            Container(
+                              height: 1,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    _gold.withValues(alpha: 0.0),
+                                    _gold.withValues(alpha: 0.22),
+                                    _gold.withValues(alpha: 0.0),
+                                  ],
+                                ),
+                              ),
                             ),
-                            _quickSelectMenu<_CeilingType>(
-                              label: item.ceiling.label,
-                              icon: Icons.home_rounded,
-                              color: _muted,
-                              items: _CeilingType.values,
-                              itemLabel: (v) => v.label,
-                              onSelected: (val) {
-                                _rebuild(() => item.ceiling = val);
-                                _triggerAutoSave();
-                              },
-                              cardDecoration: cardDecoration,
-                              cardDecorColor: cardDecorColor,
+                            SizedBox(height: gap + 1),
+
+                            // ========================================================
+                            // السطر ٤: خياطة ثقيل / خفيف
+                            // ========================================================
+                            if (sewing != null)
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: pb,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _gold.withValues(alpha: 0.06),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: _gold.withValues(alpha: 0.16),
+                                  ),
+                                ),
+                                child: sewing,
+                              ),
+
+                            SizedBox(height: gap),
+
+                            // ========================================================
+                            // السطر ٥: الأجناب + العجل/الشريط
+                            // ========================================================
+                            Container(
+                              padding: EdgeInsets.symmetric(vertical: pb),
+                              child: Align(
+                                alignment: Alignment.centerRight,
+                                child: Wrap(
+                                  alignment: WrapAlignment.end,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 6,
+                                  runSpacing: 2,
+                                  children: [
+                                    Text(
+                                      _sidesLine(item),
+                                      style: TextStyle(
+                                        color: AppPalette.cream,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        decoration: cardDecoration,
+                                        decorationColor: cardDecorColor,
+                                      ),
+                                    ),
+                                    if (item.method != _WorkMethod.press &&
+                                        wheelsLine.isNotEmpty) ...[
+                                      Text(
+                                        '•',
+                                        style: TextStyle(
+                                          color: AppPalette.text.withValues(
+                                            alpha: 0.54,
+                                          ),
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        wheelsLine,
+                                        style: TextStyle(
+                                          color: AppPalette.amber,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 14,
+                                          decoration: cardDecoration,
+                                          decorationColor: cardDecorColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
                             ),
                           ],
                         ),
                       ),
-
-                      SizedBox(height: gap + 1),
-                      Container(
-                        height: 1,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              _gold.withValues(alpha: 0.0),
-                              _gold.withValues(alpha: 0.22),
-                              _gold.withValues(alpha: 0.0),
-                            ],
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: gap + 1),
-
-                      // ========================================================
-                      // السطر ٤: خياطة ثقيل / خفيف
-                      // ========================================================
-                      if (sewing != null)
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: pb,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _gold.withValues(alpha: 0.06),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: _gold.withValues(alpha: 0.16),
-                            ),
-                          ),
-                          child: sewing,
-                        ),
-
-                      SizedBox(height: gap),
-
-                      // ========================================================
-                      // السطر ٥: الأجناب + العجل/الشريط
-                      // ========================================================
-                      Container(
-                        padding: EdgeInsets.symmetric(vertical: pb),
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: Wrap(
-                            alignment: WrapAlignment.end,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 6,
-                            runSpacing: 2,
-                            children: [
-                              Text(
-                                _sidesLine(item),
-                                style: TextStyle(
-                                  color: AppPalette.cream,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  decoration: cardDecoration,
-                                  decorationColor: cardDecorColor,
-                                ),
-                              ),
-                              if (item.method != _WorkMethod.press &&
-                                  wheelsLine.isNotEmpty) ...[
-                                Text(
-                                  '•',
-                                  style: TextStyle(
-                                    color: AppPalette.text.withValues(
-                                      alpha: 0.54,
-                                    ),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Text(
-                                  wheelsLine,
-                                  style: TextStyle(
-                                    color: AppPalette.amber,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 14,
-                                    decoration: cardDecoration,
-                                    decorationColor: cardDecorColor,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
@@ -593,7 +623,9 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
     return '$heavy + $light$blackout';
   }
 
-  /// سطر العجل والشريط: بيتغيّر لو الثقيل متلغي أو مفيش خفيف.
+  /// سطر العجل وشريط العجل: بيتغيّر لو الثقيل متلغي أو مفيش خفيف.
+  /// ملاحظة: "شريط العجل" هنا عرض × ١٫٣٣ وده حساب ورشة بس (تنبيه للمقاس)،
+  /// مش "شريط الويفي" اللي بيتحاسب عليه العميل في الفاتورة.
   String _wheelsLine(_Measurement item, _Calculation calc) {
     final h = item.heavyEnabled;
     final l = item.lightLayers > 0;
@@ -605,10 +637,10 @@ extension _MeasurementCardShell on _ParisClientMeasurementsPageState {
         ? '${calc.heavyWheelsLabel} عجلة'
         : '${_toArabic(calc.lightWheels)} عجلة';
     final tape = (h && l)
-        ? 'شريط ${_fmtAr(calc.heavyTapeMeters)} م + ${_fmtAr(calc.lightTapeMeters)} م'
+        ? 'شريط العجل ${_fmtAr(calc.heavyTapeMeters)} م + ${_fmtAr(calc.lightTapeMeters)} م'
         : h
-        ? 'شريط ${_fmtAr(calc.heavyTapeMeters)} م'
-        : 'شريط ${_fmtAr(calc.lightTapeMeters)} م';
+        ? 'شريط العجل ${_fmtAr(calc.heavyTapeMeters)} م'
+        : 'شريط العجل ${_fmtAr(calc.lightTapeMeters)} م';
     return '$wheels = ${_fmtAr(calc.wheelsFabricMeters)} م • $tape';
   }
 

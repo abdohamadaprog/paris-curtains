@@ -36,8 +36,8 @@ void main() {
     expect(_line(invoice, 'track').qty, 21);
     expect(_line(invoice, 'holder_wave').qty, 18);
     expect(_line(invoice, 'install_window').qty, 6);
-    expect(_sum(invoice.accessoryLines), 7095);
-    expect(invoice.grandTotal, 14625);
+    expect(_sum(invoice.accessoryLines), 7395);
+    expect(invoice.grandTotal, 14925);
   });
 
   test('شقة مختلطة: ويفي + دابل ويفي + كبس', () {
@@ -85,8 +85,8 @@ void main() {
     expect(_line(invoice, 'holder_double').qty, 3);
     expect(_line(invoice, 'ring_unit').qty, 93);
     expect(_line(invoice, 'cantilever_forgia').qty, 4);
-    expect(_sum(invoice.accessoryLines), 5840);
-    expect(invoice.grandTotal, 11610);
+    expect(_sum(invoice.accessoryLines), 6040);
+    expect(invoice.grandTotal, 11810);
   });
 
   test('بلكونة: عرض إجمالي 5م وقماش دك', () {

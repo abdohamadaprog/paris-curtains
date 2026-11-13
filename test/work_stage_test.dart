@@ -8,10 +8,17 @@ void main() {
       expect(WorkStage.fromData({'work_stage': 3}), 3);
     });
 
-    test('بيقصّ القيم اللي برا المدى ١ إلى ٤', () {
-      expect(WorkStage.fromData({'work_stage': 9}), 4);
-      expect(WorkStage.fromData({'work_stage': 0}), 1);
-      expect(WorkStage.fromData({'work_stage': -3}), 1);
+    test('بيقصّ القيم اللي برا المدى ١ إلى ٤ وأي رقم تالف بيبقى "تمت"', () {
+      // ٥ = ملغي (مرحلة نهائية صريحة)، وأي رقم تاني برا ١–٤ بيتقصّ على ٤
+      // عشان البيانات البايظة متحوّلش عميل لـ"ملغي" وتخفيه من الشغل.
+      expect(WorkStage.fromData({'work_stage': 9}), WorkStage.done);
+      expect(WorkStage.fromData({'work_stage': 0}), WorkStage.started);
+      expect(WorkStage.fromData({'work_stage': -3}), WorkStage.started);
+    });
+
+    test('المرحلة ٥ (ملغي) بتتقري صح', () {
+      expect(WorkStage.fromData({'work_stage': 5}), WorkStage.cancelled);
+      expect(WorkStage.isCancelled(5), isTrue);
     });
 
     test('عميل قديم من غير work_stage: تمت = ٤', () {
@@ -48,10 +55,26 @@ void main() {
       expect(fields['installation_done_at'], 'ts');
     });
 
+    test('المرحلة ٥ (ملغي): installation_done = false وفيها وقت إلغاء', () {
+      final fields = WorkStage.updateFields(5);
+      expect(fields['work_stage'], 5);
+      expect(fields['installation_done'], false);
+      expect(fields['installation_done_at'], isNull);
+      expect(fields['cancelled_at'], isNotNull);
+    });
+
     test('مرحلة برا المدى بتتقصّ', () {
       expect(WorkStage.updateFields(0)['work_stage'], 1);
+      // ٧ برا المدى → ٤ (تمت) مش ٥ (ملغي)
       expect(WorkStage.updateFields(7, doneAt: 'ts')['work_stage'], 4);
     });
+  });
+
+  test('isOpen: المنتهي والملغي مش شغالين', () {
+    expect(WorkStage.isOpen(1), isTrue);
+    expect(WorkStage.isOpen(3), isTrue);
+    expect(WorkStage.isOpen(4), isFalse);
+    expect(WorkStage.isOpen(5), isFalse);
   });
 
   test('كل مرحلة ليها لون واسم', () {
