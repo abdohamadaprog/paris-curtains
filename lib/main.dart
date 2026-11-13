@@ -9,7 +9,6 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
 import 'app.dart';
-import 'card_probe.dart';
 import 'core/services/sync_status_service.dart';
 import 'core/theme/theme_manager.dart';
 
@@ -24,12 +23,12 @@ Future<void> main() async {
   // متابعة حالة النت والتعديلات اللي لسه ماترفعتش (للشغل بدون نت)
   SyncStatus.instance.start();
   await themeManager.loadTheme();
-  // TODO(probe): تشخيص مؤقت لكارت المقاس — يترجع لـ ParisCurtainsApp بعد الاختبار.
-  runApp(const CardProbeApp());
+  runApp(const ParisCurtainsApp());
 }
 
 /// Firebase App Check: بيثبت إن الطلبات جاية من تطبيقك الأصلي مش من سكربت.
-/// في الـ debug بيستخدم debug provider (التوكن بيظهر في اللوج وبتضيفه في Console).
+/// في الـ debug بيستخدم debug provid
+/// er (التوكن بيظهر في اللوج وبتضيفه في Console).
 Future<void> _activateAppCheck() async {
   if (kIsWeb) return; // الويب محتاج مفتاح reCAPTCHA منفصل
   try {
