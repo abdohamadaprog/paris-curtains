@@ -1,74 +1,24 @@
 part of 'admin_dashboard_page.dart';
 
-/// شريط مراحل الشغل: عدد العملاء في كل مرحلة بلون نيون، واضغط تفتح العملاء مفلترين
-class _StageStrip extends StatefulWidget {
-  const _StageStrip({required this.onTapStage, required this.refreshToken});
+/// شريط مراحل الشغل: عدد العملاء في كل مرحلة بلون نيون، واضغط تفتح العملاء مفلترين.
+///
+/// الأرقام بتيجي جاهزة من الداشبورد (count() مرة واحدة لكل مرحلة)، فالودجت
+/// ده بقى عرض بس — مفيش قراءات سيرفر هنا.
+class _StageStrip extends StatelessWidget {
+  const _StageStrip({required this.counts, required this.onTapStage});
 
+  /// null = لسه بيتحمّل. المفاتيح من [WorkStage.all].
+  final Map<int, int>? counts;
   final ValueChanged<int> onTapStage;
-  final int refreshToken;
 
-  @override
-  State<_StageStrip> createState() => _StageStripState();
-}
-
-class _StageStripState extends State<_StageStrip> {
   static const Map<int, Color> _colors = WorkStage.colors;
   static const Map<int, String> _labels = WorkStage.shortLabels;
-
-  Map<int, int>? _counts;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  @override
-  void didUpdateWidget(covariant _StageStrip oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.refreshToken != widget.refreshToken) _load();
-  }
-
-  /// بدل ما نحمّل كل العملاء (قراءة لكل مستند)، بنستخدم count() (قراءة واحدة
-  /// تقريبًا لكل ١٠٠٠ مستند). العملاء القدام من غير work_stage بيتحسبوا:
-  /// تمت = installation_done، والباقي = مرحلة ١ (نفس WorkStage.fromData).
-  Future<void> _load() async {
-    try {
-      final col = FirebaseFirestore.instance.collection('clients');
-      final results = await Future.wait([
-        col.count().get(),
-        col.where('work_stage', isEqualTo: WorkStage.preparing).count().get(),
-        col.where('work_stage', isEqualTo: WorkStage.drilled).count().get(),
-        col.where('installation_done', isEqualTo: true).count().get(),
-        col.where('work_stage', isEqualTo: WorkStage.cancelled).count().get(),
-      ]);
-      final total = results[0].count ?? 0;
-      final preparing = results[1].count ?? 0;
-      final drilled = results[2].count ?? 0;
-      final done = results[3].count ?? 0;
-      final cancelled = results[4].count ?? 0;
-      final started = total - preparing - drilled - done - cancelled;
-      if (!mounted) return;
-      setState(() {
-        _counts = {
-          1: started < 0 ? 0 : started,
-          2: preparing,
-          3: drilled,
-          4: done,
-          5: cancelled,
-        };
-      });
-    } catch (_) {
-      // لو فشل (مفيش نت) بنسيب القيم القديمة أو "…"
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // يعيد البناء عند تغيير الثيم
-    final counts = _counts ?? const <int, int>{};
-    final loaded = _counts != null;
-    final onTapStage = widget.onTapStage;
+    final loaded = counts != null;
+    final onTapStage = this.onTapStage;
 
     return Row(
       children: [
@@ -103,7 +53,7 @@ class _StageStripState extends State<_StageStrip> {
                   child: Column(
                     children: [
                       Text(
-                        loaded ? _ar(counts[stage]) : '…',
+                        loaded ? _ar(counts![stage]) : '…',
                         style: TextStyle(
                           color: _colors[stage],
                           fontSize: 25,

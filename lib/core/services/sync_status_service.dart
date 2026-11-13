@@ -51,6 +51,10 @@ class SyncStatus extends ChangeNotifier {
   /// فيه تعديلات لسه ماترفعتش للسيرفر؟
   bool get hasPending => _queued > 0 || _leftover;
 
+  /// عدد التعديلات المستنية الرفع (على الأقل ١ لو فيه كتابات من جلسة سابقة).
+  /// ده تقدير للعرض بس — Firestore مش بيقول العدد الحقيقي.
+  int get pendingCount => _queued > 0 ? _queued : (_leftover ? 1 : 0);
+
   /// مفيش اتصال بالسيرفر دلوقتي؟
   bool get offline => _offline;
 

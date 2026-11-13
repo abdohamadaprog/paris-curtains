@@ -8,31 +8,25 @@ import '../../../core/constants/work_stage.dart';
 import '../../clients/list/clients_list_page.dart';
 import '../../auth/login_page.dart';
 import '../../home/home_screen.dart';
-import 'gallery_reorder_page.dart';
 
 import '../../auth/admin_auth_service.dart';
 import '../../clients/invoice/price_settings_page.dart';
 import '../../../core/config/app_features.dart';
 import '../../../core/services/notification_service.dart';
+import '../../../core/services/sync_status_service.dart';
+import '../../../core/utils/digits.dart';
 import '../services/local_backup_service.dart';
 import '../../../core/widgets/sync_status_banner.dart';
 import 'backup_page.dart';
 import 'telegram_backup_page.dart';
 import 'admin_analytics_page.dart';
-import 'upload_image_page.dart';
-import 'gallery_management_page.dart';
+import 'gallery_hub_page.dart';
 import 'installation_agenda_page.dart';
-import 'promo_management_page.dart';
-import 'upload_queue_page.dart';
-import 'featured_works_page.dart';
 
 part 'dashboard_stage_strip.dart';
 part 'dashboard_widgets.dart';
 
-String _ar(Object? n) => (n ?? '').toString().replaceAllMapped(
-  RegExp(r'[0-9]'),
-  (m) => '٠١٢٣٤٥٦٧٨٩'[int.parse(m[0]!)],
-);
+String _ar(Object? n) => toArabicDigits(n);
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -42,7 +36,10 @@ class AdminDashboardPage extends StatefulWidget {
 }
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
-  int _stageRefresh = 0;
+  /// عدّادات المراحل + مواعيد النهارده. null = لسه بيتحمّل.
+  Map<int, int>? _stageCounts;
+  int _appointmentsToday = 0;
+  int _openJobs = 0;
   final LocalAuthentication auth = LocalAuthentication();
 
   // نفس ألوان الفاتورة والمقاسات
@@ -60,8 +57,58 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   @override
   void initState() {
     super.initState();
+    _loadCounts();
     // لوحة الإدارة مبتتفتحش من غير جلسة أدمن سليمة (حتى لو اتفتحت بالبصمة)
     WidgetsBinding.instance.addPostFrameCallback((_) => _verifySession());
+  }
+
+  /// أرقام الداشبورد كلها من count() (قراءة واحدة تقريبًا لكل ١٠٠٠ مستند)
+  /// بدل تحميل كل العملاء. العملاء القدام من غير work_stage بيتحسبوا:
+  /// تمت = installation_done، والباقي = مرحلة ١ (نفس WorkStage.fromData).
+  Future<void> _loadCounts() async {
+    try {
+      final col = FirebaseFirestore.instance.collection('clients');
+      final now = DateTime.now();
+      final dayStart = Timestamp.fromDate(
+        DateTime(now.year, now.month, now.day),
+      );
+      final dayEnd = Timestamp.fromDate(
+        DateTime(now.year, now.month, now.day + 1),
+      );
+      final results = await Future.wait([
+        col.count().get(),
+        col.where('work_stage', isEqualTo: WorkStage.preparing).count().get(),
+        col.where('work_stage', isEqualTo: WorkStage.drilled).count().get(),
+        col.where('installation_done', isEqualTo: true).count().get(),
+        col.where('work_stage', isEqualTo: WorkStage.cancelled).count().get(),
+        col
+            .where('installation_date', isGreaterThanOrEqualTo: dayStart)
+            .where('installation_date', isLessThan: dayEnd)
+            .count()
+            .get(),
+      ]);
+      final total = results[0].count ?? 0;
+      final preparing = results[1].count ?? 0;
+      final drilled = results[2].count ?? 0;
+      final done = results[3].count ?? 0;
+      final cancelled = results[4].count ?? 0;
+      final started = total - preparing - drilled - done - cancelled;
+      final open = total - done - cancelled;
+      if (!mounted) return;
+      setState(() {
+        _stageCounts = {
+          1: started < 0 ? 0 : started,
+          2: preparing,
+          3: drilled,
+          4: done,
+          5: cancelled,
+        };
+        _appointmentsToday = results[5].count ?? 0;
+        _openJobs = open < 0 ? 0 : open;
+      });
+    } catch (_) {
+      // لو فشل (مفيش نت) بنسيب القيم القديمة أو "…"
+    }
   }
 
   /// الوضع المجاني: لو عدّى أسبوع من آخر نسخة يدوية، نفكّر الأدمن.
@@ -141,11 +188,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
                   _buildWelcome(),
+                  const SizedBox(height: 16),
+                  _TodaySummary(
+                    loading: _stageCounts == null,
+                    appointments: _appointmentsToday,
+                    openJobs: _openJobs,
+                    onTapAppointments: () =>
+                        _navTo(const InstallationAgendaPage()),
+                    onTapOpenJobs: () => _navTo(const ClientsListPage()),
+                    onTapPending: _showPendingInfo,
+                  ),
                   const SizedBox(height: 22),
                   _sectionTitle('حالة الشغل', Icons.local_fire_department_rounded),
                   const SizedBox(height: 12),
                   _StageStrip(
-                    refreshToken: _stageRefresh,
+                    counts: _stageCounts,
                     onTapStage: (stage) =>
                         _navTo(ClientsListPage(initialStage: stage)),
                   ),
@@ -178,6 +235,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         runSpacing: 12,
                         children: [
                           tile(
+                            'عميل جديد',
+                            'تسجيل مقاسات من أول خطوة',
+                            Icons.person_add_alt_1_rounded,
+                            _gold,
+                            const ClientsListPage(autoAdd: true),
+                          ),
+                          tile(
                             'العملاء',
                             'المقاسات والفواتير',
                             Icons.groups_rounded,
@@ -192,77 +256,34 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             const InstallationAgendaPage(),
                           ),
                           tile(
-                            'إضافة عمل',
-                            'صور للمعرض',
-                            Icons.add_photo_alternate_rounded,
-                            _gold,
-                            const UploadImagePage(),
-                          ),
-                          tile(
                             'التقارير',
                             'أرقام الشغل',
                             Icons.insights_rounded,
                             _green,
                             const AdminAnalyticsPage(),
                           ),
-                          tile(
-                            'ثوابت الحساب',
-                            'أسعار الفواتير',
-                            Icons.price_change_rounded,
-                            _gold,
-                            const PriceSettingsPage(),
-                          ),
                         ],
                       );
                     },
                   ),
                   const SizedBox(height: 26),
-                  _sectionTitle(
-                    'المعرض والمحتوى',
-                    Icons.photo_library_rounded,
-                  ),
+                  _sectionTitle('إدارة', Icons.settings_rounded),
                   const SizedBox(height: 12),
                   _buildGroup([
                     _GroupRow(
-                      title: 'أحدث الأعمال',
-                      subtitle: '٢٥ صورة مميزة في الواجهة الرئيسية',
-                      icon: Icons.auto_awesome_rounded,
+                      title: 'المعرض والمحتوى',
+                      subtitle: 'رفع الصور والترتيب والسلايدر',
+                      icon: Icons.photo_library_rounded,
                       color: _gold,
-                      onTap: () => _navTo(const FeaturedWorksPage()),
+                      onTap: () => _navTo(const GalleryHubPage()),
                     ),
                     _GroupRow(
-                      title: 'إدارة المعرض',
-                      subtitle: 'تعديل وحذف صور المعرض',
-                      icon: Icons.collections_rounded,
+                      title: 'ثوابت الحساب',
+                      subtitle: 'أسعار الفواتير',
+                      icon: Icons.price_change_rounded,
                       color: _sky,
-                      onTap: () => _navTo(const GalleryManagementPage()),
+                      onTap: () => _navTo(const PriceSettingsPage()),
                     ),
-                    _GroupRow(
-                      title: 'ترتيب الصور',
-                      subtitle: 'تغيير ترتيب ظهور الصور',
-                      icon: Icons.swap_vert_rounded,
-                      color: _violet,
-                      onTap: () => _navTo(const GalleryReorderPage()),
-                    ),
-                    _GroupRow(
-                      title: 'السلايدر والعروض',
-                      subtitle: 'صور البانر العلوي',
-                      icon: Icons.view_carousel_rounded,
-                      color: _gold,
-                      onTap: () => _navTo(const PromoManagementPage()),
-                    ),
-                    _GroupRow(
-                      title: 'متابعة رفع الصور',
-                      subtitle: 'طابور الرفع وإعادة المحاولة',
-                      icon: Icons.cloud_upload_rounded,
-                      color: _green,
-                      onTap: () => _navTo(const UploadQueuePage()),
-                    ),
-                  ]),
-                  const SizedBox(height: 24),
-                  _sectionTitle('الأمان', Icons.admin_panel_settings_rounded),
-                  const SizedBox(height: 12),
-                  _buildGroup([
                     _GroupRow(
                       title: 'النسخ الاحتياطي والأرشيف',
                       subtitle: AppFeatures.cloudFunctionsEnabled
@@ -279,24 +300,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       color: _sky,
                       onTap: () => _navTo(const TelegramBackupPage()),
                     ),
-                    _GroupRow(
-                      title: 'أمان التطبيق',
-                      subtitle: 'البصمة لحماية لوحة الإدارة',
-                      icon: Icons.fingerprint_rounded,
-                      color: _gold,
-                      onTap: _showSecurityDialog,
-                    ),
-                    _GroupRow(
-                      title: 'تسجيل الخروج',
-                      subtitle: 'إنهاء الجلسة وقفل لوحة الإدارة',
-                      icon: Icons.logout_rounded,
-                      color: AppColors.danger,
-                      onTap: _signOut,
-                    ),
                   ]),
-                  const SizedBox(height: 22),
-                  _buildHomeButton(),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 18),
                   const Center(
                     child: Text(
                       'PARIS CURTAINS • ADMIN',
@@ -318,9 +323,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   Widget _buildHeader() {
-    final now = DateTime.now();
     return Container(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      padding: const EdgeInsets.fromLTRB(18, 12, 8, 12),
       decoration: BoxDecoration(
         color: _panel,
         border: Border(bottom: BorderSide(color: _line)),
@@ -359,13 +363,177 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ],
             ),
           ),
-          Text(
-            _ar('${now.day}/${now.month}/${now.year}'),
-            style: TextStyle(fontSize: 12, color: _muted),
+          PopupMenuButton<String>(
+            tooltip: 'القائمة',
+            color: _panel,
+            icon: Icon(Icons.more_vert_rounded, color: _muted),
+            onSelected: (value) {
+              switch (value) {
+                case 'search':
+                  _openSearch();
+                case 'security':
+                  _showSecurityDialog();
+                case 'home':
+                  _goHome();
+                case 'logout':
+                  _signOut();
+              }
+            },
+            itemBuilder: (_) => [
+              _menuItem('search', Icons.search_rounded, 'بحث عن عميل', _sky),
+              _menuItem(
+                'security',
+                Icons.fingerprint_rounded,
+                'أمان التطبيق (البصمة)',
+                _gold,
+              ),
+              _menuItem(
+                'home',
+                Icons.storefront_rounded,
+                'الواجهة الرئيسية',
+                _violet,
+              ),
+              _menuItem(
+                'logout',
+                Icons.logout_rounded,
+                'تسجيل الخروج',
+                AppColors.danger,
+              ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  PopupMenuItem<String> _menuItem(
+    String value,
+    IconData icon,
+    String label,
+    Color color,
+  ) {
+    return PopupMenuItem<String>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, size: 19, color: color),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              fontSize: 13,
+              color: _white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// بحث سريع: بتكتب اسم العميل أو رقمه، وبيفتح قائمة العملاء على النتيجة.
+  Future<void> _openSearch() async {
+    final controller = TextEditingController();
+    final query = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _panel,
+        title: Row(
+          children: [
+            Icon(Icons.search_rounded, color: _gold, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'بحث عن عميل',
+              style: TextStyle(
+                color: _gold,
+                fontFamily: 'Cairo',
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textInputAction: TextInputAction.search,
+          onSubmitted: (v) => Navigator.of(ctx).pop(v),
+          style: TextStyle(color: _white, fontFamily: 'Cairo'),
+          decoration: InputDecoration(
+            hintText: 'الاسم أو رقم التليفون',
+            hintStyle: TextStyle(color: _muted, fontFamily: 'Cairo'),
+            filled: true,
+            fillColor: _panel2,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: _line),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: _line),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('إلغاء', style: TextStyle(color: _muted)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text),
+            child: Text('بحث', style: TextStyle(color: _gold)),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (!mounted || query == null) return;
+    await _navTo(ClientsListPage(initialQuery: query));
+  }
+
+  /// تعديلات مستنية الرفع: تطمين + إمكانية المحاولة دلوقتي.
+  void _showPendingInfo() {
+    final sync = SyncStatus.instance;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _panel,
+        title: Text(
+          'التعديلات المستنية',
+          style: TextStyle(color: _gold, fontFamily: 'Cairo'),
+        ),
+        content: Text(
+          sync.hasPending
+              ? '${_ar(sync.pendingCount)} تعديل اتحفظ على الجهاز ولسه ماوصلش للسيرفر.\n'
+                    'هيترفع لوحده أول ما النت يرجع — متقلقش، بياناتك مش ضايعة.'
+              : 'كل حاجة متزامنة مع السيرفر. مفيش أي تعديل مستني الرفع.',
+          style: TextStyle(
+            color: _white,
+            fontFamily: 'Cairo',
+            fontSize: 13,
+            height: 1.6,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('تمام', style: TextStyle(color: _gold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String get _adminName {
+    final user = AdminAuthService.currentUser;
+    final name = (user?.displayName ?? '').trim();
+    if (name.isNotEmpty) return name;
+    final email = (user?.email ?? '').trim();
+    if (email.isNotEmpty) {
+      final prefix = email.split('@').first.trim();
+      if (prefix.isNotEmpty) return prefix;
+    }
+    return 'صاحب المحل';
   }
 
   Widget _buildWelcome() {
@@ -397,7 +565,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'أهلاً بك، م/ عبده حمادة',
+                  'أهلاً بك، $_adminName',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 15.5,
                     fontWeight: FontWeight.bold,
@@ -464,46 +634,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  Widget _buildHomeButton() {
-    return InkWell(
-      onTap: () {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-          (route) => false,
-        );
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: _panel2,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _gold.withValues(alpha: 0.35)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.storefront_rounded, color: _gold, size: 20),
-            SizedBox(width: 8),
-            Text(
-              'الرجوع للواجهة الرئيسية للتطبيق',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-                color: _gold,
-              ),
-            ),
-          ],
-        ),
-      ),
+  void _goHome() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      (route) => false,
     );
   }
 
-  /// بيفتح الصفحة، ولما نرجع منها بنحدّث عدّاد المراحل
-  /// (لأن العدّاد بقى count() مش stream حي على كل العملاء).
+  /// بيفتح الصفحة، ولما نرجع منها بنحدّث الأرقام (لأن العدّادات count()
+  /// مش stream حي على كل العملاء).
   Future<void> _navTo(Widget page) async {
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
-    if (mounted) setState(() => _stageRefresh++);
+    if (mounted) _loadCounts();
   }
 
   void _showSecurityDialog() {
