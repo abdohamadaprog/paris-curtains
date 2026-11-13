@@ -72,21 +72,23 @@ double _safeNum(dynamic val) {
   return double.tryParse(clean) ?? 0.0;
 }
 
+/// الأرقام المالية بتتكتب لاتينية (14925) عشان تتنسخ وتتطابق بسهولة مع
+/// كشف الحساب أو التحويل. التواريخ والموبايل لسه بأرقام عربية في مكانها.
 String _money(dynamic v) {
   final d = _safeNum(v);
   final r = roundMoney(d);
   if (r == r.roundToDouble()) {
-    return _arNum(r.toInt().toString());
+    return r.toInt().toString();
   }
-  return _arNum(r.toStringAsFixed(2));
+  return r.toStringAsFixed(2);
 }
 
 String _fmtQty(dynamic q) {
   final d = _safeNum(q);
   if (d == d.roundToDouble()) {
-    return _arNum(d.toInt().toString());
+    return d.toInt().toString();
   }
-  return _arNum(d.toStringAsFixed(2));
+  return d.toStringAsFixed(2);
 }
 
 /// ============================================================================
@@ -142,6 +144,13 @@ class _InvoicePageState extends State<InvoicePage>
   final Set<String> _aptExcluded = {};
   final Set<String> _balcExcluded = {};
   bool _hideExcluded = false;
+
+  // لقطة الأسعار: لو الفاتورة محفوظة قبل كده، أسعارها متجمّدة ومش بتتأثر
+  // بتغيير «ثوابت الحساب». بنعرض تنبيه صغير يوضّح ده للمستخدم.
+  bool _pricesFrozen = false;
+  DateTime? _pricesFrozenAt;
+  List<PriceDef> _missingFrozenDefs = const [];
+  bool _frozenNoteHidden = false;
 
   // نوع قماش البلكونة
   String _balconyFabricKey = 'fabric_dak';
@@ -257,6 +266,18 @@ class _InvoicePageState extends State<InvoicePage>
           rawPrices.forEach((k, v) {
             _customPrices[k.toString()] = _safeNum(v);
           });
+          // فيه لقطة أسعار محفوظة = فاتورة قديمة، أسعارها متجمّدة
+          if (rawPrices.isNotEmpty) {
+            _pricesFrozen = true;
+            final rawSavedAt = inv['saved_at'];
+            if (rawSavedAt is Timestamp) {
+              _pricesFrozenAt = rawSavedAt.toDate();
+            }
+            // بنود اتضافت للتطبيق بعد حفظ الفاتورة دي (زي الكوبشة)
+            _missingFrozenDefs = kPriceDefs
+                .where((d) => !rawPrices.containsKey(d.key) && d.value > 0)
+                .toList();
+          }
         }
         final rawAptQ = inv['apt_qty_override'];
         if (rawAptQ is Map) {
@@ -515,6 +536,7 @@ class _InvoicePageState extends State<InvoicePage>
             : Column(
                 children: [
                   _buildClientBanner(),
+                  _buildFrozenPricesNote(),
                   _buildTabBar(),
                   Expanded(
                     child: TabBarView(
@@ -530,6 +552,32 @@ class _InvoicePageState extends State<InvoicePage>
   }
 
   PreferredSizeWidget _buildAppBar() {
+    // عناصر القائمة الجانبية: بتفضّل الشريط العلوي فاضي عشان أهم زرار
+    // (المشاركة) يبان. كل خيار ليه اسم مكتوب مش أيقونة بس.
+    PopupMenuItem<String> menuItem(
+      String value,
+      IconData icon,
+      String label, {
+      Color? color,
+    }) {
+      final c = color ?? AppPalette.text;
+      return PopupMenuItem<String>(
+        value: value,
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: color ?? _kMuted),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(color: c, fontSize: 13.5),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return AppBar(
       backgroundColor: _kPanel,
       elevation: 0,
@@ -543,37 +591,52 @@ class _InvoicePageState extends State<InvoicePage>
         ),
       ),
       actions: [
-        IconButton(
-          tooltip: 'ثوابت الحساب (الأسعار العامة)',
-          icon: Icon(Icons.price_change_rounded, color: _kGold),
-          onPressed: _openGlobalPrices,
-        ),
-        IconButton(
-          tooltip: 'أسعار الفاتورة دي',
-          icon: Icon(Icons.tune_rounded, color: _kMuted),
-          onPressed: _openPriceSettings,
-        ),
-        IconButton(
-          tooltip: _hideExcluded
-              ? 'إظهار البنود المستبعدة'
-              : 'إخفاء البنود المستبعدة (للتصوير)',
-          icon: Icon(
-            _hideExcluded
-                ? Icons.visibility_off_rounded
-                : Icons.visibility_rounded,
-            color: _hideExcluded ? _kGold : _kMuted,
-          ),
-          onPressed: () => setState(() => _hideExcluded = !_hideExcluded),
-        ),
-        IconButton(
-          tooltip: 'صورة الفاتورة (باللوجو) للمشاركة',
-          icon: Icon(Icons.image_rounded, color: _kGold),
-          onPressed: _openInvoiceImage,
-        ),
-        IconButton(
-          tooltip: 'نسخ الفاتورة كنص',
-          icon: Icon(Icons.share_rounded, color: _kGold),
-          onPressed: _shareAsText,
+        PopupMenuButton<String>(
+          tooltip: 'خيارات الفاتورة',
+          icon: Icon(Icons.more_vert_rounded, color: _kMuted),
+          color: _kPanel,
+          onSelected: (value) {
+            if (value == 'image') {
+              _openInvoiceImage();
+            } else if (value == 'text') {
+              _shareAsText();
+            } else if (value == 'excluded') {
+              setState(() => _hideExcluded = !_hideExcluded);
+            } else if (value == 'global_prices') {
+              _openGlobalPrices();
+            } else if (value == 'invoice_prices') {
+              _openPriceSettings();
+            }
+          },
+          itemBuilder: (_) => [
+            menuItem(
+              'image',
+              Icons.image_rounded,
+              'صورة الفاتورة (باللوجو) للمشاركة',
+            ),
+            menuItem('text', Icons.share_rounded, 'نسخ الفاتورة كنص'),
+            menuItem(
+              'excluded',
+              _hideExcluded
+                  ? Icons.visibility_off_rounded
+                  : Icons.visibility_rounded,
+              _hideExcluded
+                  ? 'إظهار البنود المستبعدة'
+                  : 'إخفاء البنود المستبعدة (للتصوير)',
+            ),
+            const PopupMenuDivider(),
+            menuItem(
+              'global_prices',
+              Icons.price_change_rounded,
+              'ثوابت الحساب (الأسعار العامة)',
+              color: _kGold,
+            ),
+            menuItem(
+              'invoice_prices',
+              Icons.tune_rounded,
+              'أسعار الفاتورة دي',
+            ),
+          ],
         ),
         // مؤشر الحفظ (الحفظ تلقائي، والضغط عليه بيحفظ فورًا)
         IconButton(
@@ -602,6 +665,19 @@ class _InvoicePageState extends State<InvoicePage>
                       : _kGold,
                 ),
           onPressed: () => _save(),
+        ),
+        Padding(
+          padding: const EdgeInsetsDirectional.only(end: 8),
+          child: IconButton.filled(
+            tooltip: 'مشاركة الفاتورة',
+            style: IconButton.styleFrom(
+              backgroundColor: _kGold,
+              foregroundColor: _kBg,
+              minimumSize: const Size(38, 38),
+            ),
+            icon: const Icon(Icons.ios_share_rounded, size: 19),
+            onPressed: _shareAsText,
+          ),
         ),
       ],
     );
@@ -682,6 +758,122 @@ class _InvoicePageState extends State<InvoicePage>
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// تنبيه صغير: أسعار الفاتورة دي متجمّدة من يوم حفظها، فمش بتتأثر
+  /// بتغيير «ثوابت الحساب». بيظهر مرة واحدة وبيتقفل بضغطة.
+  Widget _buildFrozenPricesNote() {
+    if (!_pricesFrozen || _frozenNoteHidden) return const SizedBox.shrink();
+    final at = _pricesFrozenAt;
+    final date = at == null
+        ? null
+        : '${at.day}/${at.month}/${at.year}';
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+      padding: const EdgeInsetsDirectional.fromSTEB(10, 2, 4, 2),
+      decoration: BoxDecoration(
+        color: _kGold.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _kGold.withValues(alpha: 0.45)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.lock_clock_rounded, size: 15, color: _kGold),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              date == null
+                  ? 'أسعار الفاتورة دي متجمّدة عند حفظها'
+                  : 'أسعار الفاتورة دي متجمّدة من $date',
+              style: TextStyle(
+                color: _kGold,
+                fontSize: 11.5,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: _kGold,
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              minimumSize: const Size(0, 26),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            onPressed: _showFrozenPricesInfo,
+            child: const Text('إيه معناها؟', style: TextStyle(fontSize: 11.5)),
+          ),
+          IconButton(
+            tooltip: 'إخفاء التنبيه',
+            iconSize: 15,
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.all(6),
+            constraints: const BoxConstraints(),
+            onPressed: () => setState(() => _frozenNoteHidden = true),
+            icon: Icon(Icons.close_rounded, color: _kMuted),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showFrozenPricesInfo() async {
+    final at = _pricesFrozenAt;
+    final date = at == null
+        ? 'وقت الحفظ'
+        : '${at.day}/${at.month}/${at.year}';
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('يعني إيه «أسعار متجمّدة»؟'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'الفاتورة دي اتحفظت بأسعار يوم $date. أي تغيير في '
+                '«ثوابت الحساب» بعد كده مش بيغيّر الأرقام دي، عشان '
+                'حساب قديم ميتغيّرش لوحده.',
+                style: const TextStyle(fontSize: 13, height: 1.6),
+              ),
+              const SizedBox(height: 12),
+              if (_missingFrozenDefs.isEmpty)
+                const Text(
+                  'كل بنود الفاتورة محفوظة بسعرها القديم ✅',
+                  style: TextStyle(fontSize: 13, height: 1.6),
+                )
+              else ...[
+                const Text(
+                  'بس فيه بنود اتضافت للتطبيق بعد حفظها — دي لو اتضافت '
+                  'للفاتورة هتتحسب بسعر النهارده:',
+                  style: TextStyle(fontSize: 13, height: 1.6),
+                ),
+                const SizedBox(height: 8),
+                for (final d in _missingFrozenDefs)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 3),
+                    child: Text(
+                      '• ${d.label}: ${_fmtQty(d.value)} ج / ${d.unit}',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: _kGold,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('تمام'),
           ),
         ],
       ),

@@ -1,6 +1,7 @@
 // تستات الجزء الإداري من الفاتورة: الخصم، الحالة، الدفعات، رقم الفاتورة.
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:paris_curtains/features/clients/invoice/invoice_calculator.dart';
 import 'package:paris_curtains/features/clients/invoice/invoice_meta.dart';
 
 void main() {
@@ -149,6 +150,40 @@ void main() {
       final a = newInvoiceNumber(DateTime(2026, 1, 5), 'CLIENT123');
       final b = newInvoiceNumber(DateTime(2026, 1, 5, 23, 59), 'CLIENT123');
       expect(a, b);
+    });
+  });
+
+  group('الأسعار المتجمّدة للفاتورة', () {
+    tearDown(PriceOverrides.clear);
+
+    test('اللقطة بتحتوي كل الأسعار الافتراضية', () {
+      final snap = frozenPrices(const {});
+      expect(snap.length, kPriceDefs.length);
+      expect(snap['fabric_linen'], 130);
+      expect(snap['kobsha'], 50);
+    });
+
+    test('سعر الفاتورة القديمة بيغلب أي تغيير في الثوابت', () {
+      // العميل ده اتحفظ بسعر الكوبشة القديم 50
+      final oldSnapshot = frozenPrices(const {'kobsha': 50});
+      // بعدين غيّرنا السعر العام
+      PriceOverrides.set({'kobsha': 70});
+      expect(defaultPrices()['kobsha'], 70);
+      // إعادة حفظ الفاتورة القديمة بتحافظ على لقطتها
+      expect(frozenPrices(oldSnapshot)['kobsha'], 50);
+    });
+
+    test('تعديل سعر مخصوص لفاتورة معينة مش بيأثر على غيرها', () {
+      final a = frozenPrices(const {'fabric_linen': 120});
+      final b = frozenPrices(const {});
+      expect(a['fabric_linen'], 120);
+      expect(b['fabric_linen'], 130);
+    });
+
+    test('بند جديد مش موجود في اللقطة القديمة بياخد سعر النهارده', () {
+      final oldSnapshot = frozenPrices(const {})..remove('kobsha');
+      expect(oldSnapshot.containsKey('kobsha'), isFalse);
+      expect(frozenPrices(oldSnapshot)['kobsha'], 50);
     });
   });
 }
